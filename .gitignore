@@ -1,0 +1,10 @@
+node_modules/
+logs/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+.env
+.DS_Store
+nginx_cache/
+.playwright-cli/

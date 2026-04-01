@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>神马排班CrewBoard</title>
+  <link rel="stylesheet" href="/css/style.css?v=20260331c">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- LOGIN / REGISTER PAGE -->
+  <div class="auth-page" id="auth-page">
+    <!-- Left branding panel -->
+    <div class="auth-brand">
+      <div class="auth-brand-inner">
+        <div class="auth-brand-logo">
+          <svg width="36" height="36" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="6" fill="rgba(255,255,255,.15)"/><path d="M8 22L8 18C8 16 8.5 14 9.5 12.5L11 10C10.5 9.5 10 8.5 10 7.5C10 6 11 5 12.5 5C13 5 13.5 5.3 14 5.8L15.5 4L16.5 5L15 7C15.5 7.5 16 8.5 16 9.5C16 10.5 15.5 11 15 11.5L13 14C12 15.5 11.5 17 11.5 18L11.5 22Z" fill="#fff"/><circle cx="12.5" cy="7.8" r="1" fill="rgba(255,255,255,.15)"/><rect x="17" y="13.5" width="5.5" height="2" rx="1" fill="#fff" opacity=".8"/><rect x="17" y="17.5" width="4" height="2" rx="1" fill="#fff" opacity=".5"/><rect x="17" y="21.5" width="5" height="2" rx="1" fill="#fff" opacity=".3"/></svg>
+          <span>神马排班CrewBoard</span>
+        </div>
+        <h2 class="auth-brand-title">高效团队资源<br>排程与管理</h2>
+        <p class="auth-brand-desc">统一管理团队排程、工时追踪和项目资源，让协作更高效。</p>
+        <div class="auth-features">
+          <div class="auth-feature">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="3" width="16" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M2 7h16M6 1v4M14 1v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <div>
+              <div class="auth-feature-title">可视化排程</div>
+              <div class="auth-feature-desc">拖拽式日历视图，一目了然掌握团队动态</div>
+            </div>
+          </div>
+          <div class="auth-feature">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <div>
+              <div class="auth-feature-title">工时追踪</div>
+              <div class="auth-feature-desc">精确记录每日工时，自动生成利用率报表</div>
+            </div>
+          </div>
+          <div class="auth-feature">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 17V9h3v8H3zM8.5 17V5h3v12h-3zM14 17V2h3v15h-3z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <div>
+              <div class="auth-feature-title">数据报表</div>
+              <div class="auth-feature-desc">多维度分析，支持 Excel 导出与人民币核算</div>
+            </div>
+          </div>
+          <div class="auth-feature">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="4" width="16" height="13" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M7 4V2h6v2M10 9v4M8 11h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <div>
+              <div class="auth-feature-title">企业协作</div>
+              <div class="auth-feature-desc">多角色权限管理，钉钉/企微/飞书消息通知</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Right form panel -->
+    <div class="auth-form-panel">
+      <div class="auth-card">
+        <!-- LOGIN PAGE -->
+        <div class="auth-view active" id="view-login">
+          <div class="auth-card-header">
+            <h1>欢迎回来</h1>
+            <p>登录您的账号以继续使用神马排班</p>
+          </div>
+          <div class="auth-form active" id="form-login">
+            <div class="form-group">
+              <label>手机号 / 邮箱</label>
+              <div class="input-with-icon">
+                <svg class="input-icon" width="18" height="18" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="7" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M3 18c0-3.3 2.7-6 7-6s7 2.7 7 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                <input type="text" id="login-account" class="text-input" placeholder="请输入手机号或邮箱">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>密码</label>
+              <div class="input-with-icon">
+                <svg class="input-icon" width="18" height="18" viewBox="0 0 20 20" fill="none"><rect x="4" y="9" width="12" height="9" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M7 9V6a3 3 0 016 0v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                <input type="password" id="login-password" class="text-input" placeholder="请输入密码">
+              </div>
+            </div>
+            <button class="btn btn-primary btn-block" id="btn-login">登录</button>
+            <div class="auth-hint">
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="none" style="vertical-align:-2px;margin-right:4px"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 9v5M10 6.5v.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              演示账号: admin@company.com / admin123
+            </div>
+          </div>
+          <div class="auth-error" id="auth-error-login"></div>
+          <div class="auth-switch">
+            还没有账号？<a href="#" id="link-to-register">立即注册</a>
+          </div>
+        </div>
+
+        <!-- REGISTER PAGE -->
+        <div class="auth-view" id="view-register">
+          <div class="auth-card-header">
+            <h1>创建账号</h1>
+            <p>注册后即可创建或加入企业，开始管理团队资源</p>
+          </div>
+          <div class="auth-form active" id="form-register">
+            <div class="form-group">
+              <label>姓名</label>
+              <div class="input-with-icon">
+                <svg class="input-icon" width="18" height="18" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="7" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M3 18c0-3.3 2.7-6 7-6s7 2.7 7 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                <input type="text" id="reg-name" class="text-input" placeholder="请输入姓名">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>手机号 <span class="label-optional">选填</span></label>
+                <div class="input-with-icon">
+                  <svg class="input-icon" width="18" height="18" viewBox="0 0 20 20" fill="none"><rect x="5" y="1" width="10" height="18" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M9 16h2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                  <input type="text" id="reg-phone" class="text-input" placeholder="手机号">
+                </div>
+              </div>
+              <div class="form-group">
+                <label>邮箱 <span class="label-optional">选填</span></label>
+                <div class="input-with-icon">
+                  <svg class="input-icon" width="18" height="18" viewBox="0 0 20 20" fill="none"><rect x="2" y="4" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M2 6l8 5 8-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <input type="email" id="reg-email" class="text-input" placeholder="邮箱地址">
+                </div>
+              </div>
+            </div>
+            <div class="auth-field-note">手机号和邮箱请至少填写一项，用于登录</div>
+            <div class="form-group">
+              <label>密码</label>
+              <div class="input-with-icon">
+                <svg class="input-icon" width="18" height="18" viewBox="0 0 20 20" fill="none"><rect x="4" y="9" width="12" height="9" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M7 9V6a3 3 0 016 0v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                <input type="password" id="reg-password" class="text-input" placeholder="请设置密码（至少6位）">
+              </div>
+            </div>
+            <button class="btn btn-primary btn-block" id="btn-register">注册</button>
+          </div>
+          <div class="auth-error" id="auth-error-register"></div>
+          <div class="auth-switch">
+            已有账号？<a href="#" id="link-to-login">返回登录</a>
+          </div>
+        </div>
+
+        <div class="auth-footer">
+          <span>本地部署版本</span>
+          <span class="auth-footer-dot"></span>
+          <span>数据安全存储在您的服务器</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN APP -->
+  <div class="app" id="main-app" style="display:none">
+    <nav class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="6" fill="#4F46E5"/><path d="M8 22L8 18C8 16 8.5 14 9.5 12.5L11 10C10.5 9.5 10 8.5 10 7.5C10 6 11 5 12.5 5C13 5 13.5 5.3 14 5.8L15.5 4L16.5 5L15 7C15.5 7.5 16 8.5 16 9.5C16 10.5 15.5 11 15 11.5L13 14C12 15.5 11.5 17 11.5 18L11.5 22Z" fill="white"/><circle cx="12.5" cy="7.8" r="1" fill="#4F46E5"/><rect x="17" y="13.5" width="5.5" height="2" rx="1" fill="white" opacity="0.8"/><rect x="17" y="17.5" width="4" height="2" rx="1" fill="white" opacity="0.5"/><rect x="17" y="21.5" width="5" height="2" rx="1" fill="white" opacity="0.3"/></svg>
+          <span>神马排班</span>
+        </div>
+        <div class="sidebar-enterprise" id="sidebar-enterprise"></div>
+      </div>
+      <ul class="nav-menu">
+        <li class="nav-item active" data-page="schedule">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="3" width="16" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M2 7h16M6 1v4M14 1v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <span>资源排程</span>
+        </li>
+        <li class="nav-item" data-page="timesheets">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <span>工时表</span>
+        </li>
+        <li class="nav-item" data-page="reports">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 17V9h3v8H3zM8.5 17V5h3v12h-3zM14 17V2h3v15h-3z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>报表</span>
+        </li>
+        <li class="nav-item" data-page="resources">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="7" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M3 18c0-3.3 2.7-6 7-6s7 2.7 7 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <span>人员管理</span>
+        </li>
+        <li class="nav-item" data-page="projects">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M2 5a2 2 0 012-2h4l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V5z" stroke="currentColor" stroke-width="1.5"/></svg>
+          <span>客户 & 项目</span>
+        </li>
+        <li class="nav-item" data-page="enterprise">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="4" width="16" height="13" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M7 4V2h6v2M10 9v4M8 11h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <span>企业管理</span>
+        </li>
+        <li class="nav-item" data-page="settings">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 1.5v2M10 16.5v2M1.5 10h2M16.5 10h2M3.4 3.4l1.4 1.4M15.2 15.2l1.4 1.4M3.4 16.6l1.4-1.4M15.2 4.8l1.4-1.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <span>设置</span>
+        </li>
+      </ul>
+      <div class="sidebar-footer">
+        <div class="user-info" id="user-info" style="cursor:pointer" title="账号管理"></div>
+        <button class="btn btn-sm btn-logout" id="btn-logout">退出登录</button>
+      </div>
+    </nav>
+
+    <main class="main-content">
+      <!-- Schedule Page -->
+      <div class="page active" id="page-schedule">
+        <div class="page-header">
+          <h1>资源排程</h1>
+          <div class="header-actions">
+            <div class="view-toggle" id="view-toggle">
+              <button class="view-btn active" data-view="week" title="周视图"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="10" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M5 3v10M11 3v10" stroke="currentColor" stroke-width="1" opacity=".4"/></svg></button>
+              <button class="view-btn" data-view="month" title="月视图"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="10" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M1 6h14M4 3v10M7 3v10M10 3v10M13 3v10" stroke="currentColor" stroke-width=".8" opacity=".35"/></svg></button>
+            </div>
+            <button class="btn btn-outline" id="schedule-prev"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+            <button class="btn btn-outline" id="schedule-today">本周</button>
+            <button class="btn btn-outline" id="schedule-next"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+            <span class="date-range" id="schedule-range"></span>
+            <button class="btn btn-primary" id="btn-add-booking">+ 新建预订</button>
+          </div>
+        </div>
+        <div class="schedule-grid" id="schedule-grid"></div>
+      </div>
+
+      <!-- Timesheets Page -->
+      <div class="page" id="page-timesheets">
+        <div class="page-header">
+          <h1>工时表</h1>
+          <div class="header-actions">
+            <button class="btn btn-outline" id="ts-prev"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+            <button class="btn btn-outline" id="ts-today">本周</button>
+            <button class="btn btn-outline" id="ts-next"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+            <span class="date-range" id="ts-range"></span>
+            <select id="ts-resource-select" class="select-input"></select>
+          </div>
+        </div>
+        <div class="timesheet-container" id="timesheet-container"></div>
+      </div>
+
+      <!-- Reports Page -->
+      <div class="page" id="page-reports">
+        <div class="page-header">
+          <h1>报表</h1>
+          <div class="header-actions">
+            <select id="report-type" class="select-input">
+              <option value="utilization">利用率报表</option>
+              <option value="projects">项目报表</option>
+            </select>
+            <input type="date" id="report-start" class="date-input">
+            <span>至</span>
+            <input type="date" id="report-end" class="date-input">
+            <button class="btn btn-primary" id="btn-gen-report">生成报表</button>
+            <button class="btn btn-outline" id="btn-export-excel">导出 Excel</button>
+          </div>
+        </div>
+        <div class="report-container" id="report-container"></div>
+      </div>
+
+      <!-- Resources Page -->
+      <div class="page" id="page-resources">
+        <div class="page-header">
+          <h1>人员管理</h1>
+          <div class="header-actions">
+            <button class="btn btn-primary" id="btn-add-resource">+ 添加人员</button>
+          </div>
+        </div>
+        <div class="resource-list" id="resource-list"></div>
+      </div>
+
+      <!-- Projects & Clients Page -->
+      <div class="page" id="page-projects">
+        <div class="page-header">
+          <div class="pc-tabs">
+            <button class="pc-tab active" data-tab="projects" id="tab-projects">项目</button>
+            <button class="pc-tab" data-tab="clients" id="tab-clients">客户</button>
+          </div>
+          <div class="header-actions">
+            <div class="search-box">
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M14 14l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              <input type="text" id="pc-search" class="text-input" placeholder="搜索...">
+            </div>
+            <button class="btn btn-primary" id="btn-add-new-pc">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              新建
+            </button>
+          </div>
+        </div>
+        <div id="clients-projects-container"></div>
+      </div>
+
+      <!-- Enterprise Page -->
+      <div class="page" id="page-enterprise">
+        <div class="page-header">
+          <h1>企业管理</h1>
+        </div>
+        <div class="enterprise-container" id="enterprise-container"></div>
+      </div>
+
+      <!-- Settings Page -->
+      <div class="page" id="page-settings">
+        <div class="page-header">
+          <h1>设置</h1>
+        </div>
+        <div class="settings-container" id="settings-container"></div>
+      </div>
+
+      <!-- Account Page -->
+      <div class="page" id="page-account">
+        <div class="page-header">
+          <h1>账号管理</h1>
+        </div>
+        <div class="account-container" id="account-container"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal" id="modal">
+      <div class="modal-header">
+        <h2 id="modal-title"></h2>
+        <button class="modal-close" id="modal-close">&times;</button>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+      <div class="modal-footer" id="modal-footer"></div>
+    </div>
+  </div>
+
+  <script src="/js/core.js?v=20260331c"></script>
+  <script src="/js/schedule.js?v=20260331c"></script>
+  <script src="/js/timesheets.js?v=20260331c"></script>
+  <script src="/js/reports.js?v=20260331c"></script>
+  <script src="/js/manage.js?v=20260331c"></script>
+  <script src="/js/enterprise.js?v=20260331c"></script>
+</body>
+</html>

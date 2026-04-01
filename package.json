@@ -1,0 +1,21 @@
+{
+  "name": "crewboard",
+  "version": "1.0.0",
+  "description": "CrewBoard - 团队资源排程管理系统",
+  "main": "server.js",
+  "scripts": {
+    "start": "NODE_ENV=production node server.js",
+    "dev": "node server.js",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop crewboard",
+    "pm2:restart": "pm2 restart crewboard",
+    "pm2:logs": "pm2 logs crewboard",
+    "update-holidays": "node scripts/update-holidays.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^9.4.3",
+    "cors": "^2.8.5",
+    "exceljs": "^4.4.0",
+    "express": "^4.18.2"
+  }
+}
