@@ -353,8 +353,10 @@ function renderProjectsTable(container) {
     }
     tr.innerHTML =
       '<td class="col-name">' +
-        '<span class="pc-color-bar" style="background:' + (p.color || '#8B5CF6') + '"></span>' +
-        '<span class="pc-name-text">' + escapeHtml(p.name) + '</span>' +
+        '<div class="col-name-inner">' +
+          '<span class="pc-color-bar" style="background:' + (p.color || '#8B5CF6') + '"></span>' +
+          '<span class="pc-name-text">' + escapeHtml(p.name) + '</span>' +
+        '</div>' +
       '</td>' +
       '<td class="col-client">' + escapeHtml(p.client_name || '') + '</td>' +
       '<td class="col-code">' + escapeHtml(p.code || '') + '</td>' +
@@ -409,8 +411,10 @@ function renderClientsTable(container) {
     tr.className = 'pc-row';
     tr.innerHTML =
       '<td class="col-name">' +
-        '<span class="pc-color-bar" style="background:' + (c.color || '#6366F1') + '"></span>' +
-        '<span class="pc-name-text">' + escapeHtml(c.name) + '</span>' +
+        '<div class="col-name-inner">' +
+          '<span class="pc-color-bar" style="background:' + (c.color || '#6366F1') + '"></span>' +
+          '<span class="pc-name-text">' + escapeHtml(c.name) + '</span>' +
+        '</div>' +
       '</td>' +
       '<td class="col-projects">' + projectCount + ' 个项目</td>' +
       '<td class="col-details">' + escapeHtml(c.details || '') + '</td>' +

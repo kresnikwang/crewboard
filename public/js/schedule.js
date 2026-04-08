@@ -124,6 +124,12 @@
       });
     });
 
+    /* Mouse drag selection for multiple days */
+    var scheduleGrid = document.getElementById('schedule-grid');
+    if (scheduleGrid) {
+      initDragSelection(scheduleGrid);
+    }
+
     /* attach click on booking blocks in month view */
     document.querySelectorAll('.m-booking[data-booking-id]').forEach(function (el) {
       el.addEventListener('click', function (e) {
