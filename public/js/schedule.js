@@ -158,23 +158,60 @@
         e.preventDefault();
         var block = e.target.closest('.booking-block, .m-booking');
         if (!block) return;
-        
+
         var bookingId = parseInt(block.dataset.bookingId, 10);
         var booking = _allBookings.find(function (b) { return b.id === bookingId; });
         if (!booking) return;
-        
+
         if (!canBookForResource(booking.resource_id)) {
           toast('您没有编辑此预订的权限', 'error');
           return;
         }
-        
-        // Prevent the click event on the booking block
-        block.style.pointerEvents = 'none';
-        setTimeout(function () {
-          block.style.pointerEvents = '';
-        }, 100);
-        
+
         initResizeBooking(block, booking, e);
+      });
+    });
+
+    /* attach move (drag) handlers to booking block bodies */
+    document.querySelectorAll('.booking-block, .m-booking').forEach(function (block) {
+      block.addEventListener('mousedown', function (e) {
+        // Ignore if clicking on the resize handle
+        if (e.target.closest('.resize-handle')) return;
+        // Only primary mouse button
+        if (e.button !== 0) return;
+
+        var bookingId = parseInt(block.dataset.bookingId, 10);
+        var booking = _allBookings.find(function (b) { return b.id === bookingId; });
+        if (!booking) return;
+
+        if (!canBookForResource(booking.resource_id)) return;
+
+        // We start a potential move — but only commit if mouse moves > 5px
+        var startX = e.clientX;
+        var startY = e.clientY;
+        var moveStarted = false;
+
+        function onMoveStart(ev) {
+          var dx = Math.abs(ev.clientX - startX);
+          var dy = Math.abs(ev.clientY - startY);
+          if (dx > 5 || dy > 5) {
+            // Threshold crossed — start real move
+            document.removeEventListener('mousemove', onMoveStart);
+            document.removeEventListener('mouseup',   onMoveCancel);
+            moveStarted = true;
+            e.preventDefault();
+            e.stopPropagation();
+            initMoveBooking(block, booking, ev);
+          }
+        }
+
+        function onMoveCancel() {
+          document.removeEventListener('mousemove', onMoveStart);
+          document.removeEventListener('mouseup',   onMoveCancel);
+        }
+
+        document.addEventListener('mousemove', onMoveStart);
+        document.addEventListener('mouseup',   onMoveCancel);
       });
     });
   };
@@ -462,6 +499,202 @@
       isResizing = false;
       clearPreview();
       blockElement.classList.remove('resizing');
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup',   handleMouseUp);
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    }
+
+    function handleKeyDown(e) {
+      if (e.key === 'Escape') {
+        cleanup();
+        document.removeEventListener('keydown', handleKeyDown);
+      }
+    }
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup',   handleMouseUp);
+    document.addEventListener('keydown',   handleKeyDown);
+  }
+
+  /* --------------------------------------------------
+     Move booking (drag entire task left/right)
+     -------------------------------------------------- */
+  function initMoveBooking(blockElement, booking, startEvent) {
+    var isMoving = true;
+
+    // 1. Collect all date cells for this resource
+    var scheduleGrid = document.getElementById('schedule-grid');
+    var selector = '.booking-cell[data-resource="' + booking.resource_id +
+      '"], .m-day-cell[data-resource="' + booking.resource_id + '"]';
+    var allCells = Array.prototype.slice.call(scheduleGrid.querySelectorAll(selector));
+    var dateMap = {};
+    allCells.forEach(function (c) { dateMap[c.dataset.date] = c; });
+    var dates = Object.keys(dateMap).sort();
+
+    var anchorIndex = dates.indexOf(booking.date);
+    if (anchorIndex === -1) return;
+
+    // 2. Find the contiguous same-project booking segment
+    var sameGroup = _allBookings
+      .filter(function (b) {
+        return b.resource_id === booking.resource_id &&
+               b.project_id  === booking.project_id;
+      })
+      .sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+
+    // Walk through sorted bookings, build contiguous segment containing this booking
+    var groupSegment = [];
+    var currentSeg = [];
+    for (var gi = 0; gi < sameGroup.length; gi++) {
+      var cur = sameGroup[gi];
+      if (currentSeg.length === 0) {
+        currentSeg.push(cur);
+      } else {
+        var prev = currentSeg[currentSeg.length - 1];
+        var prevD = new Date(prev.date);
+        var curD  = new Date(cur.date);
+        var diff  = Math.round((curD - prevD) / 86400000);
+        if (diff <= 3) {
+          currentSeg.push(cur);
+        } else {
+          if (currentSeg.some(function (b) { return b.id === booking.id; })) {
+            groupSegment = currentSeg;
+            break;
+          }
+          currentSeg = [cur];
+        }
+      }
+    }
+    if (groupSegment.length === 0) {
+      if (currentSeg.some(function (b) { return b.id === booking.id; })) {
+        groupSegment = currentSeg;
+      } else {
+        groupSegment = [booking];
+      }
+    }
+
+    // Compute segment index range in dates array
+    var segDates = groupSegment.map(function (b) { return b.date; }).sort();
+    var segStartIndex = dates.indexOf(segDates[0]);
+    var segEndIndex   = dates.indexOf(segDates[segDates.length - 1]);
+    if (segStartIndex === -1) segStartIndex = anchorIndex;
+    if (segEndIndex   === -1) segEndIndex   = anchorIndex;
+
+    // 3. Visual state
+    groupSegment.forEach(function (b) {
+      var el = scheduleGrid.querySelector('[data-booking-id="' + b.id + '"]');
+      if (el) el.classList.add('moving');
+    });
+
+    var overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;cursor:grabbing;user-select:none;';
+    document.body.appendChild(overlay);
+
+    // Preview highlight
+    var previewCells = [];
+    function clearPreview() {
+      previewCells.forEach(function (c) { c.classList.remove('move-preview'); });
+      previewCells = [];
+    }
+    function applyPreview(delta) {
+      clearPreview();
+      var newStart = segStartIndex + delta;
+      var newEnd   = segEndIndex   + delta;
+      if (newStart < 0 || newEnd >= dates.length) return;
+      for (var i = newStart; i <= newEnd; i++) {
+        var c = dateMap[dates[i]];
+        if (c) {
+          c.classList.add('move-preview');
+          previewCells.push(c);
+        }
+      }
+    }
+
+    var currentDelta = 0;
+
+    // 4. mousemove: track hover cell via elementFromPoint
+    function handleMouseMove(e) {
+      if (!isMoving) return;
+      e.preventDefault();
+
+      overlay.style.pointerEvents = 'none';
+      var el = document.elementFromPoint(e.clientX, e.clientY);
+      overlay.style.pointerEvents = '';
+
+      if (!el) return;
+      var cell = el.closest('.booking-cell, .m-day-cell');
+      if (!cell) return;
+      if (parseInt(cell.dataset.resource, 10) !== booking.resource_id) return;
+
+      var hoverDate  = cell.dataset.date;
+      var hoverIndex = dates.indexOf(hoverDate);
+      if (hoverIndex === -1) return;
+
+      var delta = hoverIndex - anchorIndex;
+      if (delta !== currentDelta) {
+        currentDelta = delta;
+        applyPreview(delta);
+      }
+    }
+
+    // 5. mouseup: execute move
+    function handleMouseUp() {
+      if (!isMoving) return;
+      cleanup();
+
+      if (currentDelta === 0) return;
+
+      var newStart = segStartIndex + currentDelta;
+      var newEnd   = segEndIndex   + currentDelta;
+      if (newStart < 0 || newEnd >= dates.length) {
+        toast('超出当前视图范围，无法移动', 'error');
+        return;
+      }
+
+      // Delete original bookings, then create at new dates
+      var deletePromises = groupSegment.map(function (b) {
+        return api('/api/bookings/' + b.id, { method: 'DELETE' });
+      });
+
+      Promise.all(deletePromises)
+        .then(function () {
+          var createPromises = groupSegment.map(function (b) {
+            var oldIdx = dates.indexOf(b.date);
+            var newIdx = oldIdx + currentDelta;
+            if (newIdx < 0 || newIdx >= dates.length) return Promise.resolve();
+            var newDate = dates[newIdx];
+            return api('/api/bookings', {
+              method: 'POST',
+              body: {
+                resource_id:  b.resource_id,
+                project_id:   b.project_id,
+                date:         newDate,
+                hours:        b.hours,
+                notes:        b.notes || '',
+                is_tentative: b.is_tentative ? 1 : 0
+              }
+            });
+          });
+          return Promise.all(createPromises);
+        })
+        .then(function () {
+          var dir = currentDelta > 0 ? '向后' : '向前';
+          toast('预订已' + dir + '移 ' + Math.abs(currentDelta) + ' 天', 'success');
+          window.loadSchedule();
+        })
+        .catch(function (err) {
+          toast('移动失败：' + (err.message || ''), 'error');
+          window.loadSchedule();
+        });
+    }
+
+    // 6. Cleanup
+    function cleanup() {
+      isMoving = false;
+      clearPreview();
+      scheduleGrid.querySelectorAll('.moving').forEach(function (el) {
+        el.classList.remove('moving');
+      });
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup',   handleMouseUp);
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
