@@ -317,7 +317,7 @@
           ' title="' + escAttr(b.project_name) + ' - ' + b.hours + 'h' +
             (b.notes ? '\n' + escAttr(b.notes) : '') + '">' +
           '<span class="booking-hours">' + b.hours + 'h</span> ' +
-          '<span class="booking-project">' + esc(b.project_name) + '</span>' +
+          '<span class="booking-project">' + esc(truncate(b.project_name, 25)) + '</span>' +
           '<div class="resize-handle"></div>' +
         '</div>';
       });
@@ -997,7 +997,7 @@
           ' style="background:' + bgColor + ';color:' + fgColor + ';border-left:2px solid ' + fgColor + '"' +
           ' title="' + escAttr(b.hours + 'h ' + b.project_name + (b.client_name ? ' | ' + b.client_name : '')) + '">' +
           '<span class="m-booking-hours">' + b.hours + 'h</span> ' +
-          esc(b.project_name) +
+          esc(truncate(b.project_name, 25)) +
           '<div class="resize-handle"></div>' +
           '</div>';
       });
@@ -1696,6 +1696,11 @@
       .replace(/"/g, '&quot;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
+  }
+
+  function truncate(str, maxLen) {
+    if (!str) return '';
+    return str.length > maxLen ? str.slice(0, maxLen) + '\u2026' : str;
   }
 
 })();
