@@ -757,6 +757,27 @@ a { text-decoration: none; color: inherit; }
 }
 .btn-icon:hover { background: var(--bg); color: var(--text); }
 .btn-icon.btn-delete:hover { color: var(--danger); }
+.btn-icon.btn-archive:hover { color: var(--warning); }
+.btn-warning { background: #FEF3C7; color: #92400E; border: none; }
+.btn-warning:hover { background: #FDE68A; }
+
+/* Archive page */
+.archive-section { margin-bottom: 24px; }
+.archive-section-title {
+  font-size: 13px; font-weight: 600; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; padding: 0 4px;
+}
+.archive-badge {
+  display: inline-block; font-size: 10px; font-weight: 500; padding: 1px 6px;
+  border-radius: 3px; background: var(--bg); color: var(--text-tertiary);
+  margin-left: 8px; vertical-align: middle;
+}
+.pc-row-archived { opacity: .7; }
+.pc-row-archived:hover { opacity: 1; }
+.pc-row-archived .col-actions .btn-restore { opacity: 0; transition: opacity .15s; margin-right: 4px; }
+.pc-row-archived .col-actions .btn-delete { opacity: 0; transition: opacity .15s; }
+.pc-row-archived:hover .col-actions .btn-restore,
+.pc-row-archived:hover .col-actions .btn-delete { opacity: 1; }
 
 /* === ResourceGuru-style Modal Form === */
 .modal.rg-modal { width: 540px; }

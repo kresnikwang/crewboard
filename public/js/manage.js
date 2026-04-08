@@ -273,9 +273,16 @@ function initColorPicker(inputId) {
 
 window.loadProjects = async function loadProjects() {
   try {
-    var results = await Promise.all([api('/api/projects'), api('/api/clients')]);
+    var results = await Promise.all([
+      api('/api/projects'),
+      api('/api/clients'),
+      api('/api/projects?archived=1'),
+      api('/api/clients?archived=1')
+    ]);
     state.projects = results[0];
     state.clients = results[1];
+    state.archivedProjects = results[2];
+    state.archivedClients = results[3];
   } catch (err) {
     toast('加载失败: ' + err.message, 'error');
     return;
@@ -287,8 +294,15 @@ function renderPCPage() {
   // Update tab counts
   var tabProjects = document.getElementById('tab-projects');
   var tabClients = document.getElementById('tab-clients');
+  var tabArchived = document.getElementById('tab-archived');
   if (tabProjects) tabProjects.textContent = '项目 (' + state.projects.length + ')';
   if (tabClients) tabClients.textContent = '客户 (' + state.clients.length + ')';
+  var archivedTotal = (state.archivedProjects ? state.archivedProjects.length : 0) + (state.archivedClients ? state.archivedClients.length : 0);
+  if (tabArchived) tabArchived.textContent = '存档' + (archivedTotal ? ' (' + archivedTotal + ')' : '');
+
+  // Hide "新建" button on archived tab
+  var btnNew = document.getElementById('btn-add-new-pc');
+  if (btnNew) btnNew.style.display = pcActiveTab === 'archived' ? 'none' : '';
 
   var container = document.getElementById('clients-projects-container');
   if (!container) return;
@@ -296,8 +310,10 @@ function renderPCPage() {
 
   if (pcActiveTab === 'projects') {
     renderProjectsTable(container);
-  } else {
+  } else if (pcActiveTab === 'clients') {
     renderClientsTable(container);
+  } else if (pcActiveTab === 'archived') {
+    renderArchivedPage(container);
   }
 }
 
@@ -346,15 +362,15 @@ function renderProjectsTable(container) {
       '<td class="col-billable">' + (p.billable ? 'Yes' : 'No') + '</td>' +
       '<td class="col-actions">' +
         '<button class="btn-icon btn-edit" title="编辑">&#9998;</button>' +
-        '<button class="btn-icon btn-delete" title="删除">&#10005;</button>' +
+        '<button class="btn-icon btn-archive" title="存档">&#128451;</button>' +
       '</td>';
     tr.querySelector('.btn-edit').addEventListener('click', function (e) {
       e.stopPropagation();
       showProjectModal(p.id);
     });
-    tr.querySelector('.btn-delete').addEventListener('click', function (e) {
+    tr.querySelector('.btn-archive').addEventListener('click', function (e) {
       e.stopPropagation();
-      deleteProject(p.id);
+      archiveProject(p.id);
     });
     // Click row to edit
     tr.addEventListener('click', function () { showProjectModal(p.id); });
@@ -400,15 +416,15 @@ function renderClientsTable(container) {
       '<td class="col-details">' + escapeHtml(c.details || '') + '</td>' +
       '<td class="col-actions">' +
         '<button class="btn-icon btn-edit" title="编辑">&#9998;</button>' +
-        '<button class="btn-icon btn-delete" title="删除">&#10005;</button>' +
+        '<button class="btn-icon btn-archive" title="存档">&#128451;</button>' +
       '</td>';
     tr.querySelector('.btn-edit').addEventListener('click', function (e) {
       e.stopPropagation();
       showClientModal(c.id);
     });
-    tr.querySelector('.btn-delete').addEventListener('click', function (e) {
+    tr.querySelector('.btn-archive').addEventListener('click', function (e) {
       e.stopPropagation();
-      deleteClient(c.id);
+      archiveClient(c.id);
     });
     tr.addEventListener('click', function () { showClientModal(c.id); });
     tbody.appendChild(tr);
@@ -444,7 +460,10 @@ window.showClientModal = function showClientModal(id) {
 
   var footer = '';
   if (isEdit) {
-    footer = '<div class="bk-footer-left"><button class="btn btn-danger btn-sm" id="btn-delete-client-modal">删除客户</button></div>';
+    footer = '<div class="bk-footer-left">' +
+      '<button class="btn btn-warning btn-sm" id="btn-archive-client-modal">存档客户</button>' +
+      '<button class="btn btn-danger btn-sm" id="btn-delete-client-modal" style="margin-left:8px">删除客户</button>' +
+    '</div>';
   }
   footer += '<button class="btn btn-outline" id="btn-cancel-client">取消</button>';
   footer += '<button class="btn btn-primary" id="btn-save-client">' + (isEdit ? '保存修改' : '创建客户') + '</button>';
@@ -457,6 +476,10 @@ window.showClientModal = function showClientModal(id) {
   document.getElementById('btn-save-client').addEventListener('click', function () { saveClient(id || null); });
   document.getElementById('btn-cancel-client').addEventListener('click', closeModal);
   if (isEdit) {
+    document.getElementById('btn-archive-client-modal').addEventListener('click', function () {
+      closeModal();
+      archiveClient(id);
+    });
     document.getElementById('btn-delete-client-modal').addEventListener('click', function () {
       closeModal();
       deleteClient(id);
@@ -549,7 +572,10 @@ window.showProjectModal = async function showProjectModal(id) {
 
   var footer = '';
   if (isEdit) {
-    footer = '<div class="bk-footer-left"><button class="btn btn-danger btn-sm" id="btn-delete-proj-modal">删除项目</button></div>';
+    footer = '<div class="bk-footer-left">' +
+      '<button class="btn btn-warning btn-sm" id="btn-archive-proj-modal">存档项目</button>' +
+      '<button class="btn btn-danger btn-sm" id="btn-delete-proj-modal" style="margin-left:8px">删除项目</button>' +
+    '</div>';
   }
   footer += '<button class="btn btn-outline" id="btn-cancel-project">取消</button>';
   footer += '<button class="btn btn-primary" id="btn-save-project">' + (isEdit ? '保存修改' : '创建项目') + '</button>';
@@ -560,6 +586,10 @@ window.showProjectModal = async function showProjectModal(id) {
   document.getElementById('btn-save-project').addEventListener('click', function () { saveProject(id || null); });
   document.getElementById('btn-cancel-project').addEventListener('click', closeModal);
   if (isEdit) {
+    document.getElementById('btn-archive-proj-modal').addEventListener('click', function () {
+      closeModal();
+      archiveProject(id);
+    });
     document.getElementById('btn-delete-proj-modal').addEventListener('click', function () {
       closeModal();
       deleteProject(id);
@@ -599,10 +629,145 @@ window.saveProject = async function saveProject(id) {
 };
 
 window.deleteProject = async function deleteProject(id) {
-  if (!confirm('确定要删除该项目吗？')) return;
+  if (!confirm('确定要永久删除该项目吗？删除后将无法恢复。')) return;
   try { await api('/api/projects/' + id, { method: 'DELETE' }); toast('项目已删除'); loadProjects(); }
   catch (err) { toast('删除失败: ' + err.message, 'error'); }
 };
+
+// --------------- Archive / Unarchive ---------------
+window.archiveProject = async function archiveProject(id) {
+  var p = state.projects.find(function (p) { return p.id === id; });
+  if (!confirm('确定要存档项目"' + (p ? p.name : '') + '"吗？\n存档后将不在项目列表中显示，可在"存档"页面恢复。')) return;
+  try { await api('/api/projects/' + id + '/archive', { method: 'PATCH' }); toast('项目已存档'); loadProjects(); }
+  catch (err) { toast('存档失败: ' + err.message, 'error'); }
+};
+
+window.unarchiveProject = async function unarchiveProject(id) {
+  try { await api('/api/projects/' + id + '/unarchive', { method: 'PATCH' }); toast('项目已恢复'); loadProjects(); }
+  catch (err) { toast('恢复失败: ' + err.message, 'error'); }
+};
+
+window.archiveClient = async function archiveClient(id) {
+  var c = state.clients.find(function (c) { return c.id === id; });
+  var projectCount = state.projects.filter(function (p) { return p.client_id === id; }).length;
+  var msg = '确定要存档客户"' + (c ? c.name : '') + '"吗？';
+  if (projectCount > 0) msg += '\n该客户下的 ' + projectCount + ' 个关联项目也将一并存档。';
+  msg += '\n可在"存档"页面恢复。';
+  if (!confirm(msg)) return;
+  try { await api('/api/clients/' + id + '/archive', { method: 'PATCH' }); toast('客户已存档'); loadProjects(); }
+  catch (err) { toast('存档失败: ' + err.message, 'error'); }
+};
+
+window.unarchiveClient = async function unarchiveClient(id) {
+  try { await api('/api/clients/' + id + '/unarchive', { method: 'PATCH' }); toast('客户已恢复'); loadProjects(); }
+  catch (err) { toast('恢复失败: ' + err.message, 'error'); }
+};
+
+// --------------- Archived Page ---------------
+function renderArchivedPage(container) {
+  var query = pcSearchQuery.toLowerCase();
+  var archivedProjects = (state.archivedProjects || []).filter(function (p) {
+    if (!query) return true;
+    return (p.name && p.name.toLowerCase().indexOf(query) >= 0) ||
+           (p.client_name && p.client_name.toLowerCase().indexOf(query) >= 0) ||
+           (p.code && p.code.toLowerCase().indexOf(query) >= 0);
+  });
+  var archivedClients = (state.archivedClients || []).filter(function (c) {
+    if (!query) return true;
+    return (c.name && c.name.toLowerCase().indexOf(query) >= 0);
+  });
+
+  if (!archivedProjects.length && !archivedClients.length) {
+    container.innerHTML = '<div class="empty-hint">' + (query ? '没有匹配的存档项' : '暂无存档项目或客户') + '</div>';
+    return;
+  }
+
+  var html = '';
+
+  // Archived clients section
+  if (archivedClients.length) {
+    html += '<div class="archive-section">' +
+      '<h3 class="archive-section-title">存档客户 (' + archivedClients.length + ')</h3>' +
+      '<table class="pc-table"><thead><tr>' +
+        '<th class="col-name">客户名称</th>' +
+        '<th class="col-details">备注</th>' +
+        '<th class="col-actions"></th>' +
+      '</tr></thead><tbody>';
+    archivedClients.forEach(function (c) {
+      html += '<tr class="pc-row pc-row-archived">' +
+        '<td class="col-name">' +
+          '<span class="pc-color-bar" style="background:' + (c.color || '#6366F1') + ';opacity:.5"></span>' +
+          '<span class="pc-name-text">' + escapeHtml(c.name) + '</span>' +
+          '<span class="archive-badge">已存档</span>' +
+        '</td>' +
+        '<td class="col-details">' + escapeHtml(c.details || '') + '</td>' +
+        '<td class="col-actions">' +
+          '<button class="btn btn-sm btn-outline btn-restore" data-type="client" data-id="' + c.id + '">恢复</button>' +
+          '<button class="btn-icon btn-delete" data-type="client" data-id="' + c.id + '" title="永久删除">&#10005;</button>' +
+        '</td>' +
+      '</tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+
+  // Archived projects section
+  if (archivedProjects.length) {
+    html += '<div class="archive-section">' +
+      '<h3 class="archive-section-title">存档项目 (' + archivedProjects.length + ')</h3>' +
+      '<table class="pc-table"><thead><tr>' +
+        '<th class="col-name">项目名称</th>' +
+        '<th class="col-client">客户</th>' +
+        '<th class="col-code">项目编号</th>' +
+        '<th class="col-dates">周期</th>' +
+        '<th class="col-actions"></th>' +
+      '</tr></thead><tbody>';
+    archivedProjects.forEach(function (p) {
+      var dateRange = '';
+      if (p.start_date || p.end_date) {
+        dateRange = (p.start_date || '—') + ' ~ ' + (p.end_date || '—');
+      }
+      html += '<tr class="pc-row pc-row-archived">' +
+        '<td class="col-name">' +
+          '<span class="pc-color-bar" style="background:' + (p.color || '#8B5CF6') + ';opacity:.5"></span>' +
+          '<span class="pc-name-text">' + escapeHtml(p.name) + '</span>' +
+          '<span class="archive-badge">已存档</span>' +
+        '</td>' +
+        '<td class="col-client">' + escapeHtml(p.client_name || '') + '</td>' +
+        '<td class="col-code">' + escapeHtml(p.code || '') + '</td>' +
+        '<td class="col-dates">' + escapeHtml(dateRange) + '</td>' +
+        '<td class="col-actions">' +
+          '<button class="btn btn-sm btn-outline btn-restore" data-type="project" data-id="' + p.id + '">恢复</button>' +
+          '<button class="btn-icon btn-delete" data-type="project" data-id="' + p.id + '" title="永久删除">&#10005;</button>' +
+        '</td>' +
+      '</tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+
+  container.innerHTML = html;
+
+  // Attach restore handlers
+  container.querySelectorAll('.btn-restore').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var type = btn.dataset.type;
+      var id = parseInt(btn.dataset.id, 10);
+      if (type === 'project') unarchiveProject(id);
+      else unarchiveClient(id);
+    });
+  });
+
+  // Attach delete handlers
+  container.querySelectorAll('.btn-delete').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var type = btn.dataset.type;
+      var id = parseInt(btn.dataset.id, 10);
+      if (type === 'project') deleteProject(id);
+      else deleteClient(id);
+    });
+  });
+}
 
 // ===================== Event Listeners =====================
 document.addEventListener('DOMContentLoaded', function () {

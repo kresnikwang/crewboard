@@ -69,7 +69,8 @@ module.exports = function(db) {
   router.get('/clients', (req, res) => {
     const entId = req.user?.enterprise_id;
     if (!entId) return res.json([]);
-    res.json(db.prepare('SELECT * FROM clients WHERE is_active = 1 AND enterprise_id = ? ORDER BY name').all(entId));
+    const archived = req.query.archived === '1' ? 1 : 0;
+    res.json(db.prepare('SELECT * FROM clients WHERE is_active = 1 AND is_archived = ? AND enterprise_id = ? ORDER BY name').all(archived, entId));
   });
 
   router.post('/clients', (req, res) => {
@@ -87,6 +88,20 @@ module.exports = function(db) {
     res.json({ ok: true });
   });
 
+  router.patch('/clients/:id/archive', (req, res) => {
+    db.prepare('UPDATE clients SET is_archived = 1 WHERE id = ?').run(req.params.id);
+    // Also archive all projects under this client
+    db.prepare('UPDATE projects SET is_archived = 1 WHERE client_id = ? AND is_active = 1').run(req.params.id);
+    res.json({ ok: true });
+  });
+
+  router.patch('/clients/:id/unarchive', (req, res) => {
+    db.prepare('UPDATE clients SET is_archived = 0 WHERE id = ?').run(req.params.id);
+    // Also unarchive all projects under this client
+    db.prepare('UPDATE projects SET is_archived = 0 WHERE client_id = ?').run(req.params.id);
+    res.json({ ok: true });
+  });
+
   router.delete('/clients/:id', (req, res) => {
     db.prepare('UPDATE clients SET is_active = 0 WHERE id = ?').run(req.params.id);
     res.json({ ok: true });
@@ -96,11 +111,12 @@ module.exports = function(db) {
   router.get('/projects', (req, res) => {
     const entId = req.user?.enterprise_id;
     if (!entId) return res.json([]);
+    const archived = req.query.archived === '1' ? 1 : 0;
     const projects = db.prepare(`
       SELECT p.*, c.name as client_name, c.color as client_color
       FROM projects p LEFT JOIN clients c ON p.client_id = c.id
-      WHERE p.is_active = 1 AND p.enterprise_id = ? ORDER BY p.name
-    `).all(entId);
+      WHERE p.is_active = 1 AND p.is_archived = ? AND p.enterprise_id = ? ORDER BY p.name
+    `).all(archived, entId);
     res.json(projects);
   });
 
@@ -117,6 +133,16 @@ module.exports = function(db) {
     const { name, client_id, color, code, start_date, end_date, budget_hours, hourly_rate, billable, details } = req.body;
     db.prepare('UPDATE projects SET name=?, client_id=?, color=?, code=?, start_date=?, end_date=?, budget_hours=?, hourly_rate=?, billable=?, details=? WHERE id=?')
       .run(name, client_id, color, code || '', start_date, end_date, budget_hours, hourly_rate, billable != null ? (billable ? 1 : 0) : 1, details || '', req.params.id);
+    res.json({ ok: true });
+  });
+
+  router.patch('/projects/:id/archive', (req, res) => {
+    db.prepare('UPDATE projects SET is_archived = 1 WHERE id = ?').run(req.params.id);
+    res.json({ ok: true });
+  });
+
+  router.patch('/projects/:id/unarchive', (req, res) => {
+    db.prepare('UPDATE projects SET is_archived = 0 WHERE id = ?').run(req.params.id);
     res.json({ ok: true });
   });
 

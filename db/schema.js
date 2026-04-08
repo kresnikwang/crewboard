@@ -191,6 +191,20 @@ function migrate(db) {
   if (!clientCols.find(c => c.name === 'details')) {
     db.exec("ALTER TABLE clients ADD COLUMN details TEXT DEFAULT ''");
   }
+
+  // Add is_archived column to projects and clients tables
+  const projCols2 = db.prepare('PRAGMA table_info(projects)').all();
+  if (!projCols2.find(c => c.name === 'is_archived')) {
+    db.exec('ALTER TABLE projects ADD COLUMN is_archived INTEGER DEFAULT 0');
+  }
+  // Ensure existing NULL values become 0
+  db.exec('UPDATE projects SET is_archived = 0 WHERE is_archived IS NULL');
+
+  const clientCols2 = db.prepare('PRAGMA table_info(clients)').all();
+  if (!clientCols2.find(c => c.name === 'is_archived')) {
+    db.exec('ALTER TABLE clients ADD COLUMN is_archived INTEGER DEFAULT 0');
+  }
+  db.exec('UPDATE clients SET is_archived = 0 WHERE is_archived IS NULL');
 }
 
 function seedDemoData(db) {
