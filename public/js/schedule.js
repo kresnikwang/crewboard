@@ -720,6 +720,7 @@
      -------------------------------------------------- */
   function initDragSelection(container) {
     var isDragging = false;
+    var didDrag = false;   // true if mouse moved >= 1 cell during drag
     var startCell = null;
     var endCell = null;
     var selectedCells = [];
@@ -727,11 +728,9 @@
     container.addEventListener('mousedown', function (e) {
       var cell = e.target.closest('.booking-cell, .m-day-cell');
       if (!cell) return;
-      
+
       // Don't start drag if clicking on existing booking or leave
-      if (e.target.closest('.booking-block, .leave-block, .m-booking, .m-leave')) {
-        return;
-      }
+      if (e.target.closest('.booking-block, .leave-block, .m-booking, .m-leave')) return;
 
       // Check permissions
       var rid = parseInt(cell.dataset.resource, 10);
@@ -739,6 +738,7 @@
 
       e.preventDefault();
       isDragging = true;
+      didDrag = false;
       startCell = cell;
       endCell = cell;
       selectedCells = [cell];
@@ -751,67 +751,70 @@
       document.addEventListener('mouseup', handleMouseUp);
     });
 
+    // ---- helper: get ordered date→cell map for a resource in the current view ----
+    function getCellsForResource(rid) {
+      // Determine which cell type we're in (week vs month view)
+      var cellSelector = startCell.classList.contains('m-day-cell')
+        ? '.m-day-cell[data-resource="' + rid + '"]'
+        : '.booking-cell[data-resource="' + rid + '"]';
+      var allCells = container.querySelectorAll(cellSelector);
+      var dateMap = {};
+      allCells.forEach(function (c) {
+        if (c.dataset.date) dateMap[c.dataset.date] = c;
+      });
+      return dateMap;
+    }
+
     function handleMouseMove(e) {
       if (!isDragging) return;
 
       var cell = document.elementFromPoint(e.clientX, e.clientY);
       if (!cell) return;
-
       cell = cell.closest('.booking-cell, .m-day-cell');
       if (!cell || cell === endCell) return;
 
-      // Check if same resource
+      // Must be same resource
       var startRid = parseInt(startCell.dataset.resource, 10);
-      var endRid = parseInt(cell.dataset.resource, 10);
+      var endRid   = parseInt(cell.dataset.resource, 10);
       if (startRid !== endRid) return;
 
-      // Clear previous selection
+      didDrag = true;
+
+      // Clear previous selection highlights
       selectedCells.forEach(function (c) {
-        c.classList.remove('drag-selecting', 'drag-end');
+        c.classList.remove('drag-selecting', 'drag-start', 'drag-end');
       });
 
-      // Determine start and end dates
       var startDate = startCell.dataset.date;
-      var endDate = cell.dataset.date;
-      
-      // Get all cells for this resource
-      var allCells = container.querySelectorAll('[data-resource="' + startRid + '"]');
-      var dateMap = {};
-      allCells.forEach(function (c) {
-        dateMap[c.dataset.date] = c;
-      });
+      var endDate   = cell.dataset.date;
 
-      // Sort dates
+      // Build date→cell map using the correct selector for this view
+      var dateMap = getCellsForResource(startRid);
       var dates = Object.keys(dateMap).sort();
       var startIndex = dates.indexOf(startDate);
-      var endIndex = dates.indexOf(endDate);
-      
-      // If dates not found (month view?), try alternative approach
+      var endIndex   = dates.indexOf(endDate);
+
       if (startIndex === -1 || endIndex === -1) {
-        // Simple fallback: just highlight the cell
+        // Fallback: just highlight start and current cell
+        startCell.classList.add('drag-selecting', 'drag-start');
         cell.classList.add('drag-selecting', 'drag-end');
         selectedCells = [startCell, cell];
         endCell = cell;
         return;
       }
 
-      // Ensure startIndex <= endIndex
       if (startIndex > endIndex) {
-        var temp = startIndex;
-        startIndex = endIndex;
-        endIndex = temp;
+        var tmp = startIndex; startIndex = endIndex; endIndex = tmp;
       }
 
-      // Select range
       selectedCells = [];
       for (var i = startIndex; i <= endIndex; i++) {
-        var date = dates[i];
-        var c = dateMap[date];
+        var c = dateMap[dates[i]];
         if (c) {
           c.classList.add('drag-selecting');
           selectedCells.push(c);
           if (i === startIndex) c.classList.add('drag-start');
-          if (i === endIndex) c.classList.add('drag-end');
+          if (i === endIndex)   c.classList.add('drag-end');
         }
       }
       endCell = cell;
@@ -824,7 +827,6 @@
       });
       selectedCells = [];
     }
-    // Store reference so closeModal can call it
     window._clearDragHighlight = clearDragHighlight;
 
     function handleMouseUp(e) {
@@ -833,21 +835,34 @@
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
 
-      // Only proceed if we have at least 2 cells selected
-      if (selectedCells.length < 2) {
+      // If mouse never moved to another cell, treat as a plain click — let the
+      // existing per-cell click handler open the single-day booking modal.
+      if (!didDrag || selectedCells.length < 2) {
         clearDragHighlight();
         isDragging = false;
+        didDrag = false;
         return;
       }
 
-      var rid = parseInt(startCell.dataset.resource, 10);
+      var rid       = parseInt(startCell.dataset.resource, 10);
       var startDate = startCell.dataset.date;
-      var endDate = endCell.dataset.date;
+      var endDate   = endCell.dataset.date;
 
       // Keep highlight visible until modal is closed (cleared by closeModal)
       isDragging = false;
+      didDrag = false;
       startCell = null;
       endCell = null;
+
+      // Suppress the upcoming click event that fires after mouseup on the same cell
+      var suppressNext = true;
+      document.addEventListener('click', function suppressClick(ev) {
+        if (suppressNext) {
+          ev.stopPropagation();
+          suppressNext = false;
+          document.removeEventListener('click', suppressClick, true);
+        }
+      }, true);
 
       // Show booking modal for the date range
       showBookingModal(null, rid, startDate, endDate);
