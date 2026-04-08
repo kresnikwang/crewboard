@@ -306,192 +306,177 @@
      Resize booking duration (ResourceGuru style)
      -------------------------------------------------- */
   function initResizeBooking(blockElement, booking, startEvent) {
-    console.log('initResizeBooking called for booking:', booking.id, 'date:', booking.date);
-    var originalDate = new Date(booking.date);
     var isResizing = true;
-    
-    // Add visual feedback
-    blockElement.classList.add('resizing');
-    
-    var overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;cursor:col-resize;';
-    document.body.appendChild(overlay);
-    
-    // Calculate column width (approx)
+
+    // ── 1. 收集当前视图中该资源所有日期格 ──────────────────────────
     var scheduleGrid = document.getElementById('schedule-grid');
-    console.log('scheduleGrid found:', !!scheduleGrid, 'booking.resource_id:', booking.resource_id);
-    // 支持周视图(.booking-cell)和月视图(.m-day-cell)
-    var selector = '.booking-cell[data-resource="' + booking.resource_id + '"], .m-day-cell[data-resource="' + booking.resource_id + '"]';
-    console.log('选择器:', selector);
-    var bookingCells = scheduleGrid.querySelectorAll(selector);
-    console.log('找到的单元格数量:', bookingCells.length);
-    var cellWidth = bookingCells.length > 0 ? bookingCells[0].offsetWidth : 100;
-    console.log('单元格宽度:', cellWidth);
-    
-    // Get all dates for this resource
+    var selector = '.booking-cell[data-resource="' + booking.resource_id +
+      '"], .m-day-cell[data-resource="' + booking.resource_id + '"]';
+    var allCells = Array.prototype.slice.call(scheduleGrid.querySelectorAll(selector));
+
+    // 按日期排序，建立 date→cell 映射
     var dateMap = {};
-    bookingCells.forEach(function (cell) {
-      console.log('单元格数据:', cell.className, 'date:', cell.dataset.date);
-      dateMap[cell.dataset.date] = cell;
-    });
+    allCells.forEach(function (c) { dateMap[c.dataset.date] = c; });
     var dates = Object.keys(dateMap).sort();
-    console.log('dates数组:', dates, '长度:', dates.length);
-    
+
     var originalIndex = dates.indexOf(booking.date);
-    console.log('预定日期:', booking.date, '在dates中的索引:', originalIndex);
-    var currentIndex = originalIndex;
-    var endIndex = originalIndex;
-    
-    // Show visual guide
-    var guide = document.createElement('div');
-    guide.style.cssText = 'position:absolute;top:0;bottom:0;width:2px;background:var(--primary);z-index:99998;pointer-events:none;display:none;';
-    document.body.appendChild(guide);
-    
+    if (originalIndex === -1) return; // 安全检查
+
+    // ── 2. 找出当前预定块所属的「连续同项目 booking」范围 ──────────
+    // 用于向左缩短时知道哪些 booking 可以删除
+    // 这里只需要知道原始日期即可，缩短时删除从 newEnd+1 到 originalDate 的 bookings
+
+    // ── 3. 视觉状态 ────────────────────────────────────────────────
+    blockElement.classList.add('resizing');
+
+    // 全屏透明遮罩，锁定 cursor 并阻止其他事件
+    var overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;cursor:col-resize;user-select:none;';
+    document.body.appendChild(overlay);
+
+    // 高亮预览：把 originalIndex 到 hoverIndex 之间的格子加 resize-preview 类
+    var previewCells = [];
+    function clearPreview() {
+      previewCells.forEach(function (c) { c.classList.remove('resize-preview', 'resize-preview-shrink'); });
+      previewCells = [];
+    }
+    function applyPreview(hoverIndex) {
+      clearPreview();
+      var lo = Math.min(originalIndex, hoverIndex);
+      var hi = Math.max(originalIndex, hoverIndex);
+      var isShrink = hoverIndex < originalIndex;
+      for (var i = lo; i <= hi; i++) {
+        var c = dateMap[dates[i]];
+        if (c) {
+          c.classList.add('resize-preview');
+          if (isShrink) c.classList.add('resize-preview-shrink');
+          previewCells.push(c);
+        }
+      }
+    }
+
+    var currentHoverIndex = originalIndex;
+
+    // ── 4. mousemove：用 elementFromPoint 追踪悬停格 ───────────────
     function handleMouseMove(e) {
       if (!isResizing) return;
-      
-      // Calculate horizontal movement
-      var dx = e.clientX - startEvent.clientX;
-      // 提高拖动灵敏度：拖动四分之一单元格宽度就能触发移动
-      var cellsMoved = Math.round(dx / (cellWidth / 4));
-      console.log('鼠标移动: dx=', dx, 'cellWidth=', cellWidth, 'cellsMoved=', cellsMoved);
-      
-      endIndex = originalIndex + cellsMoved;
-      console.log('originalIndex:', originalIndex, 'endIndex:', endIndex);
-      
-      // Clamp to available dates
-      if (endIndex < 0) endIndex = 0;
-      if (endIndex >= dates.length) endIndex = dates.length - 1;
-      
-      // Visual guide
-      if (endIndex !== originalIndex) {
-        var endCell = dateMap[dates[endIndex]];
-        if (endCell) {
-          var rect = endCell.getBoundingClientRect();
-          if (endIndex > originalIndex) {
-            guide.style.left = (rect.right - 1) + 'px';
-          } else {
-            guide.style.left = (rect.left - 1) + 'px';
-          }
-          guide.style.display = 'block';
-        }
-      } else {
-        guide.style.display = 'none';
+      e.preventDefault();
+
+      // 暂时隐藏遮罩以穿透取到下方元素
+      overlay.style.pointerEvents = 'none';
+      var el = document.elementFromPoint(e.clientX, e.clientY);
+      overlay.style.pointerEvents = '';
+
+      if (!el) return;
+      var cell = el.closest('.booking-cell, .m-day-cell');
+      if (!cell) return;
+
+      // 必须是同一资源
+      if (parseInt(cell.dataset.resource, 10) !== booking.resource_id) return;
+
+      var hoverDate = cell.dataset.date;
+      var hoverIndex = dates.indexOf(hoverDate);
+      if (hoverIndex === -1) return;
+
+      if (hoverIndex !== currentHoverIndex) {
+        currentHoverIndex = hoverIndex;
+        applyPreview(hoverIndex);
       }
-      
-      // Update UI feedback
-      currentIndex = endIndex;
     }
-    
+
+    // ── 5. mouseup：执行实际操作 ───────────────────────────────────
     function handleMouseUp(e) {
-      if (!isResizing) return; // 防止重复触发
-      console.log('handleMouseUp called, isResizing was:', isResizing);
-      
-      // 先清理事件监听器，防止重复触发
+      if (!isResizing) return;
       cleanup();
-      
-      // Only update if end date changed
-      if (endIndex === originalIndex) {
-        console.log('endIndex === originalIndex, 返回不执行操作');
-        return;
-      }
-      
-      var newEndDate = dates[endIndex];
-      console.log('准备更新预定: newEndDate=', newEndDate, '原始日期=', booking.date);
-      if (endIndex > originalIndex) {
-        // 延长预定 - 向右拖动
-        console.log('向右拖动: 从索引', originalIndex, '到', endIndex, '日期从', booking.date, '到', newEndDate);
-        if (confirm('将预定从 ' + booking.date + ' 延长到 ' + newEndDate + '？')) {
-          console.log('用户确认延长预定');
-          // Create bookings for each day in the range
-          var promises = [];
-          
-          for (var i = originalIndex + 1; i <= endIndex; i++) {
-            var date = dates[i];
-            var payload = {
-              resource_id: booking.resource_id,
-              project_id: booking.project_id,
-              date: date,
-              hours: booking.hours,
-              notes: booking.notes,
-              is_tentative: booking.is_tentative
-            };
-            
-            console.log('创建预定:', payload);
-            promises.push(
-              api('/api/bookings', { method: 'POST', body: payload })
-            );
-          }
-          
-          console.log('开始执行API调用，共', promises.length, '个预定');
-          Promise.allSettled(promises)
-            .then(function (results) {
-              console.log('API调用结果:', results);
-              var successCount = results.filter(function (r) { return r.status === 'fulfilled'; }).length;
-              if (successCount > 0) {
-                toast('预定已延长 ' + successCount + ' 天');
-                console.log('刷新视图...');
-                window.loadSchedule(); // Refresh view
-              } else {
-                toast('延长预定失败', 'error');
-              }
-            })
-            .catch(function (err) {
-              console.error('API调用错误:', err);
-              toast('操作失败: ' + err.message, 'error');
-            });
-        } else {
-          console.log('用户取消延长预定');
-        }
-      } else {
-        // 向左拖动 - 对于单日预定，这通常意味着删除
-        // 但我们需要确认用户是否真的想删除
-        if (confirm('将预定移动到 ' + newEndDate + '？这将在新日期创建预定并删除原来的预定。')) {
-          // 先删除原来的预定
-          api('/api/bookings/' + booking.id, { method: 'DELETE' })
-            .then(function() {
-              // 在新日期创建预定
-              var payload = {
+
+      if (currentHoverIndex === originalIndex) return; // 没有移动，不操作
+
+      if (currentHoverIndex > originalIndex) {
+        // ── 向右：延长 ──
+        // 在 originalIndex+1 ~ currentHoverIndex 的每一天创建相同项目的 booking
+        var promises = [];
+        for (var i = originalIndex + 1; i <= currentHoverIndex; i++) {
+          var d = dates[i];
+          // 跳过已有同项目 booking 的日期（避免重复）
+          var existingKey = booking.resource_id + '_' + d;
+          var alreadyBooked = _allBookings.some(function (b) {
+            return b.resource_id === booking.resource_id &&
+                   b.project_id === booking.project_id &&
+                   b.date === d;
+          });
+          if (!alreadyBooked) {
+            promises.push(api('/api/bookings', {
+              method: 'POST',
+              body: {
                 resource_id: booking.resource_id,
-                project_id: booking.project_id,
-                date: newEndDate,
-                hours: booking.hours,
-                notes: booking.notes,
-                is_tentative: booking.is_tentative
-              };
-              
-              return api('/api/bookings', { method: 'POST', body: payload });
-            })
-            .then(function() {
-              toast('预定已移动到 ' + newEndDate);
-              window.loadSchedule(); // Refresh view
-            })
-            .catch(function (err) {
-              toast('操作失败: ' + err.message, 'error');
-            });
+                project_id:  booking.project_id,
+                date:        d,
+                hours:       booking.hours,
+                notes:       booking.notes || '',
+                is_tentative: booking.is_tentative ? 1 : 0
+              }
+            }));
+          }
         }
+        if (promises.length === 0) {
+          toast('所选范围已有相同预订', 'info');
+          return;
+        }
+        Promise.all(promises)
+          .then(function () {
+            toast('预订已延长 ' + promises.length + ' 天', 'success');
+            window.loadSchedule();
+          })
+          .catch(function (err) {
+            toast('延长失败：' + (err.message || ''), 'error');
+          });
+
+      } else {
+        // ── 向左：缩短 ──
+        // 删除 currentHoverIndex+1 ~ originalIndex 范围内同资源同项目的 bookings
+        var toDelete = _allBookings.filter(function (b) {
+          if (b.resource_id !== booking.resource_id) return false;
+          if (b.project_id  !== booking.project_id)  return false;
+          var idx = dates.indexOf(b.date);
+          return idx > currentHoverIndex && idx <= originalIndex;
+        });
+        if (toDelete.length === 0) {
+          toast('没有可缩短的预订', 'info');
+          return;
+        }
+        Promise.all(toDelete.map(function (b) {
+          return api('/api/bookings/' + b.id, { method: 'DELETE' });
+        }))
+          .then(function () {
+            toast('预订已缩短 ' + toDelete.length + ' 天', 'success');
+            window.loadSchedule();
+          })
+          .catch(function (err) {
+            toast('缩短失败：' + (err.message || ''), 'error');
+          });
       }
     }
-    
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    overlay.addEventListener('mouseup', handleMouseUp);
-    
-    // Cleanup if user clicks elsewhere
+
+    // ── 6. 清理函数 ────────────────────────────────────────────────
     function cleanup() {
       isResizing = false;
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      overlay.removeEventListener('mouseup', handleMouseUp);
+      clearPreview();
       blockElement.classList.remove('resizing');
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup',   handleMouseUp);
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
-      if (guide.parentNode) guide.parentNode.removeChild(guide);
     }
-    
-    overlay.addEventListener('click', cleanup);
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') cleanup();
-    });
+
+    function handleKeyDown(e) {
+      if (e.key === 'Escape') {
+        cleanup();
+        document.removeEventListener('keydown', handleKeyDown);
+      }
+    }
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup',   handleMouseUp);
+    document.addEventListener('keydown',   handleKeyDown);
   }
 
   /* --------------------------------------------------
