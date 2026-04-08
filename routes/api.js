@@ -203,12 +203,8 @@ module.exports = function(db) {
       const ids = [];
       while (d <= end) {
         const dateStr = d.toISOString().split('T')[0];
-        const day = d.getDay();
-        // Skip weekends
-        if (day !== 0 && day !== 6) {
-          const result = insert.run(resource_id, project_id, dateStr, bookHours, tentative, bookNotes);
-          ids.push(result.lastInsertRowid);
-        }
+        const result = insert.run(resource_id, project_id, dateStr, bookHours, tentative, bookNotes);
+        ids.push(result.lastInsertRowid);
         d.setDate(d.getDate() + 1);
       }
       return ids;

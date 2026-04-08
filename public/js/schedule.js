@@ -150,6 +150,33 @@
         }
       });
     });
+
+    /* attach resize handlers to booking blocks */
+    document.querySelectorAll('.booking-block .resize-handle, .m-booking .resize-handle').forEach(function (handle) {
+      handle.addEventListener('mousedown', function (e) {
+        e.stopPropagation();
+        e.preventDefault();
+        var block = e.target.closest('.booking-block, .m-booking');
+        if (!block) return;
+        
+        var bookingId = parseInt(block.dataset.bookingId, 10);
+        var booking = _allBookings.find(function (b) { return b.id === bookingId; });
+        if (!booking) return;
+        
+        if (!canBookForResource(booking.resource_id)) {
+          toast('您没有编辑此预订的权限', 'error');
+          return;
+        }
+        
+        // Prevent the click event on the booking block
+        block.style.pointerEvents = 'none';
+        setTimeout(function () {
+          block.style.pointerEvents = '';
+        }, 100);
+        
+        initResizeBooking(block, booking, e);
+      });
+    });
   };
 
   /* --------------------------------------------------
@@ -246,11 +273,15 @@
 
         html += '<div class="booking-block' + tentCls + '"' +
           ' style="background:' + bgColor + ';color:' + fgColor + ';border-left:3px solid ' + fgColor + '"' +
+          ' data-booking-id="' + b.id + '"' +
+          ' data-resource-id="' + b.resource_id + '"' +
+          ' data-date="' + b.date + '"' +
           ' onclick="window.editBooking(' + b.id + ')"' +
           ' title="' + escAttr(b.project_name) + ' - ' + b.hours + 'h' +
             (b.notes ? '\n' + escAttr(b.notes) : '') + '">' +
           '<span class="booking-hours">' + b.hours + 'h</span> ' +
           '<span class="booking-project">' + esc(b.project_name) + '</span>' +
+          '<div class="resize-handle"></div>' +
         '</div>';
       });
 
@@ -269,6 +300,333 @@
   function getLeaveLabel(type) {
     var labels = { vacation: '休假', sick: '病假', personal: '事假', holiday: '法定假期', other: '请假' };
     return labels[type] || '休假';
+  }
+
+  /* --------------------------------------------------
+     Resize booking duration (ResourceGuru style)
+     -------------------------------------------------- */
+  function initResizeBooking(blockElement, booking, startEvent) {
+    console.log('initResizeBooking called for booking:', booking.id, 'date:', booking.date);
+    var originalDate = new Date(booking.date);
+    var isResizing = true;
+    
+    // Add visual feedback
+    blockElement.classList.add('resizing');
+    
+    var overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;cursor:col-resize;';
+    document.body.appendChild(overlay);
+    
+    // Calculate column width (approx)
+    var scheduleGrid = document.getElementById('schedule-grid');
+    console.log('scheduleGrid found:', !!scheduleGrid, 'booking.resource_id:', booking.resource_id);
+    // 支持周视图(.booking-cell)和月视图(.m-day-cell)
+    var selector = '.booking-cell[data-resource="' + booking.resource_id + '"], .m-day-cell[data-resource="' + booking.resource_id + '"]';
+    console.log('选择器:', selector);
+    var bookingCells = scheduleGrid.querySelectorAll(selector);
+    console.log('找到的单元格数量:', bookingCells.length);
+    var cellWidth = bookingCells.length > 0 ? bookingCells[0].offsetWidth : 100;
+    console.log('单元格宽度:', cellWidth);
+    
+    // Get all dates for this resource
+    var dateMap = {};
+    bookingCells.forEach(function (cell) {
+      console.log('单元格数据:', cell.className, 'date:', cell.dataset.date);
+      dateMap[cell.dataset.date] = cell;
+    });
+    var dates = Object.keys(dateMap).sort();
+    console.log('dates数组:', dates, '长度:', dates.length);
+    
+    var originalIndex = dates.indexOf(booking.date);
+    console.log('预定日期:', booking.date, '在dates中的索引:', originalIndex);
+    var currentIndex = originalIndex;
+    var endIndex = originalIndex;
+    
+    // Show visual guide
+    var guide = document.createElement('div');
+    guide.style.cssText = 'position:absolute;top:0;bottom:0;width:2px;background:var(--primary);z-index:99998;pointer-events:none;display:none;';
+    document.body.appendChild(guide);
+    
+    function handleMouseMove(e) {
+      if (!isResizing) return;
+      
+      // Calculate horizontal movement
+      var dx = e.clientX - startEvent.clientX;
+      // 提高拖动灵敏度：拖动四分之一单元格宽度就能触发移动
+      var cellsMoved = Math.round(dx / (cellWidth / 4));
+      console.log('鼠标移动: dx=', dx, 'cellWidth=', cellWidth, 'cellsMoved=', cellsMoved);
+      
+      endIndex = originalIndex + cellsMoved;
+      console.log('originalIndex:', originalIndex, 'endIndex:', endIndex);
+      
+      // Clamp to available dates
+      if (endIndex < 0) endIndex = 0;
+      if (endIndex >= dates.length) endIndex = dates.length - 1;
+      
+      // Visual guide
+      if (endIndex !== originalIndex) {
+        var endCell = dateMap[dates[endIndex]];
+        if (endCell) {
+          var rect = endCell.getBoundingClientRect();
+          if (endIndex > originalIndex) {
+            guide.style.left = (rect.right - 1) + 'px';
+          } else {
+            guide.style.left = (rect.left - 1) + 'px';
+          }
+          guide.style.display = 'block';
+        }
+      } else {
+        guide.style.display = 'none';
+      }
+      
+      // Update UI feedback
+      currentIndex = endIndex;
+    }
+    
+    function handleMouseUp(e) {
+      if (!isResizing) return; // 防止重复触发
+      console.log('handleMouseUp called, isResizing was:', isResizing);
+      
+      // 先清理事件监听器，防止重复触发
+      cleanup();
+      
+      // Only update if end date changed
+      if (endIndex === originalIndex) {
+        console.log('endIndex === originalIndex, 返回不执行操作');
+        return;
+      }
+      
+      var newEndDate = dates[endIndex];
+      console.log('准备更新预定: newEndDate=', newEndDate, '原始日期=', booking.date);
+      if (endIndex > originalIndex) {
+        // 延长预定 - 向右拖动
+        console.log('向右拖动: 从索引', originalIndex, '到', endIndex, '日期从', booking.date, '到', newEndDate);
+        if (confirm('将预定从 ' + booking.date + ' 延长到 ' + newEndDate + '？')) {
+          console.log('用户确认延长预定');
+          // Create bookings for each day in the range
+          var promises = [];
+          
+          for (var i = originalIndex + 1; i <= endIndex; i++) {
+            var date = dates[i];
+            var payload = {
+              resource_id: booking.resource_id,
+              project_id: booking.project_id,
+              date: date,
+              hours: booking.hours,
+              notes: booking.notes,
+              is_tentative: booking.is_tentative
+            };
+            
+            console.log('创建预定:', payload);
+            promises.push(
+              api('/api/bookings', { method: 'POST', body: payload })
+            );
+          }
+          
+          console.log('开始执行API调用，共', promises.length, '个预定');
+          Promise.allSettled(promises)
+            .then(function (results) {
+              console.log('API调用结果:', results);
+              var successCount = results.filter(function (r) { return r.status === 'fulfilled'; }).length;
+              if (successCount > 0) {
+                toast('预定已延长 ' + successCount + ' 天');
+                console.log('刷新视图...');
+                window.loadSchedule(); // Refresh view
+              } else {
+                toast('延长预定失败', 'error');
+              }
+            })
+            .catch(function (err) {
+              console.error('API调用错误:', err);
+              toast('操作失败: ' + err.message, 'error');
+            });
+        } else {
+          console.log('用户取消延长预定');
+        }
+      } else {
+        // 向左拖动 - 对于单日预定，这通常意味着删除
+        // 但我们需要确认用户是否真的想删除
+        if (confirm('将预定移动到 ' + newEndDate + '？这将在新日期创建预定并删除原来的预定。')) {
+          // 先删除原来的预定
+          api('/api/bookings/' + booking.id, { method: 'DELETE' })
+            .then(function() {
+              // 在新日期创建预定
+              var payload = {
+                resource_id: booking.resource_id,
+                project_id: booking.project_id,
+                date: newEndDate,
+                hours: booking.hours,
+                notes: booking.notes,
+                is_tentative: booking.is_tentative
+              };
+              
+              return api('/api/bookings', { method: 'POST', body: payload });
+            })
+            .then(function() {
+              toast('预定已移动到 ' + newEndDate);
+              window.loadSchedule(); // Refresh view
+            })
+            .catch(function (err) {
+              toast('操作失败: ' + err.message, 'error');
+            });
+        }
+      }
+    }
+    
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    overlay.addEventListener('mouseup', handleMouseUp);
+    
+    // Cleanup if user clicks elsewhere
+    function cleanup() {
+      isResizing = false;
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      overlay.removeEventListener('mouseup', handleMouseUp);
+      blockElement.classList.remove('resizing');
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+      if (guide.parentNode) guide.parentNode.removeChild(guide);
+    }
+    
+    overlay.addEventListener('click', cleanup);
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') cleanup();
+    });
+  }
+
+  /* --------------------------------------------------
+     Drag selection for multiple days (ResourceGuru style)
+     -------------------------------------------------- */
+  function initDragSelection(container) {
+    var isDragging = false;
+    var startCell = null;
+    var endCell = null;
+    var selectedCells = [];
+
+    container.addEventListener('mousedown', function (e) {
+      var cell = e.target.closest('.booking-cell, .m-day-cell');
+      if (!cell) return;
+      
+      // Don't start drag if clicking on existing booking or leave
+      if (e.target.closest('.booking-block, .leave-block, .m-booking, .m-leave')) {
+        return;
+      }
+
+      // Check permissions
+      var rid = parseInt(cell.dataset.resource, 10);
+      if (!rid || !canBookForResource(rid)) return;
+
+      e.preventDefault();
+      isDragging = true;
+      startCell = cell;
+      endCell = cell;
+      selectedCells = [cell];
+
+      // Highlight starting cell
+      cell.classList.add('drag-selecting', 'drag-start');
+
+      // Add global listeners
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    });
+
+    function handleMouseMove(e) {
+      if (!isDragging) return;
+
+      var cell = document.elementFromPoint(e.clientX, e.clientY);
+      if (!cell) return;
+
+      cell = cell.closest('.booking-cell, .m-day-cell');
+      if (!cell || cell === endCell) return;
+
+      // Check if same resource
+      var startRid = parseInt(startCell.dataset.resource, 10);
+      var endRid = parseInt(cell.dataset.resource, 10);
+      if (startRid !== endRid) return;
+
+      // Clear previous selection
+      selectedCells.forEach(function (c) {
+        c.classList.remove('drag-selecting', 'drag-end');
+      });
+
+      // Determine start and end dates
+      var startDate = startCell.dataset.date;
+      var endDate = cell.dataset.date;
+      
+      // Get all cells for this resource
+      var allCells = container.querySelectorAll('[data-resource="' + startRid + '"]');
+      var dateMap = {};
+      allCells.forEach(function (c) {
+        dateMap[c.dataset.date] = c;
+      });
+
+      // Sort dates
+      var dates = Object.keys(dateMap).sort();
+      var startIndex = dates.indexOf(startDate);
+      var endIndex = dates.indexOf(endDate);
+      
+      // If dates not found (month view?), try alternative approach
+      if (startIndex === -1 || endIndex === -1) {
+        // Simple fallback: just highlight the cell
+        cell.classList.add('drag-selecting', 'drag-end');
+        selectedCells = [startCell, cell];
+        endCell = cell;
+        return;
+      }
+
+      // Ensure startIndex <= endIndex
+      if (startIndex > endIndex) {
+        var temp = startIndex;
+        startIndex = endIndex;
+        endIndex = temp;
+      }
+
+      // Select range
+      selectedCells = [];
+      for (var i = startIndex; i <= endIndex; i++) {
+        var date = dates[i];
+        var c = dateMap[date];
+        if (c) {
+          c.classList.add('drag-selecting');
+          selectedCells.push(c);
+          if (i === startIndex) c.classList.add('drag-start');
+          if (i === endIndex) c.classList.add('drag-end');
+        }
+      }
+      endCell = cell;
+    }
+
+    function handleMouseUp(e) {
+      if (!isDragging) return;
+
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+
+      // Clear selection after delay
+      setTimeout(function () {
+        selectedCells.forEach(function (c) {
+          c.classList.remove('drag-selecting', 'drag-start', 'drag-end');
+        });
+      }, 300);
+
+      // Only proceed if we have at least 2 cells selected
+      if (selectedCells.length < 2) {
+        isDragging = false;
+        return;
+      }
+
+      var rid = parseInt(startCell.dataset.resource, 10);
+      var startDate = startCell.dataset.date;
+      var endDate = endCell.dataset.date;
+
+      // Show booking modal for the date range
+      showBookingModal(null, rid, startDate, endDate);
+
+      isDragging = false;
+      startCell = null;
+      endCell = null;
+      selectedCells = [];
+    }
   }
 
   /* --------------------------------------------------
@@ -412,10 +770,14 @@
         var bgColor = (b.project_color || '#6366F1') + '33';
         var fgColor = b.project_color || '#6366F1';
         html += '<div class="m-booking" data-booking-id="' + b.id + '"' +
+          ' data-resource-id="' + b.resource_id + '"' +
+          ' data-date="' + b.date + '"' +
           ' style="background:' + bgColor + ';color:' + fgColor + ';border-left:2px solid ' + fgColor + '"' +
           ' title="' + escAttr(b.hours + 'h ' + b.project_name + (b.client_name ? ' | ' + b.client_name : '')) + '">' +
           '<span class="m-booking-hours">' + b.hours + 'h</span> ' +
-          esc(b.project_name) + '</div>';
+          esc(b.project_name) +
+          '<div class="resize-handle"></div>' +
+          '</div>';
       });
 
       /* Utilization bar */
@@ -491,7 +853,7 @@
   /* --------------------------------------------------
      3. showBookingModal — ResourceGuru-style with tabs
      -------------------------------------------------- */
-  async function showBookingModal(bookingId, resourceId, date) {
+  async function showBookingModal(bookingId, resourceId, date, endDate) {
     var fetched = await Promise.all([
       api('/api/resources'),
       api('/api/projects')
@@ -505,7 +867,7 @@
     }
 
     var dateVal = (booking && booking.date) || date || fmt(new Date());
-    var endDateVal = (booking && booking.date) || date || fmt(new Date());
+    var endDateVal = (booking && booking.date) || endDate || date || fmt(new Date());
     var hoursVal = booking ? booking.hours : 8;
     var tentChecked = (booking && booking.is_tentative) ? true : false;
     var notesVal = (booking && booking.notes) ? booking.notes : '';
@@ -870,12 +1232,12 @@
     if (!startEl || !endEl) return;
 
     var totalHPerDay = hours + mins / 60;
-    var workDays = countWorkDays(startEl.value, endEl.value);
-    var totalH = totalHPerDay * workDays;
+    var totalDays = countAllDays(startEl.value, endEl.value);
+    var totalH = totalHPerDay * totalDays;
 
     var el = document.getElementById('bk-total');
     if (el) {
-      el.textContent = '合计: ' + totalH.toFixed(1) + 'h (' + workDays + '个工作日, ' + totalHPerDay.toFixed(1) + 'h/天)';
+      el.textContent = '合计: ' + totalH.toFixed(1) + 'h (' + totalDays + '天, ' + totalHPerDay.toFixed(1) + 'h/天)';
     }
   };
 
@@ -888,21 +1250,20 @@
     var endEl = document.getElementById('to-date-end');
     if (!startEl || !endEl) return;
 
-    var workDays = countWorkDays(startEl.value, endEl.value);
+    var totalDays = countAllDays(startEl.value, endEl.value);
     var el = document.getElementById('to-total');
     if (el) {
-      el.textContent = '合计: ' + workDays + '个工作日';
+      el.textContent = '合计: ' + totalDays + '天';
     }
   };
 
-  function countWorkDays(startStr, endStr) {
+  function countAllDays(startStr, endStr) {
     if (!startStr || !endStr) return 0;
     var d = new Date(startStr);
     var end = new Date(endStr);
     var count = 0;
     while (d <= end) {
-      var day = d.getDay();
-      if (day !== 0 && day !== 6) count++;
+      count++;
       d.setDate(d.getDate() + 1);
     }
     return count;
