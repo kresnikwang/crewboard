@@ -1,0 +1,1 @@
+import{Z as e}from"./_plugin-vue_export-helper-hdBRQI2m.js";var t=e(null);function n(){function e(e,n=`success`){t.value?.show(e,n)}return{toast:e}}export{n,t};
