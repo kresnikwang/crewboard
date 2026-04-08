@@ -46,6 +46,7 @@ export const authApi = {
   reviewRequest: (id, body) => http.put(`/auth/enterprises/requests/${id}`, body),
   bulkCreate: (body) => http.post('/auth/enterprises/bulk-create', body),
   uploadAvatar: (body) => http.post('/auth/avatar', body),
+  updateAvatar: (avatar) => http.post('/auth/avatar', { avatar }),
 }
 
 // ── Resources ─────────────────────────────────────────────────────

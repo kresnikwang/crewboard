@@ -130,7 +130,7 @@ export function useDragSelect(arg1, arg2) {
     if (!el) return
     const cell = el.closest('[data-date][data-resource]')
     if (!cell) return
-    if (parseInt(cell.dataset.resource) !== resourceId) return
+    if (String(cell.dataset.resource) !== String(resourceId)) return
 
     const startDate = _startDate
     const endDate = cell.dataset.date
