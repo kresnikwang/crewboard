@@ -38,10 +38,7 @@ async function handleLogin() {
   error.value = ''
   loading.value = true
   try {
-    const payload = form.identifier.includes('@')
-      ? { email: form.identifier, password: form.password }
-      : { phone: form.identifier, password: form.password }
-    await auth.login(payload)
+    await auth.login({ account: form.identifier, password: form.password })
     if (auth.mustChangePassword) {
       router.push('/first-login')
     } else {
