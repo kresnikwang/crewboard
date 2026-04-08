@@ -7,16 +7,24 @@ const router = express.Router();
 module.exports = function(db) {
 
   // === CURRENT USER PERMISSIONS (effective) ===
+  // New three-role model: basic (read-only) | manager (create+edit own) | admin (full access)
   router.get('/permissions', (req, res) => {
     const u = req.user;
-    if (!u) return res.json({ book_others: false, manage_resources: false, view_reports: false });
-    const isAdmin = u.role === 'owner' || u.role === 'admin';
+    if (!u) return res.json({ role: 'basic', can_book: false, can_manage: false, can_view_reports: false, can_admin: false, resource_id: null });
+    const role = u.role; // 'basic' | 'manager' | 'admin'
+    const isAdmin = role === 'admin';
+    const isManager = role === 'manager';
     res.json({
-      book_others: isAdmin || !!u.perm_book_others,
-      manage_resources: isAdmin || !!u.perm_manage_resources,
-      view_reports: isAdmin || !!u.perm_view_reports,
-      role: u.role,
+      role,
+      can_book: isAdmin || isManager,           // can create/edit bookings
+      can_manage: isAdmin,                       // can manage resources/clients/projects (full CRUD)
+      can_view_reports: isAdmin || isManager,    // can view reports
+      can_admin: isAdmin,                        // can manage users and enterprise settings
       resource_id: u.resource_id,
+      // Legacy aliases for backward compat with old vanilla frontend
+      book_others: isAdmin || isManager,
+      manage_resources: isAdmin,
+      view_reports: isAdmin || isManager,
     });
   });
 
@@ -48,6 +56,7 @@ module.exports = function(db) {
     const { name, email, role, team, color, hours_per_day } = req.body;
     const entId = req.user?.enterprise_id;
     if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: '仅管理员可添加人员' });
     const stmt = db.prepare('INSERT INTO resources (name, email, role, team, color, hours_per_day, enterprise_id) VALUES (?, ?, ?, ?, ?, ?, ?)');
     const result = stmt.run(name, email || null, role || '', team || '', color || '#4F46E5', hours_per_day || 8, entId);
     res.json({ id: result.lastInsertRowid });
@@ -55,12 +64,14 @@ module.exports = function(db) {
 
   router.put('/resources/:id', (req, res) => {
     const { name, email, role, team, color, hours_per_day } = req.body;
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: '仅管理员可编辑人员' });
     db.prepare('UPDATE resources SET name=?, email=?, role=?, team=?, color=?, hours_per_day=? WHERE id=?')
       .run(name, email, role, team, color, hours_per_day, req.params.id);
     res.json({ ok: true });
   });
 
   router.delete('/resources/:id', (req, res) => {
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: '仅管理员可删除人员' });
     db.prepare('UPDATE resources SET is_active = 0 WHERE id = ?').run(req.params.id);
     res.json({ ok: true });
   });
@@ -77,32 +88,41 @@ module.exports = function(db) {
     const { name, color, details } = req.body;
     const entId = req.user?.enterprise_id;
     if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
-    const result = db.prepare('INSERT INTO clients (name, color, details, enterprise_id) VALUES (?, ?, ?, ?)').run(name, color || '#6366F1', details || '', entId);
+    const userRole = req.user?.role;
+    if (userRole !== 'admin' && userRole !== 'manager') return res.status(403).json({ error: '仅经理及以上可添加客户' });
+    const result = db.prepare('INSERT INTO clients (name, color, details, enterprise_id, created_by) VALUES (?, ?, ?, ?, ?)').run(name, color || '#6366F1', details || '', entId, req.user.id);
     res.json({ id: result.lastInsertRowid });
   });
 
   router.put('/clients/:id', (req, res) => {
     const { name, color, details } = req.body;
+    const userRole = req.user?.role;
+    if (userRole !== 'admin' && userRole !== 'manager') return res.status(403).json({ error: '仅经理及以上可编辑客户' });
+    if (userRole === 'manager') {
+      const client = db.prepare('SELECT created_by FROM clients WHERE id=?').get(req.params.id);
+      if (client && client.created_by !== req.user.id) return res.status(403).json({ error: '经理只能编辑自己创建的客户' });
+    }
     db.prepare('UPDATE clients SET name=?, color=?, details=? WHERE id=?')
       .run(name, color || '#6366F1', details || '', req.params.id);
     res.json({ ok: true });
   });
 
   router.patch('/clients/:id/archive', (req, res) => {
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: '仅管理员可归档客户' });
     db.prepare('UPDATE clients SET is_archived = 1 WHERE id = ?').run(req.params.id);
-    // Also archive all projects under this client
     db.prepare('UPDATE projects SET is_archived = 1 WHERE client_id = ? AND is_active = 1').run(req.params.id);
     res.json({ ok: true });
   });
 
   router.patch('/clients/:id/unarchive', (req, res) => {
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: '仅管理员可取消归档客户' });
     db.prepare('UPDATE clients SET is_archived = 0 WHERE id = ?').run(req.params.id);
-    // Also unarchive all projects under this client
     db.prepare('UPDATE projects SET is_archived = 0 WHERE client_id = ?').run(req.params.id);
     res.json({ ok: true });
   });
 
   router.delete('/clients/:id', (req, res) => {
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: '仅管理员可删除客户' });
     db.prepare('UPDATE clients SET is_active = 0 WHERE id = ?').run(req.params.id);
     res.json({ ok: true });
   });
@@ -124,29 +144,40 @@ module.exports = function(db) {
     const { name, client_id, color, code, start_date, end_date, budget_hours, hourly_rate, billable, details } = req.body;
     const entId = req.user?.enterprise_id;
     if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
-    const result = db.prepare('INSERT INTO projects (name, client_id, color, code, start_date, end_date, budget_hours, hourly_rate, billable, details, enterprise_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
-      .run(name, client_id || null, color || '#8B5CF6', code || '', start_date || null, end_date || null, budget_hours || 0, hourly_rate || 0, billable != null ? (billable ? 1 : 0) : 1, details || '', entId);
+    const userRole = req.user?.role;
+    if (userRole !== 'admin' && userRole !== 'manager') return res.status(403).json({ error: '仅经理及以上可添加项目' });
+    const result = db.prepare('INSERT INTO projects (name, client_id, color, code, start_date, end_date, budget_hours, hourly_rate, billable, details, enterprise_id, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
+      .run(name, client_id || null, color || '#8B5CF6', code || '', start_date || null, end_date || null, budget_hours || 0, hourly_rate || 0, billable != null ? (billable ? 1 : 0) : 1, details || '', entId, req.user.id);
     res.json({ id: result.lastInsertRowid });
   });
 
   router.put('/projects/:id', (req, res) => {
     const { name, client_id, color, code, start_date, end_date, budget_hours, hourly_rate, billable, details } = req.body;
+    const userRole = req.user?.role;
+    if (userRole !== 'admin' && userRole !== 'manager') return res.status(403).json({ error: '仅经理及以上可编辑项目' });
+    if (userRole === 'manager') {
+      const proj = db.prepare('SELECT created_by FROM projects WHERE id=?').get(req.params.id);
+      if (proj && proj.created_by !== req.user.id) return res.status(403).json({ error: '经理只能编辑自己创建的项目' });
+    }
     db.prepare('UPDATE projects SET name=?, client_id=?, color=?, code=?, start_date=?, end_date=?, budget_hours=?, hourly_rate=?, billable=?, details=? WHERE id=?')
       .run(name, client_id, color, code || '', start_date, end_date, budget_hours, hourly_rate, billable != null ? (billable ? 1 : 0) : 1, details || '', req.params.id);
     res.json({ ok: true });
   });
 
   router.patch('/projects/:id/archive', (req, res) => {
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: '仅管理员可归档项目' });
     db.prepare('UPDATE projects SET is_archived = 1 WHERE id = ?').run(req.params.id);
     res.json({ ok: true });
   });
 
   router.patch('/projects/:id/unarchive', (req, res) => {
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: '仅管理员可取消归档项目' });
     db.prepare('UPDATE projects SET is_archived = 0 WHERE id = ?').run(req.params.id);
     res.json({ ok: true });
   });
 
   router.delete('/projects/:id', (req, res) => {
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: '仅管理员可删除项目' });
     db.prepare('UPDATE projects SET is_active = 0 WHERE id = ?').run(req.params.id);
     res.json({ ok: true });
   });
@@ -200,15 +231,23 @@ module.exports = function(db) {
 
   // === BOOKINGS ===
 
-  // Permission helper: can this user book for the given resource?
+  // Permission helper: can this user create/edit bookings?
+  // admin: full access | manager: can book for anyone | basic: read-only
   function canBookResource(user, resourceId) {
     if (!user) return false;
-    // Owner & admin can always book
-    if (user.role === 'owner' || user.role === 'admin') return true;
-    // Member can always book their own resource
-    if (user.resource_id && user.resource_id === resourceId) return true;
-    // Otherwise need perm_book_others
-    return !!user.perm_book_others;
+    if (user.role === 'admin') return true;
+    if (user.role === 'manager') return true;
+    // basic: can only log their own timesheets, not bookings
+    return false;
+  }
+
+  // Permission helper: can this user edit/delete a specific booking?
+  // admin: yes | manager: only own created bookings | basic: no
+  function canEditBooking(user, booking) {
+    if (!user) return false;
+    if (user.role === 'admin') return true;
+    if (user.role === 'manager') return booking.created_by === user.id;
+    return false;
   }
 
   router.get('/bookings', (req, res) => {
@@ -234,7 +273,7 @@ module.exports = function(db) {
     const { resource_id, project_id, date, end_date, hours, is_tentative, notes } = req.body;
 
     if (!canBookResource(req.user, resource_id)) {
-      return res.status(403).json({ error: '您没有为他人排程的权限' });
+      return res.status(403).json({ error: '您没有创建排程的权限' });
     }
 
     const startDate = date;
@@ -242,15 +281,16 @@ module.exports = function(db) {
     const bookHours = hours || 8;
     const tentative = is_tentative ? 1 : 0;
     const bookNotes = notes || '';
+    const createdBy = req.user?.id || null;
 
-    const insert = db.prepare('INSERT INTO bookings (resource_id, project_id, date, hours, is_tentative, notes) VALUES (?,?,?,?,?,?)');
+    const insert = db.prepare('INSERT INTO bookings (resource_id, project_id, date, hours, is_tentative, notes, created_by) VALUES (?,?,?,?,?,?,?)');
     const batchInsert = db.transaction(() => {
       const d = new Date(startDate);
       const end = new Date(endDate);
       const ids = [];
       while (d <= end) {
         const dateStr = d.toISOString().split('T')[0];
-        const result = insert.run(resource_id, project_id, dateStr, bookHours, tentative, bookNotes);
+        const result = insert.run(resource_id, project_id, dateStr, bookHours, tentative, bookNotes, createdBy);
         ids.push(result.lastInsertRowid);
         d.setDate(d.getDate() + 1);
       }
@@ -272,9 +312,10 @@ module.exports = function(db) {
 
   router.put('/bookings/:id', (req, res) => {
     const { resource_id, project_id, date, hours, is_tentative, notes } = req.body;
-
-    if (!canBookResource(req.user, resource_id)) {
-      return res.status(403).json({ error: '您没有为他人排程的权限' });
+    const existing = db.prepare('SELECT * FROM bookings WHERE id=?').get(req.params.id);
+    if (!existing) return res.status(404).json({ error: '预订不存在' });
+    if (!canEditBooking(req.user, existing)) {
+      return res.status(403).json({ error: '您只能编辑自己创建的排程' });
     }
 
     db.prepare('UPDATE bookings SET resource_id=?, project_id=?, date=?, hours=?, is_tentative=?, notes=? WHERE id=?')
@@ -293,8 +334,8 @@ module.exports = function(db) {
     const booking = db.prepare('SELECT b.*, r.name as rname, p.name as pname FROM bookings b JOIN resources r ON b.resource_id=r.id JOIN projects p ON b.project_id=p.id WHERE b.id=?').get(req.params.id);
     if (!booking) return res.status(404).json({ error: '预订不存在' });
 
-    if (!canBookResource(req.user, booking.resource_id)) {
-      return res.status(403).json({ error: '您没有为他人排程的权限' });
+    if (!canEditBooking(req.user, booking)) {
+      return res.status(403).json({ error: '您只能删除自己创建的排程' });
     }
 
     db.prepare('DELETE FROM bookings WHERE id = ?').run(req.params.id);
@@ -427,15 +468,14 @@ module.exports = function(db) {
     const entId = req.user?.enterprise_id;
     if (!entId) return res.json([]);
 
-    /* Project manager: only show their managed projects */
+    /* basic users: no reports access */
+    if (req.user?.role === 'basic') return res.status(403).json({ error: '您没有查看报表的权限' });
+    /* manager: only show projects they created */
     let projectFilter = '';
     let extraParams = [];
-    if (req.user.perm_project_manager && !['owner','admin'].includes(req.user.role)) {
-      let managedIds = [];
-      try { managedIds = JSON.parse(req.user.managed_project_ids || '[]'); } catch(_) {}
-      if (!managedIds.length) return res.json({ rows: [], summary: { total_projects: 0, budget_hours: 0, scheduled_hours: 0, actual_hours: 0 } });
-      projectFilter = ' AND p.id IN (' + managedIds.map(() => '?').join(',') + ')';
-      extraParams = managedIds;
+    if (req.user?.role === 'manager') {
+      projectFilter = ' AND p.created_by = ?';
+      extraParams = [req.user.id];
     }
 
     const sql = `

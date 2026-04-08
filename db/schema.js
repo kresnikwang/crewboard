@@ -220,6 +220,30 @@ function migrate(db) {
   if (!userCols3.find(c => c.name === 'managed_project_ids')) {
     db.exec("ALTER TABLE users ADD COLUMN managed_project_ids TEXT DEFAULT ''");
   }
+
+  // === New three-role system migration ===
+  // Migrate legacy owner/admin/member + perm_* to new basic/manager/admin roles
+  // owner → admin (full access)
+  db.exec("UPDATE users SET role = 'admin' WHERE role = 'owner'");
+  // admin → admin (already mapped)
+  // member with perm_book_others = 1 → manager
+  db.exec("UPDATE users SET role = 'manager' WHERE role = 'member' AND perm_book_others = 1");
+  // member without perm_book_others → basic
+  db.exec("UPDATE users SET role = 'basic' WHERE role = 'member'");
+
+  // Add created_by to bookings, clients, projects for manager ownership check
+  const bookingCols = db.prepare('PRAGMA table_info(bookings)').all();
+  if (!bookingCols.find(c => c.name === 'created_by')) {
+    db.exec('ALTER TABLE bookings ADD COLUMN created_by INTEGER DEFAULT NULL');
+  }
+  const clientCols3 = db.prepare('PRAGMA table_info(clients)').all();
+  if (!clientCols3.find(c => c.name === 'created_by')) {
+    db.exec('ALTER TABLE clients ADD COLUMN created_by INTEGER DEFAULT NULL');
+  }
+  const projCols3 = db.prepare('PRAGMA table_info(projects)').all();
+  if (!projCols3.find(c => c.name === 'created_by')) {
+    db.exec('ALTER TABLE projects ADD COLUMN created_by INTEGER DEFAULT NULL');
+  }
 }
 
 function seedDemoData(db) {

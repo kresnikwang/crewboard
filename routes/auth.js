@@ -213,36 +213,38 @@ module.exports = function(db) {
     res.json(members);
   });
 
-  // Update member role
+  // Update member role (new three-role system: basic | manager | admin)
   router.put('/enterprises/members/:id/role', (req, res) => {
-    if (req.user?.role !== 'owner') return res.status(403).json({ error: '仅企业主管可操作' });
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: '仅管理员可操作' });
     const { role } = req.body;
-    if (!['admin', 'member'].includes(role)) return res.status(400).json({ error: '无效角色' });
-    // When promoted to admin, grant all permissions automatically
-    if (role === 'admin') {
-      db.prepare('UPDATE users SET role = ?, perm_book_others = 1, perm_manage_resources = 1, perm_view_reports = 1 WHERE id = ? AND enterprise_id = ?')
-        .run(role, req.params.id, req.user.enterprise_id);
-    } else {
-      db.prepare('UPDATE users SET role = ? WHERE id = ? AND enterprise_id = ?')
-        .run(role, req.params.id, req.user.enterprise_id);
-    }
+    if (!['basic', 'manager', 'admin'].includes(role)) return res.status(400).json({ error: '无效角色，可选：basic / manager / admin' });
+    db.prepare('UPDATE users SET role = ? WHERE id = ? AND enterprise_id = ?')
+      .run(role, req.params.id, req.user.enterprise_id);
     res.json({ ok: true });
   });
 
-  // Update member permissions
+  // Update member permissions (deprecated in new role model, kept for backward compat)
+  // Prefer PUT /enterprises/members/:id/role instead
   router.put('/enterprises/members/:id/permissions', (req, res) => {
     if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
-    if (req.user.role !== 'owner' && req.user.role !== 'admin') return res.status(403).json({ error: '仅管理员可操作' });
+    if (req.user.role !== 'admin') return res.status(403).json({ error: '仅管理员可操作' });
 
     const target = db.prepare('SELECT * FROM users WHERE id = ? AND enterprise_id = ?')
       .get(req.params.id, req.user.enterprise_id);
     if (!target) return res.status(404).json({ error: '成员不存在' });
-    // Cannot change owner/admin permissions (they always have all)
-    if (target.role === 'owner' || target.role === 'admin') {
-      return res.status(400).json({ error: '管理员及以上角色默认拥有所有权限' });
+    if (target.role === 'admin') {
+      return res.status(400).json({ error: '管理员角色默认拥有所有权限' });
     }
 
-    const { perm_book_others, perm_manage_resources, perm_view_reports, perm_project_manager } = req.body;
+    // In new model, permissions map directly to roles
+    // This endpoint now accepts { role } or legacy perm booleans
+    const { role, perm_book_others, perm_manage_resources, perm_view_reports, perm_project_manager } = req.body;
+    if (role && ['basic', 'manager', 'admin'].includes(role)) {
+      db.prepare('UPDATE users SET role=? WHERE id=? AND enterprise_id=?')
+        .run(role, req.params.id, req.user.enterprise_id);
+      return res.json({ ok: true });
+    }
+    // Legacy boolean support
     db.prepare('UPDATE users SET perm_book_others=?, perm_manage_resources=?, perm_view_reports=?, perm_project_manager=? WHERE id=? AND enterprise_id=?')
       .run(
         perm_book_others ? 1 : 0,
@@ -425,7 +427,7 @@ module.exports = function(db) {
         const userResult = db.prepare(
           `INSERT INTO users (phone, email, password_hash, name, enterprise_id, role,
             perm_book_others, perm_manage_resources, perm_view_reports, status, must_change_password)
-           VALUES (?, ?, ?, ?, ?, 'member', 0, 0, 0, 'active', 1)`
+           VALUES (?, ?, ?, ?, ?, 'basic', 0, 0, 0, 'active', 1)`
         ).run(phone || null, email || null, hash, name, req.user.enterprise_id);
 
         // Create linked resource entry

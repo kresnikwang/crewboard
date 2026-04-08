@@ -25,8 +25,12 @@
             <span class="mc-role badge" :class="`badge-${m.role}`">{{ roleLabel(m.role) }}</span>
           </div>
           <div class="mc-actions" v-if="canManage(m)">
-            <button class="btn btn-secondary btn-sm" @click="openPermModal(m)">权限</button>
-            <button v-if="m.role !== 'owner'" class="btn btn-danger-outline btn-sm" @click="removeMember(m)">移除</button>
+            <select class="role-select" :value="m.role" @change="changeRole(m, $event.target.value)">
+              <option value="basic">基础用户</option>
+              <option value="manager">经理</option>
+              <option value="admin">管理员</option>
+            </select>
+            <button class="btn btn-danger-outline btn-sm" @click="removeMember(m)">移除</button>
           </div>
         </div>
       </div>
@@ -184,8 +188,16 @@ async function loadMembers() {
   } finally { loadingMembers.value = false }
 }
 
-function roleLabel(r) { return { owner: '所有者', admin: '管理员', member: '成员' }[r] || r }
-function canManage(m) { return auth.user?.role === 'owner' || (auth.user?.role === 'admin' && m.role === 'member') }
+function roleLabel(r) { return { owner: '管理员', admin: '管理员', manager: '经理', member: '基础用户', basic: '基础用户' }[r] || r }
+function canManage(m) { return auth.isAdmin && m.id !== auth.user?.id }
+
+async function changeRole(m, newRole) {
+  try {
+    await enterpriseApi.updateMemberRole(m.id, newRole)
+    m.role = newRole
+    toast(`已将 ${m.name || m.email} 设为${roleLabel(newRole)}`)
+  } catch (e) { toast(e.response?.data?.error || e.message, 'error'); await loadMembers() }
+}
 
 async function removeMember(m) {
   if (!confirm(`确认移除成员「${m.name || m.email}」？`)) return
@@ -217,53 +229,10 @@ function copyInviteCode() {
   toast('邀请码已复制')
 }
 
-// ── Permissions ───────────────────────────────────────────────────
-const showPermModal = ref(false)
-const editingMember = ref(null)
-const permSaving = ref(false)
-const permForm = reactive({
-  perm_book_others: false,
-  perm_manage_resources: false,
-  perm_view_reports: false,
-  perm_project_manager: false,
-  managed_project_ids: [],
-})
-
-const permOptions = [
-  { key: 'perm_book_others', label: '为他人排程', desc: '可以为其他成员创建和修改排程' },
-  { key: 'perm_manage_resources', label: '管理人员和项目', desc: '可以添加、编辑、删除人员和项目' },
-  { key: 'perm_view_reports', label: '查看报表', desc: '可以查看全公司利用率和项目报表' },
-  { key: 'perm_project_manager', label: '项目经理（仅看负责项目）', desc: '只能查看和管理自己负责的项目数据' },
-]
-
-function openPermModal(m) {
-  editingMember.value = m
-  Object.assign(permForm, {
-    perm_book_others: !!m.perm_book_others,
-    perm_manage_resources: !!m.perm_manage_resources,
-    perm_view_reports: !!m.perm_view_reports,
-    perm_project_manager: !!m.perm_project_manager,
-    managed_project_ids: m.managed_project_ids ? JSON.parse(m.managed_project_ids) : [],
-  })
-  showPermModal.value = true
-}
-
-async function savePerms() {
-  permSaving.value = true
-  try {
-    await enterpriseApi.updatePermissions(editingMember.value.id, {
-      perm_book_others: permForm.perm_book_others ? 1 : 0,
-      perm_manage_resources: permForm.perm_manage_resources ? 1 : 0,
-      perm_view_reports: permForm.perm_view_reports ? 1 : 0,
-      perm_project_manager: permForm.perm_project_manager ? 1 : 0,
-      managed_project_ids: JSON.stringify(permForm.managed_project_ids),
-    })
-    toast('权限已更新')
-    showPermModal.value = false
-    await loadMembers()
-  } catch (e) { toast(e.message, 'error') }
-  finally { permSaving.value = false }
-}
+// ── Role descriptions ─────────────────────────────────────────────
+// basic  : 只读，查看排程/工时/报表
+// manager: 可创建排程/项目，只能编辑自己创建的内容
+// admin  : 全权，包含用户管理
 
 // ── Settings ──────────────────────────────────────────────────────
 const settingsForm = reactive({ name: '', currency: 'CNY', theme_color: 'indigo' })
@@ -380,9 +349,12 @@ onMounted(() => {
 .mc-role { font-size: 11px; }
 .mc-actions { display: flex; gap: 6px; }
 .badge { border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 500; }
-.badge-owner { background: #fef3c7; color: #92400e; }
-.badge-admin { background: #dbeafe; color: #1e40af; }
+.badge-owner { background: #ede9fe; color: #7c3aed; }
+.badge-admin { background: #ede9fe; color: #7c3aed; }
+.badge-manager { background: #fef3c7; color: #d97706; }
 .badge-member { background: #f3f4f6; color: #374151; }
+.badge-basic { background: #f3f4f6; color: #374151; }
+.role-select { padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; background: var(--surface); cursor: pointer; }
 
 .settings-form { max-width: 500px; display: flex; flex-direction: column; gap: 16px; }
 .theme-swatches { display: flex; flex-wrap: wrap; gap: 8px; }

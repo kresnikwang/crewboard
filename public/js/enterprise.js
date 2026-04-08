@@ -15,6 +15,11 @@ function isOwnerOrAdmin() {
   return role === 'owner' || role === 'admin';
 }
 
+function isManager() {
+  var role = state.user && state.user.role;
+  return role === 'manager' || isOwnerOrAdmin();
+}
+
 // ============================================================
 // ENTERPRISE PAGE
 // ============================================================
@@ -162,79 +167,48 @@ async function loadEnterpriseMembers() {
     var countEl = document.getElementById('ent-member-count');
     if (countEl) countEl.textContent = members.length + ' 人';
 
-    var isOwner = state.user.role === 'owner';
     var isAdminOrOwner = isOwnerOrAdmin();
-    var roleLabels = { owner: '主管', admin: '管理员', member: '成员' };
-
-    var permLabels = [
-      { key: 'perm_book_others',       label: '排程他人' },
-      { key: 'perm_manage_resources',   label: '管理人员/项目' },
-      { key: 'perm_view_reports',       label: '查看报表' },
-      { key: 'perm_project_manager',    label: '项目经理（仅看负责项目）' },
-    ];
-
-    /* Load projects list for PM assignment */
-    var allProjects = [];
-    try { allProjects = await api('/api/projects'); } catch (_) {}
+    var roleLabels = { owner: '管理员', admin: '管理员', manager: '经理', member: '基础用户', basic: '基础用户' };
+    var roleDescriptions = {
+      admin:   '全权：可管理成员、项目、查看所有报表',
+      manager: '可创建排程，只能编辑自己创建的内容',
+      basic:   '只读：查看排程、工时和报表',
+    };
 
     var html = '<div class="member-list">';
     members.forEach(function (m) {
-      var isAdminRole = m.role === 'owner' || m.role === 'admin';
+      var effectiveRole = (m.role === 'owner' || m.role === 'admin') ? 'admin' : (m.role === 'manager' ? 'manager' : 'basic');
+      var initial = (m.name || m.email || '?').charAt(0).toUpperCase();
 
       html += '<div class="member-card">' +
         '<div class="member-card-header">' +
-          '<div class="member-info">' +
-            '<span class="member-name">' + escHtml(m.name) + '</span>' +
-            '<span class="member-contact">' +
-              (m.phone ? escHtml(m.phone) : '') +
-              (m.phone && m.email ? ' · ' : '') +
-              (m.email ? escHtml(m.email) : '') +
-            '</span>' +
+          '<div class="member-info" style="display:flex;align-items:center;gap:10px">' +
+            '<div class="req-avatar">' + escHtml(initial) + '</div>' +
+            '<div>' +
+              '<div class="member-name">' + escHtml(m.name || '(未设置)') + '</div>' +
+              '<div class="member-contact">' +
+                (m.phone ? escHtml(m.phone) : '') +
+                (m.phone && m.email ? ' · ' : '') +
+                (m.email ? escHtml(m.email) : '') +
+              '</div>' +
+            '</div>' +
           '</div>' +
-          '<div class="member-actions">';
+          '<div class="member-actions" style="display:flex;align-items:center;gap:8px">';
 
-      if (isOwner && m.role !== 'owner') {
-        html += '<select class="text-input member-role-select" data-member-id="' + m.id + '" style="width:auto">' +
-          '<option value="admin"' + (m.role === 'admin' ? ' selected' : '') + '>管理员</option>' +
-          '<option value="member"' + (m.role === 'member' ? ' selected' : '') + '>成员</option>' +
+      if (isAdminOrOwner && m.id !== state.user.id) {
+        html += '<select class="text-input member-role-select" data-member-id="' + m.id + '" style="width:auto;font-size:13px">' +
+          '<option value="basic"' + (effectiveRole === 'basic' ? ' selected' : '') + '>基础用户</option>' +
+          '<option value="manager"' + (effectiveRole === 'manager' ? ' selected' : '') + '>经理</option>' +
+          '<option value="admin"' + (effectiveRole === 'admin' ? ' selected' : '') + '>管理员</option>' +
         '</select>';
       } else {
-        html += '<span class="role-badge role-' + m.role + '">' + (roleLabels[m.role] || m.role) + '</span>';
+        html += '<span class="role-badge role-' + effectiveRole + '">' + (roleLabels[m.role] || m.role) + '</span>';
       }
 
       html += '</div></div>';
 
-      // Permission toggles — only show for members (admin/owner always have all)
-      if (isAdminOrOwner && m.role === 'member') {
-        html += '<div class="member-perms" data-member-id="' + m.id + '">';
-        permLabels.forEach(function (p) {
-          var checked = m[p.key] ? ' checked' : '';
-          html += '<label class="perm-toggle">' +
-            '<input type="checkbox" class="perm-checkbox" data-perm="' + p.key + '"' + checked + '>' +
-            '<span class="perm-label">' + p.label + '</span>' +
-          '</label>';
-        });
-        html += '</div>';
-
-        /* Project manager: project assignment panel */
-        if (m.perm_project_manager) {
-          var managedIds = [];
-          try { managedIds = JSON.parse(m.managed_project_ids || '[]'); } catch(_) {}
-          html += '<div class="pm-projects-panel" data-member-id="' + m.id + '">' +
-            '<div class="pm-projects-label">负责项目：</div>' +
-            '<div class="pm-projects-list">';
-          allProjects.forEach(function (p) {
-            var sel = managedIds.indexOf(p.id) !== -1 ? ' checked' : '';
-            html += '<label class="perm-toggle">' +
-              '<input type="checkbox" class="pm-proj-checkbox" data-proj-id="' + p.id + '"' + sel + '>' +
-              '<span class="perm-label"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + (p.color || '#8B5CF6') + ';margin-right:4px"></span>' + escHtml(p.name) + '</span>' +
-            '</label>';
-          });
-          html += '</div></div>';
-        }
-      } else if (isAdminRole && m.id !== state.user.id) {
-        html += '<div class="member-perms-note">管理员默认拥有所有权限</div>';
-      }
+      // Role description note
+      html += '<div class="member-role-desc">' + (roleDescriptions[effectiveRole] || '') + '</div>';
 
       html += '</div>';
     });
@@ -243,7 +217,7 @@ async function loadEnterpriseMembers() {
     document.getElementById('ent-members').innerHTML = html;
 
     // Bind role change handlers
-    if (isOwner) {
+    if (isAdminOrOwner) {
       document.querySelectorAll('.member-role-select').forEach(function (sel) {
         sel.addEventListener('change', async function () {
           var memberId = sel.dataset.memberId;
@@ -254,7 +228,7 @@ async function loadEnterpriseMembers() {
               body: { role: newRole },
             });
             toast('角色已更新');
-            loadEnterpriseMembers(); // Re-render to update perm toggles
+            loadEnterpriseMembers();
           } catch (err) {
             toast(err.message || '更新失败', 'error');
             loadEnterpriseMembers();
@@ -263,56 +237,7 @@ async function loadEnterpriseMembers() {
       });
     }
 
-    // Bind permission toggle handlers
-    if (isAdminOrOwner) {
-      document.querySelectorAll('.member-perms').forEach(function (container) {
-        var memberId = container.dataset.memberId;
-        container.querySelectorAll('.perm-checkbox').forEach(function (cb) {
-          cb.addEventListener('change', async function () {
-            var permsEl = container;
-            var payload = {
-              perm_book_others:      !!permsEl.querySelector('[data-perm="perm_book_others"]').checked,
-              perm_manage_resources: !!permsEl.querySelector('[data-perm="perm_manage_resources"]').checked,
-              perm_view_reports:     !!permsEl.querySelector('[data-perm="perm_view_reports"]').checked,
-              perm_project_manager:  !!permsEl.querySelector('[data-perm="perm_project_manager"]').checked,
-            };
-            try {
-              await api('/api/auth/enterprises/members/' + memberId + '/permissions', {
-                method: 'PUT',
-                body: payload,
-              });
-              toast('权限已更新');
-              /* Re-render to show/hide PM project panel */
-              loadEnterpriseMembers();
-            } catch (err) {
-              toast(err.message || '更新失败', 'error');
-              cb.checked = !cb.checked;
-            }
-          });
-        });
-      });
 
-      /* Bind PM project assignment checkboxes */
-      document.querySelectorAll('.pm-projects-panel').forEach(function (panel) {
-        var memberId = panel.dataset.memberId;
-        panel.querySelectorAll('.pm-proj-checkbox').forEach(function (cb) {
-          cb.addEventListener('change', async function () {
-            var checked = Array.from(panel.querySelectorAll('.pm-proj-checkbox:checked'))
-              .map(function (c) { return parseInt(c.dataset.projId, 10); });
-            try {
-              await api('/api/auth/enterprises/members/' + memberId + '/managed-projects', {
-                method: 'PUT',
-                body: { project_ids: checked },
-              });
-              toast('项目分配已更新');
-            } catch (err) {
-              toast(err.message || '更新失败', 'error');
-              cb.checked = !cb.checked;
-            }
-          });
-        });
-      });
-    }
   } catch (err) {
     document.getElementById('ent-members').innerHTML = '<p style="color:var(--text-secondary)">加载成员失败</p>';
   }
