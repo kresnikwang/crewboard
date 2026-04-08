@@ -170,7 +170,12 @@ async function loadEnterpriseMembers() {
       { key: 'perm_book_others',       label: '排程他人' },
       { key: 'perm_manage_resources',   label: '管理人员/项目' },
       { key: 'perm_view_reports',       label: '查看报表' },
+      { key: 'perm_project_manager',    label: '项目经理（仅看负责项目）' },
     ];
+
+    /* Load projects list for PM assignment */
+    var allProjects = [];
+    try { allProjects = await api('/api/projects'); } catch (_) {}
 
     var html = '<div class="member-list">';
     members.forEach(function (m) {
@@ -210,6 +215,23 @@ async function loadEnterpriseMembers() {
           '</label>';
         });
         html += '</div>';
+
+        /* Project manager: project assignment panel */
+        if (m.perm_project_manager) {
+          var managedIds = [];
+          try { managedIds = JSON.parse(m.managed_project_ids || '[]'); } catch(_) {}
+          html += '<div class="pm-projects-panel" data-member-id="' + m.id + '">' +
+            '<div class="pm-projects-label">负责项目：</div>' +
+            '<div class="pm-projects-list">';
+          allProjects.forEach(function (p) {
+            var sel = managedIds.indexOf(p.id) !== -1 ? ' checked' : '';
+            html += '<label class="perm-toggle">' +
+              '<input type="checkbox" class="pm-proj-checkbox" data-proj-id="' + p.id + '"' + sel + '>' +
+              '<span class="perm-label"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + (p.color || '#8B5CF6') + ';margin-right:4px"></span>' + escHtml(p.name) + '</span>' +
+            '</label>';
+          });
+          html += '</div></div>';
+        }
       } else if (isAdminRole && m.id !== state.user.id) {
         html += '<div class="member-perms-note">管理员默认拥有所有权限</div>';
       }
@@ -247,12 +269,12 @@ async function loadEnterpriseMembers() {
         var memberId = container.dataset.memberId;
         container.querySelectorAll('.perm-checkbox').forEach(function (cb) {
           cb.addEventListener('change', async function () {
-            // Gather all three values from this member's row
             var permsEl = container;
             var payload = {
-              perm_book_others: !!permsEl.querySelector('[data-perm="perm_book_others"]').checked,
+              perm_book_others:      !!permsEl.querySelector('[data-perm="perm_book_others"]').checked,
               perm_manage_resources: !!permsEl.querySelector('[data-perm="perm_manage_resources"]').checked,
-              perm_view_reports: !!permsEl.querySelector('[data-perm="perm_view_reports"]').checked,
+              perm_view_reports:     !!permsEl.querySelector('[data-perm="perm_view_reports"]').checked,
+              perm_project_manager:  !!permsEl.querySelector('[data-perm="perm_project_manager"]').checked,
             };
             try {
               await api('/api/auth/enterprises/members/' + memberId + '/permissions', {
@@ -260,9 +282,32 @@ async function loadEnterpriseMembers() {
                 body: payload,
               });
               toast('权限已更新');
+              /* Re-render to show/hide PM project panel */
+              loadEnterpriseMembers();
             } catch (err) {
               toast(err.message || '更新失败', 'error');
-              cb.checked = !cb.checked; // revert
+              cb.checked = !cb.checked;
+            }
+          });
+        });
+      });
+
+      /* Bind PM project assignment checkboxes */
+      document.querySelectorAll('.pm-projects-panel').forEach(function (panel) {
+        var memberId = panel.dataset.memberId;
+        panel.querySelectorAll('.pm-proj-checkbox').forEach(function (cb) {
+          cb.addEventListener('change', async function () {
+            var checked = Array.from(panel.querySelectorAll('.pm-proj-checkbox:checked'))
+              .map(function (c) { return parseInt(c.dataset.projId, 10); });
+            try {
+              await api('/api/auth/enterprises/members/' + memberId + '/managed-projects', {
+                method: 'PUT',
+                body: { project_ids: checked },
+              });
+              toast('项目分配已更新');
+            } catch (err) {
+              toast(err.message || '更新失败', 'error');
+              cb.checked = !cb.checked;
             }
           });
         });

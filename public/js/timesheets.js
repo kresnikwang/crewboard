@@ -10,6 +10,9 @@
   var state = window.state;
   var api   = window.api;
 
+  /* ---- module-level cache for current week's bookings (used by copy feature) ---- */
+  var _currentBookings = [];
+
   /* --------------------------------------------------
      1. loadTimesheets — main render function
      -------------------------------------------------- */
@@ -67,6 +70,9 @@
     var timesheets = results[1];
     var bookings   = results[2];
 
+    /* ---- cache bookings for copy feature ---- */
+    _currentBookings = bookings;
+
     /* ---- find relevant projects ---- */
     var relevantIds = {};
     timesheets.forEach(function (ts) { relevantIds[ts.project_id] = true; });
@@ -106,6 +112,13 @@
         handleSave(days);
       };
     }
+
+    /* ---- update totals on input change ---- */
+    gridEl.querySelectorAll('.ts-input').forEach(function (input) {
+      input.addEventListener('input', function () {
+        updateTotals(days, relevantProjects);
+      });
+    });
   };
 
   /* --------------------------------------------------
@@ -131,7 +144,7 @@
       var color = p.client_color || p.color || '#6366F1';
       var codeLabel = p.code ? '<span class="ts-proj-code">' + esc(p.code) + '</span>' : '';
 
-      html += '<tr style="border-left:3px solid ' + color + '">' +
+      html += '<tr style="border-left:3px solid ' + color + '" data-project-id="' + p.id + '">' +
         '<td class="ts-project-cell">' +
         '<span class="ts-color-dot" style="background:' + color + '"></span>' +
         codeLabel + esc(p.name) + '</td>';
@@ -143,7 +156,17 @@
         var placeholder = scheduleMap[key] || '';
         var displayVal = (val !== undefined && val !== null) ? val : '';
 
-        html += '<td><input type="number" class="ts-input"' +
+        /* Variance highlight: if actual differs from scheduled by >20% */
+        var varClass = '';
+        if (displayVal !== '' && placeholder !== '') {
+          var actual = parseFloat(displayVal);
+          var sched  = parseFloat(placeholder);
+          if (sched > 0 && Math.abs(actual - sched) / sched > 0.2) {
+            varClass = ' ts-input-variance';
+          }
+        }
+
+        html += '<td><input type="number" class="ts-input' + varClass + '"' +
           ' data-project="' + p.id + '"' +
           ' data-date="' + dateStr + '"' +
           ' value="' + displayVal + '"' +
@@ -156,19 +179,114 @@
       });
 
       weekTotal += rowTotal;
-      html += '<td class="ts-row-total">' + rowTotal + '</td></tr>';
+      html += '<td class="ts-row-total" id="ts-row-total-' + p.id + '">' + rowTotal + '</td></tr>';
     });
 
     /* ---- totals row ---- */
     html += '<tr class="ts-totals-row"><td>合计</td>';
-    dayTotals.forEach(function (t) {
-      html += '<td>' + t + '</td>';
+    dayTotals.forEach(function (t, idx) {
+      html += '<td id="ts-day-total-' + idx + '">' + t + '</td>';
     });
-    html += '<td>' + weekTotal + '</td></tr>';
+    html += '<td id="ts-week-total">' + weekTotal + '</td></tr>';
 
     html += '</tbody></table>';
-    html += '<div style="margin-top:16px;text-align:right"><button class="btn btn-primary" id="ts-save">保存工时</button></div>';
+    html += '<div style="margin-top:16px;text-align:right">' +
+      '<button class="btn btn-primary" id="ts-save">保存工时</button>' +
+      '</div>';
     return html;
+  }
+
+  /* --------------------------------------------------
+     Live totals updater (called on input change)
+     -------------------------------------------------- */
+  function updateTotals(days, projects) {
+    var dayTotals = days.map(function () { return 0; });
+    var weekTotal = 0;
+
+    projects.forEach(function (p) {
+      var rowTotal = 0;
+      days.forEach(function (d, idx) {
+        var input = document.querySelector(
+          '.ts-input[data-project="' + p.id + '"][data-date="' + fmt(d) + '"]'
+        );
+        if (!input) return;
+        var val = parseFloat(input.value) || 0;
+        rowTotal += val;
+        dayTotals[idx] += val;
+      });
+      weekTotal += rowTotal;
+      var rowTotalEl = document.getElementById('ts-row-total-' + p.id);
+      if (rowTotalEl) rowTotalEl.textContent = rowTotal || 0;
+    });
+
+    dayTotals.forEach(function (t, idx) {
+      var el = document.getElementById('ts-day-total-' + idx);
+      if (el) el.textContent = t || 0;
+    });
+    var weekEl = document.getElementById('ts-week-total');
+    if (weekEl) weekEl.textContent = weekTotal || 0;
+  }
+
+  /* --------------------------------------------------
+     Copy from Schedule — fill inputs with booking hours
+     -------------------------------------------------- */
+  function copyFromSchedule() {
+    var inputs = document.querySelectorAll('.ts-input');
+    if (!inputs.length) {
+      toast('请先加载工时表', 'error');
+      return;
+    }
+
+    /* Build a map from cached bookings: project_date -> total hours */
+    var bookingMap = {};
+    _currentBookings.forEach(function (b) {
+      var key = b.project_id + '_' + b.date;
+      bookingMap[key] = (bookingMap[key] || 0) + b.hours;
+    });
+
+    var filled = 0;
+    var skipped = 0;
+
+    inputs.forEach(function (input) {
+      var key = input.dataset.project + '_' + input.dataset.date;
+      var bookingHours = bookingMap[key];
+      if (bookingHours == null) return;
+
+      if (input.value !== '' && parseFloat(input.value) === bookingHours) {
+        /* Already matches — skip */
+        return;
+      }
+
+      if (input.value !== '' && parseFloat(input.value) !== bookingHours) {
+        /* Has existing value that differs — skip to avoid overwriting */
+        skipped++;
+        return;
+      }
+
+      /* Empty cell — fill with booking hours */
+      input.value = bookingHours;
+      input.classList.add('ts-input-copied');
+      setTimeout(function () { input.classList.remove('ts-input-copied'); }, 1500);
+      filled++;
+    });
+
+    /* Trigger totals refresh */
+    var days = weekDates(state.tsWeekStart).slice(0, 5);
+    var projects = (state.resources || []).map(function () { return null; }); /* dummy */
+    /* Simpler: just re-read all inputs */
+    var allInputs = document.querySelectorAll('.ts-input');
+    var projectIds = {};
+    allInputs.forEach(function (inp) { projectIds[inp.dataset.project] = true; });
+    var projectList = Object.keys(projectIds).map(function (id) { return { id: parseInt(id, 10) }; });
+    updateTotals(days, projectList);
+
+    if (filled > 0) {
+      toast('已从排程复制 ' + filled + ' 条工时' + (skipped > 0 ? '，跳过 ' + skipped + ' 条已有记录' : ''), 'success');
+    } else if (skipped > 0) {
+      toast('所有格子已有工时记录，未覆盖', 'info');
+    } else {
+      toast('本周排程中没有可复制的工时', 'info');
+    }
   }
 
   /* --------------------------------------------------
@@ -208,6 +326,7 @@
     var prevBtn  = document.getElementById('ts-prev');
     var nextBtn  = document.getElementById('ts-next');
     var todayBtn = document.getElementById('ts-today');
+    var copyBtn  = document.getElementById('ts-copy-from-schedule');
 
     if (prevBtn) {
       prevBtn.addEventListener('click', function () {
@@ -226,6 +345,9 @@
         state.tsWeekStart = getMonday(new Date());
         window.loadTimesheets();
       });
+    }
+    if (copyBtn) {
+      copyBtn.addEventListener('click', copyFromSchedule);
     }
   });
 

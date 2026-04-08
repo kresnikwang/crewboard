@@ -151,6 +151,53 @@ module.exports = function(db) {
     res.json({ ok: true });
   });
 
+  // === SCHEDULE DATA AGGREGATION (performance optimization) ===
+  // Returns resources + bookings + leave + holidays in a single request
+  router.get('/schedule-data', (req, res) => {
+    const { start, end } = req.query;
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.json({ resources: [], bookings: [], leave: [], holidays: {} });
+    if (!start || !end) return res.status(400).json({ error: '缺少日期参数' });
+
+    /* Resources */
+    const resources = db.prepare(
+      'SELECT * FROM resources WHERE is_active = 1 AND enterprise_id = ? ORDER BY team, name'
+    ).all(entId);
+
+    /* Bookings with joined names */
+    const bookings = db.prepare(`
+      SELECT b.*, r.name as resource_name, r.color as resource_color, r.team,
+             p.name as project_name, COALESCE(c.color, p.color) as project_color, c.name as client_name
+      FROM bookings b
+      JOIN resources r ON b.resource_id = r.id
+      JOIN projects p ON b.project_id = p.id
+      LEFT JOIN clients c ON p.client_id = c.id
+      WHERE r.enterprise_id = ? AND b.date >= ? AND b.date <= ?
+      ORDER BY r.name, b.date
+    `).all(entId, start, end);
+
+    /* Leave entries */
+    const leave = db.prepare(`
+      SELECT l.*, r.name as resource_name
+      FROM leave_entries l
+      JOIN resources r ON l.resource_id = r.id
+      WHERE r.enterprise_id = ? AND l.date >= ? AND l.date <= ?
+    `).all(entId, start, end);
+
+    /* Holidays */
+    const holidayResult = {};
+    const d = new Date(start);
+    const endDate = new Date(end);
+    while (d <= endDate) {
+      const dateStr = d.toISOString().split('T')[0];
+      const h = getHoliday(dateStr);
+      if (h) holidayResult[dateStr] = h;
+      d.setDate(d.getDate() + 1);
+    }
+
+    res.json({ resources, bookings, leave, holidays: holidayResult });
+  });
+
   // === BOOKINGS ===
 
   // Permission helper: can this user book for the given resource?
@@ -352,15 +399,45 @@ module.exports = function(db) {
 
     const result = rows.map(r => ({
       ...r,
+      group: r.team,
+      available_hours: workingDays * r.hours_per_day,
       capacity_hours: workingDays * r.hours_per_day,
       utilization: workingDays > 0 ? Math.round((r.booked_hours / (workingDays * r.hours_per_day)) * 100) : 0,
       actual_utilization: workingDays > 0 ? Math.round((r.actual_hours / (workingDays * r.hours_per_day)) * 100) : 0,
     }));
-    res.json({ data: result, working_days: workingDays });
+    const totalBooked = result.reduce((s, r) => s + r.booked_hours, 0);
+    const totalAvail  = result.reduce((s, r) => s + r.available_hours, 0);
+    const avgUtil = totalAvail > 0 ? Math.round(totalBooked / totalAvail * 100) : 0;
+    res.json({
+      data: result,
+      working_days: workingDays,
+      /* unified shape for front-end */
+      rows: result,
+      summary: {
+        avg_utilization: avgUtil,
+        total_booked: totalBooked,
+        total_available: totalAvail,
+        working_days: workingDays
+      }
+    });
   });
 
   router.get('/reports/projects', (req, res) => {
     const { start, end } = req.query;
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.json([]);
+
+    /* Project manager: only show their managed projects */
+    let projectFilter = '';
+    let extraParams = [];
+    if (req.user.perm_project_manager && !['owner','admin'].includes(req.user.role)) {
+      let managedIds = [];
+      try { managedIds = JSON.parse(req.user.managed_project_ids || '[]'); } catch(_) {}
+      if (!managedIds.length) return res.json({ rows: [], summary: { total_projects: 0, budget_hours: 0, scheduled_hours: 0, actual_hours: 0 } });
+      projectFilter = ' AND p.id IN (' + managedIds.map(() => '?').join(',') + ')';
+      extraParams = managedIds;
+    }
+
     const sql = `
       SELECT p.id, p.name, p.color, p.budget_hours, p.hourly_rate, c.name as client_name,
         COALESCE(SUM(b.hours), 0) as booked_hours,
@@ -368,13 +445,64 @@ module.exports = function(db) {
       FROM projects p
       LEFT JOIN clients c ON p.client_id = c.id
       LEFT JOIN bookings b ON p.id = b.project_id AND b.date >= ? AND b.date <= ?
-      WHERE p.is_active = 1 AND p.enterprise_id = ?
+      WHERE p.is_active = 1 AND p.enterprise_id = ?${projectFilter}
       GROUP BY p.id
       ORDER BY p.name
     `;
+    const projRows = db.prepare(sql).all(start, end, start, end, entId, ...extraParams);
+    const projResult = projRows.map(r => ({
+      ...r,
+      client: r.client_name,
+      scheduled_hours: r.booked_hours,
+      progress: r.budget_hours > 0 ? Math.round(r.booked_hours / r.budget_hours * 100) : 0
+    }));
+    const totalBudget    = projResult.reduce((s, r) => s + (r.budget_hours || 0), 0);
+    const totalScheduled = projResult.reduce((s, r) => s + (r.booked_hours || 0), 0);
+    const totalActual    = projResult.reduce((s, r) => s + (r.actual_hours || 0), 0);
+    res.json({
+      rows: projResult,
+      summary: {
+        total_projects: projResult.length,
+        budget_hours: totalBudget,
+        scheduled_hours: totalScheduled,
+        actual_hours: totalActual
+      }
+    });
+  });
+
+  // === DRILL-DOWN: resource -> projects ===
+  router.get('/reports/resource-drill', (req, res) => {
+    const { resource_id, start, end } = req.query;
     const entId = req.user?.enterprise_id;
-    if (!entId) return res.json([]);
-    res.json(db.prepare(sql).all(start, end, start, end, entId));
+    if (!entId || !resource_id) return res.json([]);
+    const sql = `
+      SELECT p.id, p.name, p.color, c.name as client_name,
+        COALESCE(SUM(b.hours), 0) as booked_hours,
+        (SELECT COALESCE(SUM(t.hours),0) FROM timesheets t WHERE t.resource_id=? AND t.project_id=p.id AND t.date>=? AND t.date<=?) as actual_hours
+      FROM bookings b
+      JOIN projects p ON b.project_id = p.id
+      LEFT JOIN clients c ON p.client_id = c.id
+      WHERE b.resource_id=? AND b.date>=? AND b.date<=?
+      GROUP BY p.id ORDER BY booked_hours DESC
+    `;
+    res.json(db.prepare(sql).all(resource_id, start, end, resource_id, start, end));
+  });
+
+  // === DRILL-DOWN: project -> members ===
+  router.get('/reports/project-drill', (req, res) => {
+    const { project_id, start, end } = req.query;
+    const entId = req.user?.enterprise_id;
+    if (!entId || !project_id) return res.json([]);
+    const sql = `
+      SELECT r.id, r.name, r.role, r.team, r.color,
+        COALESCE(SUM(b.hours), 0) as booked_hours,
+        (SELECT COALESCE(SUM(t.hours),0) FROM timesheets t WHERE t.resource_id=r.id AND t.project_id=? AND t.date>=? AND t.date<=?) as actual_hours
+      FROM bookings b
+      JOIN resources r ON b.resource_id = r.id
+      WHERE b.project_id=? AND b.date>=? AND b.date<=? AND r.enterprise_id=?
+      GROUP BY r.id ORDER BY booked_hours DESC
+    `;
+    res.json(db.prepare(sql).all(project_id, start, end, project_id, start, end, entId));
   });
 
   // === LEAVE ===

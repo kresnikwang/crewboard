@@ -211,6 +211,15 @@ function migrate(db) {
     db.exec('ALTER TABLE clients ADD COLUMN is_archived INTEGER DEFAULT 0');
   }
   db.exec('UPDATE clients SET is_archived = 0 WHERE is_archived IS NULL');
+
+  // Add project manager permission fields
+  const userCols3 = db.prepare('PRAGMA table_info(users)').all();
+  if (!userCols3.find(c => c.name === 'perm_project_manager')) {
+    db.exec('ALTER TABLE users ADD COLUMN perm_project_manager INTEGER DEFAULT 0');
+  }
+  if (!userCols3.find(c => c.name === 'managed_project_ids')) {
+    db.exec("ALTER TABLE users ADD COLUMN managed_project_ids TEXT DEFAULT ''");
+  }
 }
 
 function seedDemoData(db) {

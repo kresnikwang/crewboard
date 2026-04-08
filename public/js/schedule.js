@@ -12,6 +12,11 @@
   /* ---- cached bookings & leave used by edit lookup ---- */
   var _allBookings = [];
   var _allLeave    = [];
+  /* expose to window so saveBooking (outside IIFE) can access */
+  Object.defineProperty(window, '_allLeave', {
+    get: function () { return _allLeave; },
+    configurable: true
+  });
 
   /* ---- view mode: 'week' or 'month' ---- */
   if (!state.scheduleView) state.scheduleView = 'week';
@@ -54,17 +59,13 @@
     var todayBtn = document.getElementById('schedule-today');
     if (todayBtn) todayBtn.textContent = isMonth ? '本月' : '本周';
 
-    var results = await Promise.all([
-      api('/api/resources'),
-      api('/api/bookings?start=' + startStr + '&end=' + endStr),
-      api('/api/leave?start=' + startStr + '&end=' + endStr),
-      api('/api/holidays?start=' + startStr + '&end=' + endStr)
-    ]);
+    /* Single aggregated request instead of 4 parallel calls */
+    var schedData = await api('/api/schedule-data?start=' + startStr + '&end=' + endStr);
 
-    var resources = results[0];
-    var bookings  = results[1];
-    var leave     = results[2];
-    var holidays  = results[3];
+    var resources = schedData.resources;
+    var bookings  = schedData.bookings;
+    var leave     = schedData.leave;
+    var holidays  = schedData.holidays;
 
     state.resources = resources;
     _allBookings = bookings;
@@ -1573,22 +1574,113 @@
         };
         await api('/api/bookings/' + id, { method: 'PUT', body: data });
       } else {
-        /* Create bookings for each selected resource */
-        var promises = resourceIds.map(function (rid) {
-          return api('/api/bookings', {
-            method: 'POST',
-            body: {
-              resource_id: rid,
-              project_id: projectId,
-              date: document.getElementById('bk-date-start').value,
-              end_date: document.getElementById('bk-date-end').value,
-              hours: Math.round(totalH * 10) / 10,
-              is_tentative: document.getElementById('bk-tentative').checked,
-              notes: document.getElementById('bk-notes').value
+        /* --- Leave conflict check --- */
+        var startDateVal = document.getElementById('bk-date-start').value;
+        var endDateVal   = document.getElementById('bk-date-end').value || startDateVal;
+        var lMap = {};
+        if (window._allLeave) {
+          window._allLeave.forEach(function (l) {
+            var k = l.resource_id + '_' + l.date;
+            lMap[k] = true;
+          });
+        }
+
+        /* Collect all dates in the booking range */
+        var rangeDates = [];
+        var dCursor = new Date(startDateVal);
+        var dEnd    = new Date(endDateVal);
+        while (dCursor <= dEnd) {
+          rangeDates.push(dCursor.toISOString().split('T')[0]);
+          dCursor.setDate(dCursor.getDate() + 1);
+        }
+
+        /* For each resource, find which dates have leave */
+        var conflictInfo = [];
+        resourceIds.forEach(function (rid) {
+          rangeDates.forEach(function (dateStr) {
+            if (lMap[rid + '_' + dateStr]) {
+              conflictInfo.push({ rid: rid, date: dateStr });
             }
           });
         });
-        await Promise.all(promises);
+
+        if (conflictInfo.length > 0) {
+          /* Build a readable summary */
+          var conflictDates = {};
+          conflictInfo.forEach(function (c) {
+            conflictDates[c.date] = true;
+          });
+          var dateList = Object.keys(conflictDates).sort().slice(0, 5).join('、');
+          if (Object.keys(conflictDates).length > 5) dateList += ' 等';
+
+          /* Ask user: skip leave days or cancel */
+          var skipConfirmed = window.confirm(
+            '以下日期已有休假安排：' + dateList + '\n\n' +
+            '点击「确定」自动跳过休假日继续创建；\n点击「取消」放弃本次操作。'
+          );
+          if (!skipConfirmed) return;
+
+          /* Filter out leave dates from each resource's booking range */
+          /* We'll create per-resource, per-contiguous-segment bookings */
+          var createPromises = [];
+          resourceIds.forEach(function (rid) {
+            /* Find non-leave dates for this resource */
+            var validDates = rangeDates.filter(function (d) {
+              return !lMap[rid + '_' + d];
+            });
+            if (!validDates.length) return;
+
+            /* Group into contiguous segments */
+            var segments = [];
+            var seg = [validDates[0]];
+            for (var vi = 1; vi < validDates.length; vi++) {
+              var prev = new Date(validDates[vi - 1]);
+              var curr = new Date(validDates[vi]);
+              var diff = (curr - prev) / 86400000;
+              if (diff === 1) {
+                seg.push(validDates[vi]);
+              } else {
+                segments.push(seg);
+                seg = [validDates[vi]];
+              }
+            }
+            segments.push(seg);
+
+            segments.forEach(function (s) {
+              createPromises.push(api('/api/bookings', {
+                method: 'POST',
+                body: {
+                  resource_id: rid,
+                  project_id: projectId,
+                  date: s[0],
+                  end_date: s[s.length - 1],
+                  hours: Math.round(totalH * 10) / 10,
+                  is_tentative: document.getElementById('bk-tentative').checked,
+                  notes: document.getElementById('bk-notes').value
+                }
+              }));
+            });
+          });
+          await Promise.all(createPromises);
+
+        } else {
+          /* No conflicts — normal batch create */
+          var promises = resourceIds.map(function (rid) {
+            return api('/api/bookings', {
+              method: 'POST',
+              body: {
+                resource_id: rid,
+                project_id: projectId,
+                date: startDateVal,
+                end_date: endDateVal,
+                hours: Math.round(totalH * 10) / 10,
+                is_tentative: document.getElementById('bk-tentative').checked,
+                notes: document.getElementById('bk-notes').value
+              }
+            });
+          });
+          await Promise.all(promises);
+        }
       }
       document.getElementById('modal').classList.remove('bk-modal');
       closeModal();

@@ -206,6 +206,7 @@ module.exports = function(db) {
     const members = db.prepare(`
       SELECT u.id, u.name, u.phone, u.email, u.role, u.resource_id,
              u.perm_book_others, u.perm_manage_resources, u.perm_view_reports,
+             u.perm_project_manager, u.managed_project_ids,
              u.created_at
       FROM users u WHERE u.enterprise_id = ? AND u.status = 'active' ORDER BY u.role DESC, u.name
     `).all(req.user.enterprise_id);
@@ -241,15 +242,30 @@ module.exports = function(db) {
       return res.status(400).json({ error: '管理员及以上角色默认拥有所有权限' });
     }
 
-    const { perm_book_others, perm_manage_resources, perm_view_reports } = req.body;
-    db.prepare('UPDATE users SET perm_book_others=?, perm_manage_resources=?, perm_view_reports=? WHERE id=? AND enterprise_id=?')
+    const { perm_book_others, perm_manage_resources, perm_view_reports, perm_project_manager } = req.body;
+    db.prepare('UPDATE users SET perm_book_others=?, perm_manage_resources=?, perm_view_reports=?, perm_project_manager=? WHERE id=? AND enterprise_id=?')
       .run(
         perm_book_others ? 1 : 0,
         perm_manage_resources ? 1 : 0,
         perm_view_reports ? 1 : 0,
+        perm_project_manager ? 1 : 0,
         req.params.id,
         req.user.enterprise_id
       );
+    res.json({ ok: true });
+  });
+
+  // Assign managed projects to a project manager
+  router.put('/enterprises/members/:id/managed-projects', (req, res) => {
+    if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
+    if (req.user.role !== 'owner' && req.user.role !== 'admin') return res.status(403).json({ error: '仅管理员可操作' });
+    const target = db.prepare('SELECT * FROM users WHERE id = ? AND enterprise_id = ?')
+      .get(req.params.id, req.user.enterprise_id);
+    if (!target) return res.status(404).json({ error: '成员不存在' });
+    const { project_ids } = req.body; // array of project IDs
+    const idsJson = JSON.stringify(Array.isArray(project_ids) ? project_ids.map(Number) : []);
+    db.prepare('UPDATE users SET managed_project_ids = ? WHERE id = ? AND enterprise_id = ?')
+      .run(idsJson, req.params.id, req.user.enterprise_id);
     res.json({ ok: true });
   });
 
@@ -497,7 +513,7 @@ module.exports.authMiddleware = function(db) {
     if (token) {
       const session = db.prepare('SELECT * FROM sessions WHERE token = ? AND expires_at > datetime(?)').get(token, new Date().toISOString());
       if (session) {
-        req.user = db.prepare('SELECT id, name, phone, email, enterprise_id, resource_id, role, avatar, perm_book_others, perm_manage_resources, perm_view_reports, status FROM users WHERE id = ?').get(session.user_id);
+        req.user = db.prepare('SELECT id, name, phone, email, enterprise_id, resource_id, role, avatar, perm_book_others, perm_manage_resources, perm_view_reports, perm_project_manager, managed_project_ids, status FROM users WHERE id = ?').get(session.user_id);
       }
     }
     next();

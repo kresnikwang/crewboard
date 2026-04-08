@@ -187,6 +187,56 @@ a { text-decoration: none; color: inherit; }
 .util-bar { height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; min-width: 120px; }
 .util-bar-fill { height: 100%; border-radius: 3px; transition: width .3s; }
 
+/* report summary cards */
+.report-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 24px; }
+.summary-card { background: var(--surface); border-radius: var(--radius); padding: 16px 20px; box-shadow: var(--shadow); }
+.summary-label { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+.summary-value { font-size: 22px; font-weight: 700; color: var(--text); }
+.summary-sub { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+
+/* report charts */
+.report-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+.report-chart-card { background: var(--surface); border-radius: var(--radius); padding: 16px 20px; box-shadow: var(--shadow); }
+.report-chart-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 12px; }
+@media (max-width: 900px) { .report-charts { grid-template-columns: 1fr; } }
+
+/* report table wrap */
+.report-table-wrap { overflow-x: auto; }
+
+/* drillable rows */
+.report-row-drillable { cursor: pointer; transition: background .15s; }
+.report-row-drillable:hover { background: var(--hover) !important; }
+.report-row-drillable.drill-open { background: var(--primary-light, #ede9fe) !important; }
+.drill-row td { padding: 0 !important; background: var(--bg); }
+.drill-content { padding: 12px 24px 16px 48px; }
+.drill-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.drill-table th { padding: 6px 10px; color: var(--text-secondary); font-weight: 600; border-bottom: 1px solid var(--border); }
+.drill-table td { padding: 6px 10px; border-bottom: 1px solid var(--border); }
+.drill-loading, .drill-empty { padding: 12px 24px; font-size: 13px; color: var(--text-secondary); }
+
+/* report name cell */
+.report-name-cell { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.report-color-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* overrun badge */
+.overrun-badge { display: inline-block; font-size: 10px; font-weight: 700; color: #fff; background: #e74c3c; border-radius: 3px; padding: 1px 5px; margin-left: 6px; vertical-align: middle; }
+
+/* quick preset buttons */
+.report-presets { display: flex; gap: 4px; flex-wrap: wrap; }
+.btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text-secondary); border-radius: var(--radius); padding: 4px 10px; font-size: 12px; cursor: pointer; transition: all .15s; }
+.btn-ghost:hover { background: var(--hover); color: var(--text); border-color: var(--primary); }
+
+/* PM project assignment panel */
+.pm-projects-panel { padding: 8px 12px 10px 12px; background: var(--bg); border-top: 1px solid var(--border); }
+.pm-projects-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; }
+.pm-projects-list { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* ts copy flash */
+.ts-input-copied { background: #d1fae5 !important; transition: background .3s; }
+.ts-input-variance { border-color: #f59e0b !important; background: #fffbeb; }
+
+.report-loading { padding: 40px; text-align: center; color: var(--text-secondary); }
+
 /* === RESOURCE / PROJECT LIST === */
 .resource-list, .project-list { padding: 24px; }
 #clients-projects-container { padding: 24px; overflow-y: auto; flex: 1; }

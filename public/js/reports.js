@@ -1,26 +1,29 @@
 /* ============================================================
-   reports.js — Resource Guru reports module
-   Utilization & project reports with Excel export
+   reports.js — Reports module (enhanced)
+   Features: Chart.js charts, quick date presets, drill-down
    Dependencies: state, api, fmt, toast (from core.js)
    ============================================================ */
 
 (function () {
   'use strict';
 
+  /* ---- Chart.js instances (destroy before re-creating) ---- */
+  var _utilChart = null;
+  var _projChart = null;
+
+  /* ---- current report data cache (for drill-down) ---- */
+  var _lastStart = '';
+  var _lastEnd   = '';
+
   // --------------- Helpers ---------------
 
-  function el(id) {
-    return document.getElementById(id);
-  }
+  function el(id) { return document.getElementById(id); }
 
-  function getMonthStart() {
-    var now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
-  }
-
-  function getMonthEnd() {
-    var now = new Date();
-    return new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  function fmt(d) {
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + day;
   }
 
   function utilColor(pct) {
@@ -40,55 +43,124 @@
     return d.innerHTML;
   }
 
+  function destroyCharts() {
+    if (_utilChart) { try { _utilChart.destroy(); } catch (_) {} _utilChart = null; }
+    if (_projChart) { try { _projChart.destroy(); } catch (_) {} _projChart = null; }
+  }
+
+  // --------------- Quick Date Presets ---------------
+
+  function applyPreset(preset) {
+    var now = new Date();
+    var y = now.getFullYear();
+    var m = now.getMonth();
+    var start, end;
+
+    switch (preset) {
+      case 'this_week': {
+        var day = now.getDay() || 7;
+        start = new Date(now); start.setDate(now.getDate() - day + 1);
+        end   = new Date(start); end.setDate(start.getDate() + 6);
+        break;
+      }
+      case 'last_week': {
+        var day2 = now.getDay() || 7;
+        end   = new Date(now); end.setDate(now.getDate() - day2);
+        start = new Date(end); start.setDate(end.getDate() - 6);
+        break;
+      }
+      case 'this_month':
+        start = new Date(y, m, 1);
+        end   = new Date(y, m + 1, 0);
+        break;
+      case 'last_month':
+        start = new Date(y, m - 1, 1);
+        end   = new Date(y, m, 0);
+        break;
+      case 'this_quarter': {
+        var q = Math.floor(m / 3);
+        start = new Date(y, q * 3, 1);
+        end   = new Date(y, q * 3 + 3, 0);
+        break;
+      }
+      case 'last_quarter': {
+        var q2 = Math.floor(m / 3) - 1;
+        var qy = q2 < 0 ? y - 1 : y;
+        var qm = ((q2 % 4) + 4) % 4;
+        start = new Date(qy, qm * 3, 1);
+        end   = new Date(qy, qm * 3 + 3, 0);
+        break;
+      }
+      case 'this_year':
+        start = new Date(y, 0, 1);
+        end   = new Date(y, 11, 31);
+        break;
+      default:
+        return;
+    }
+
+    el('report-start').value = fmt(start);
+    el('report-end').value   = fmt(end);
+    generateReport();
+  }
+
   // --------------- Summary Cards ---------------
 
   function renderSummaryCards(container, cards) {
     var html = '<div class="report-summary">';
     cards.forEach(function (c) {
-      html += '<div class="summary-card">';
-      html += '<div class="summary-label">' + esc(c.label) + '</div>';
-      html += '<div class="summary-value"' +
+      html += '<div class="summary-card">' +
+        '<div class="summary-label">' + esc(c.label) + '</div>' +
+        '<div class="summary-value"' +
         (c.color ? ' style="color:' + c.color + '"' : '') +
-        '>' + esc(c.value) + '</div>';
-      html += '</div>';
+        '>' + esc(String(c.value)) + '</div>' +
+        (c.sub ? '<div class="summary-sub">' + esc(c.sub) + '</div>' : '') +
+        '</div>';
     });
     html += '</div>';
-    container.innerHTML = html;
+    container.insertAdjacentHTML('beforeend', html);
   }
 
   // --------------- Utilization Report ---------------
 
   function renderUtilizationReport(start, end) {
     var container = el('report-container');
-    container.innerHTML = '<p>加载中…</p>';
+    container.innerHTML = '<p class="report-loading">加载中…</p>';
 
     api('/api/reports/utilization?start=' + encodeURIComponent(start) + '&end=' + encodeURIComponent(end))
       .then(function (data) {
         var summary = data.summary || {};
-        var rows = data.rows || [];
+        var rows = data.rows || data.data || [];
 
+        destroyCharts();
+        container.innerHTML = '';
+
+        /* ---- Summary cards ---- */
         var avgUtil = summary.avg_utilization || 0;
-
-        // Summary cards
-        var cardsHtml = '';
-        var cards = [
+        renderSummaryCards(container, [
           { label: '平均利用率', value: pctText(avgUtil), color: utilColor(avgUtil) },
-          { label: '总预订工时', value: String(summary.total_booked || 0) },
-          { label: '总可用工时', value: String(summary.total_available || 0) },
-          { label: '工作日', value: String(summary.working_days || 0) }
-        ];
+          { label: '总预订工时', value: (summary.total_booked || 0) + 'h' },
+          { label: '总可用工时', value: (summary.total_available || 0) + 'h' },
+          { label: '工作日', value: (summary.working_days || 0) + '天' }
+        ]);
 
-        cardsHtml = '<div class="report-summary">';
-        cards.forEach(function (c) {
-          cardsHtml += '<div class="summary-card">' +
-            '<div class="summary-label">' + esc(c.label) + '</div>' +
-            '<div class="summary-value"' +
-            (c.color ? ' style="color:' + c.color + '"' : '') +
-            '>' + esc(c.value) + '</div></div>';
-        });
-        cardsHtml += '</div>';
+        /* ---- Chart area ---- */
+        var chartWrap = document.createElement('div');
+        chartWrap.className = 'report-charts';
+        chartWrap.innerHTML =
+          '<div class="report-chart-card">' +
+            '<div class="report-chart-title">团队利用率分布</div>' +
+            '<canvas id="chart-util-bar" height="220"></canvas>' +
+          '</div>' +
+          '<div class="report-chart-card">' +
+            '<div class="report-chart-title">工时构成（预订 vs 可用）</div>' +
+            '<canvas id="chart-util-pie" height="220"></canvas>' +
+          '</div>';
+        container.appendChild(chartWrap);
 
-        // Table
+        /* ---- Table ---- */
+        var tableWrap = document.createElement('div');
+        tableWrap.className = 'report-table-wrap';
         var tableHtml = '<table class="report-table"><thead><tr>' +
           '<th>人员</th><th>角色</th><th>组别</th>' +
           '<th>预订工时</th><th>实际工时</th><th>可用工时</th>' +
@@ -98,54 +170,180 @@
         rows.forEach(function (r) {
           var util = r.utilization || 0;
           var color = utilColor(util);
-          tableHtml += '<tr>' +
-            '<td>' + esc(r.name) + '</td>' +
-            '<td>' + esc(r.role) + '</td>' +
-            '<td>' + esc(r.group) + '</td>' +
-            '<td>' + (r.booked_hours || 0) + '</td>' +
-            '<td>' + (r.actual_hours || 0) + '</td>' +
-            '<td>' + (r.available_hours || 0) + '</td>' +
+          tableHtml += '<tr class="report-row-drillable" data-resource-id="' + r.id + '" title="点击查看详情">' +
+            '<td class="report-name-cell"><span class="report-color-dot" style="background:' + (r.color || '#6366F1') + '"></span>' + esc(r.name) + '</td>' +
+            '<td>' + esc(r.role || '') + '</td>' +
+            '<td>' + esc(r.group || r.team || '') + '</td>' +
+            '<td>' + (r.booked_hours || 0) + 'h</td>' +
+            '<td>' + (r.actual_hours || 0) + 'h</td>' +
+            '<td>' + (r.available_hours || r.capacity_hours || 0) + 'h</td>' +
             '<td style="color:' + color + ';font-weight:600">' + pctText(util) + '</td>' +
-            '<td><div class="util-bar">' +
-            '<div class="util-bar-fill" style="width:' + Math.min(util, 100) + '%;background:' + color + '"></div>' +
-            '</div></td>' +
+            '<td><div class="util-bar"><div class="util-bar-fill" style="width:' + Math.min(util, 100) + '%;background:' + color + '"></div></div></td>' +
             '</tr>';
         });
-
         tableHtml += '</tbody></table>';
-        container.innerHTML = cardsHtml + tableHtml;
+        tableWrap.innerHTML = tableHtml;
+        container.appendChild(tableWrap);
+
+        /* ---- Drill-down rows ---- */
+        tableWrap.querySelectorAll('.report-row-drillable').forEach(function (row) {
+          row.addEventListener('click', function () {
+            var rid = row.dataset.resourceId;
+            toggleResourceDrill(row, rid, start, end);
+          });
+        });
+
+        /* ---- Draw charts after DOM is ready ---- */
+        requestAnimationFrame(function () {
+          drawUtilBarChart(rows);
+          drawUtilPieChart(summary);
+        });
       })
       .catch(function (err) {
-        container.innerHTML = '<p class="error">加载失败：' + esc(err.message) + '</p>';
+        el('report-container').innerHTML = '<p class="error">加载失败：' + esc(err.message) + '</p>';
       });
+  }
+
+  /* ---- Drill-down: resource -> projects ---- */
+  function toggleResourceDrill(row, resourceId, start, end) {
+    var existingDrill = row.nextElementSibling;
+    if (existingDrill && existingDrill.classList.contains('drill-row')) {
+      existingDrill.remove();
+      row.classList.remove('drill-open');
+      return;
+    }
+    row.classList.add('drill-open');
+    var drillRow = document.createElement('tr');
+    drillRow.className = 'drill-row';
+    drillRow.innerHTML = '<td colspan="8"><div class="drill-loading">加载中…</div></td>';
+    row.after(drillRow);
+
+    api('/api/reports/resource-drill?resource_id=' + resourceId +
+        '&start=' + encodeURIComponent(start) + '&end=' + encodeURIComponent(end))
+      .then(function (items) {
+        if (!items.length) {
+          drillRow.querySelector('td').innerHTML = '<div class="drill-empty">该时段无项目数据</div>';
+          return;
+        }
+        var html = '<div class="drill-content"><table class="drill-table">' +
+          '<thead><tr><th>项目</th><th>客户</th><th>预订工时</th><th>实际工时</th></tr></thead><tbody>';
+        items.forEach(function (p) {
+          html += '<tr>' +
+            '<td><span class="report-color-dot" style="background:' + (p.color || '#8B5CF6') + '"></span>' + esc(p.name) + '</td>' +
+            '<td>' + esc(p.client_name || '—') + '</td>' +
+            '<td>' + (p.booked_hours || 0) + 'h</td>' +
+            '<td>' + (p.actual_hours || 0) + 'h</td>' +
+            '</tr>';
+        });
+        html += '</tbody></table></div>';
+        drillRow.querySelector('td').innerHTML = html;
+      })
+      .catch(function () {
+        drillRow.querySelector('td').innerHTML = '<div class="drill-empty">加载失败</div>';
+      });
+  }
+
+  /* ---- Chart: utilization bar ---- */
+  function drawUtilBarChart(rows) {
+    var canvas = document.getElementById('chart-util-bar');
+    if (!canvas || !window.Chart) return;
+    var labels = rows.map(function (r) { return r.name; });
+    var utilData = rows.map(function (r) { return r.utilization || 0; });
+    var colors = utilData.map(function (v) { return utilColor(v); });
+    _utilChart = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: '利用率 %',
+          data: utilData,
+          backgroundColor: colors,
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { min: 0, max: 100, ticks: { callback: function (v) { return v + '%'; } } }
+        }
+      }
+    });
+  }
+
+  /* ---- Chart: booked vs available pie ---- */
+  function drawUtilPieChart(summary) {
+    var canvas = document.getElementById('chart-util-pie');
+    if (!canvas || !window.Chart) return;
+    var booked = summary.total_booked || 0;
+    var avail  = summary.total_available || 0;
+    var free   = Math.max(0, avail - booked);
+    _projChart = new Chart(canvas, {
+      type: 'doughnut',
+      data: {
+        labels: ['已预订', '空闲'],
+        datasets: [{
+          data: [booked, free],
+          backgroundColor: ['#4F46E5', '#e5e7eb'],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true,
+        cutout: '65%',
+        plugins: {
+          legend: { position: 'bottom' },
+          tooltip: {
+            callbacks: {
+              label: function (ctx) {
+                return ctx.label + ': ' + ctx.parsed + 'h';
+              }
+            }
+          }
+        }
+      }
+    });
   }
 
   // --------------- Project Report ---------------
 
   function renderProjectReport(start, end) {
     var container = el('report-container');
-    container.innerHTML = '<p>加载中…</p>';
+    container.innerHTML = '<p class="report-loading">加载中…</p>';
 
     api('/api/reports/projects?start=' + encodeURIComponent(start) + '&end=' + encodeURIComponent(end))
       .then(function (data) {
         var summary = data.summary || {};
         var rows = data.rows || [];
 
-        var cardsHtml = '<div class="report-summary">';
-        var cards = [
-          { label: '项目总数', value: String(summary.total_projects || 0) },
-          { label: '预算工时', value: String(summary.budget_hours || 0) },
-          { label: '已排工时', value: String(summary.scheduled_hours || 0) },
-          { label: '实际工时', value: String(summary.actual_hours || 0) }
-        ];
-        cards.forEach(function (c) {
-          cardsHtml += '<div class="summary-card">' +
-            '<div class="summary-label">' + esc(c.label) + '</div>' +
-            '<div class="summary-value">' + esc(c.value) + '</div></div>';
-        });
-        cardsHtml += '</div>';
+        destroyCharts();
+        container.innerHTML = '';
 
-        // Table
+        /* ---- Summary cards ---- */
+        renderSummaryCards(container, [
+          { label: '项目总数', value: summary.total_projects || 0 },
+          { label: '预算工时', value: (summary.budget_hours || 0) + 'h' },
+          { label: '已排工时', value: (summary.scheduled_hours || 0) + 'h' },
+          { label: '实际工时', value: (summary.actual_hours || 0) + 'h' }
+        ]);
+
+        /* ---- Chart area ---- */
+        var chartWrap = document.createElement('div');
+        chartWrap.className = 'report-charts';
+        chartWrap.innerHTML =
+          '<div class="report-chart-card">' +
+            '<div class="report-chart-title">项目预算消耗（前10）</div>' +
+            '<canvas id="chart-proj-budget" height="220"></canvas>' +
+          '</div>' +
+          '<div class="report-chart-card">' +
+            '<div class="report-chart-title">工时分布（已排 vs 实际）</div>' +
+            '<canvas id="chart-proj-compare" height="220"></canvas>' +
+          '</div>';
+        container.appendChild(chartWrap);
+
+        /* ---- Table ---- */
+        var tableWrap = document.createElement('div');
+        tableWrap.className = 'report-table-wrap';
         var tableHtml = '<table class="report-table"><thead><tr>' +
           '<th>项目</th><th>客户</th><th>预算工时</th>' +
           '<th>已排工时</th><th>实际工时</th><th>费率(¥/h)</th>' +
@@ -153,44 +351,150 @@
           '</tr></thead><tbody>';
 
         rows.forEach(function (r) {
-          var budget = r.budget_hours || 0;
-          var scheduled = r.scheduled_hours || 0;
-          var progress = budget > 0 ? (scheduled / budget * 100) : 0;
-          var progressColor = utilColor(progress);
+          var budget    = r.budget_hours || 0;
+          var scheduled = r.scheduled_hours || r.booked_hours || 0;
+          var progress  = budget > 0 ? (scheduled / budget * 100) : 0;
+          var pColor    = utilColor(progress);
+          var dot = '<span class="report-color-dot" style="background:' + (r.color || '#8B5CF6') + '"></span>';
 
-          var colorDot = r.color
-            ? '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + esc(r.color) + ';margin-right:6px;vertical-align:middle"></span>'
+          /* Overrun warning */
+          var overrunBadge = progress > 100
+            ? '<span class="overrun-badge" title="已超出预算">超支</span>'
             : '';
 
-          tableHtml += '<tr>' +
-            '<td>' + colorDot + esc(r.name) + '</td>' +
-            '<td>' + esc(r.client) + '</td>' +
-            '<td>' + budget + '</td>' +
-            '<td>' + scheduled + '</td>' +
-            '<td>' + (r.actual_hours || 0) + '</td>' +
+          tableHtml += '<tr class="report-row-drillable" data-project-id="' + r.id + '" title="点击查看成员贡献">' +
+            '<td class="report-name-cell">' + dot + esc(r.name) + overrunBadge + '</td>' +
+            '<td>' + esc(r.client || r.client_name || '—') + '</td>' +
+            '<td>' + budget + 'h</td>' +
+            '<td>' + scheduled + 'h</td>' +
+            '<td>' + (r.actual_hours || 0) + 'h</td>' +
             '<td>¥' + (r.hourly_rate || 0) + '/h</td>' +
-            '<td style="color:' + progressColor + ';font-weight:600">' + pctText(progress) + '</td>' +
-            '<td><div class="util-bar">' +
-            '<div class="util-bar-fill" style="width:' + Math.min(progress, 100) + '%;background:' + progressColor + '"></div>' +
-            '</div></td>' +
+            '<td style="color:' + pColor + ';font-weight:600">' + pctText(progress) + '</td>' +
+            '<td><div class="util-bar"><div class="util-bar-fill" style="width:' + Math.min(progress, 100) + '%;background:' + pColor + '"></div></div></td>' +
             '</tr>';
         });
-
         tableHtml += '</tbody></table>';
-        container.innerHTML = cardsHtml + tableHtml;
+        tableWrap.innerHTML = tableHtml;
+        container.appendChild(tableWrap);
+
+        /* ---- Drill-down rows ---- */
+        tableWrap.querySelectorAll('.report-row-drillable').forEach(function (row) {
+          row.addEventListener('click', function () {
+            var pid = row.dataset.projectId;
+            toggleProjectDrill(row, pid, start, end);
+          });
+        });
+
+        /* ---- Draw charts ---- */
+        requestAnimationFrame(function () {
+          drawProjectBudgetChart(rows);
+          drawProjectCompareChart(rows);
+        });
       })
       .catch(function (err) {
-        container.innerHTML = '<p class="error">加载失败：' + esc(err.message) + '</p>';
+        el('report-container').innerHTML = '<p class="error">加载失败：' + esc(err.message) + '</p>';
       });
+  }
+
+  /* ---- Drill-down: project -> members ---- */
+  function toggleProjectDrill(row, projectId, start, end) {
+    var existingDrill = row.nextElementSibling;
+    if (existingDrill && existingDrill.classList.contains('drill-row')) {
+      existingDrill.remove();
+      row.classList.remove('drill-open');
+      return;
+    }
+    row.classList.add('drill-open');
+    var drillRow = document.createElement('tr');
+    drillRow.className = 'drill-row';
+    drillRow.innerHTML = '<td colspan="8"><div class="drill-loading">加载中…</div></td>';
+    row.after(drillRow);
+
+    api('/api/reports/project-drill?project_id=' + projectId +
+        '&start=' + encodeURIComponent(start) + '&end=' + encodeURIComponent(end))
+      .then(function (items) {
+        if (!items.length) {
+          drillRow.querySelector('td').innerHTML = '<div class="drill-empty">该时段无成员数据</div>';
+          return;
+        }
+        var html = '<div class="drill-content"><table class="drill-table">' +
+          '<thead><tr><th>成员</th><th>角色</th><th>组别</th><th>预订工时</th><th>实际工时</th></tr></thead><tbody>';
+        items.forEach(function (m) {
+          html += '<tr>' +
+            '<td><span class="report-color-dot" style="background:' + (m.color || '#6366F1') + '"></span>' + esc(m.name) + '</td>' +
+            '<td>' + esc(m.role || '') + '</td>' +
+            '<td>' + esc(m.team || '') + '</td>' +
+            '<td>' + (m.booked_hours || 0) + 'h</td>' +
+            '<td>' + (m.actual_hours || 0) + 'h</td>' +
+            '</tr>';
+        });
+        html += '</tbody></table></div>';
+        drillRow.querySelector('td').innerHTML = html;
+      })
+      .catch(function () {
+        drillRow.querySelector('td').innerHTML = '<div class="drill-empty">加载失败</div>';
+      });
+  }
+
+  /* ---- Chart: project budget bar (top 10) ---- */
+  function drawProjectBudgetChart(rows) {
+    var canvas = document.getElementById('chart-proj-budget');
+    if (!canvas || !window.Chart) return;
+    var top = rows.slice(0, 10);
+    var labels   = top.map(function (r) { return r.name.length > 8 ? r.name.slice(0, 8) + '…' : r.name; });
+    var budgets  = top.map(function (r) { return r.budget_hours || 0; });
+    var scheduled = top.map(function (r) { return r.scheduled_hours || r.booked_hours || 0; });
+    _utilChart = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: '预算工时', data: budgets,   backgroundColor: '#e0e7ff', borderRadius: 4 },
+          { label: '已排工时', data: scheduled, backgroundColor: '#4F46E5', borderRadius: 4 }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: 'bottom' } },
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+  }
+
+  /* ---- Chart: scheduled vs actual compare ---- */
+  function drawProjectCompareChart(rows) {
+    var canvas = document.getElementById('chart-proj-compare');
+    if (!canvas || !window.Chart) return;
+    var top = rows.slice(0, 10);
+    var labels   = top.map(function (r) { return r.name.length > 8 ? r.name.slice(0, 8) + '…' : r.name; });
+    var scheduled = top.map(function (r) { return r.scheduled_hours || r.booked_hours || 0; });
+    var actual    = top.map(function (r) { return r.actual_hours || 0; });
+    _projChart = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: '已排工时', data: scheduled, backgroundColor: '#818cf8', borderRadius: 4 },
+          { label: '实际工时', data: actual,    backgroundColor: '#34d399', borderRadius: 4 }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: 'bottom' } },
+        scales: { y: { beginAtZero: true } }
+      }
+    });
   }
 
   // --------------- Generate Report ---------------
 
   function generateReport() {
-    var type = el('report-type').value;
+    var type  = el('report-type').value;
     var start = el('report-start').value;
-    var end = el('report-end').value;
-
+    var end   = el('report-end').value;
+    if (!start || !end) { toast('请选择日期范围', 'error'); return; }
+    _lastStart = start;
+    _lastEnd   = end;
     if (type === 'utilization') {
       renderUtilizationReport(start, end);
     } else {
@@ -201,9 +505,9 @@
   // --------------- Export Excel ---------------
 
   function exportExcel() {
-    var type = el('report-type').value;
+    var type  = el('report-type').value;
     var start = el('report-start').value;
-    var end = el('report-end').value;
+    var end   = el('report-end').value;
     var endpoint = type === 'utilization' ? '/api/export/utilization' : '/api/export/projects';
     window.open(endpoint + '?start=' + encodeURIComponent(start) + '&end=' + encodeURIComponent(end));
     toast('正在导出...', 'success');
@@ -213,34 +517,48 @@
 
   window.loadReports = function loadReports() {
     var startInput = el('report-start');
-    var endInput = el('report-end');
+    var endInput   = el('report-end');
+    if (!startInput || !endInput) return;
 
     if (!startInput.value) {
-      startInput.value = fmt(getMonthStart());
+      var now = new Date();
+      startInput.value = fmt(new Date(now.getFullYear(), now.getMonth(), 1));
     }
     if (!endInput.value) {
-      endInput.value = fmt(getMonthEnd());
+      var now2 = new Date();
+      endInput.value = fmt(new Date(now2.getFullYear(), now2.getMonth() + 1, 0));
     }
 
-    generateReport();
+    /* Ensure Chart.js is loaded */
+    if (!window.Chart) {
+      var script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+      script.onload = function () { generateReport(); };
+      document.head.appendChild(script);
+    } else {
+      generateReport();
+    }
   };
 
   // --------------- Event Listeners ---------------
 
   document.addEventListener('DOMContentLoaded', function () {
     var btnGen = el('btn-gen-report');
-    if (btnGen) {
-      btnGen.addEventListener('click', generateReport);
-    }
+    if (btnGen) btnGen.addEventListener('click', generateReport);
 
     var reportType = el('report-type');
-    if (reportType) {
-      reportType.addEventListener('change', generateReport);
-    }
+    if (reportType) reportType.addEventListener('change', generateReport);
 
     var btnExport = el('btn-export-excel');
-    if (btnExport) {
-      btnExport.addEventListener('click', exportExcel);
+    if (btnExport) btnExport.addEventListener('click', exportExcel);
+
+    /* Quick preset buttons */
+    var presetsContainer = el('report-presets');
+    if (presetsContainer) {
+      presetsContainer.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-preset]');
+        if (btn) applyPreset(btn.dataset.preset);
+      });
     }
   });
 })();
