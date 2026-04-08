@@ -1,31 +1,63 @@
 <template>
   <AuthLayout>
-    <h2 class="auth-title">注册账号</h2>
-    <form @submit.prevent="handleRegister">
-      <div class="form-group">
-        <label class="form-label">姓名 <span class="required">*</span></label>
-        <input v-model="form.name" class="form-input" type="text" placeholder="请输入姓名" required />
+    <div class="auth-view active">
+      <div class="auth-card-header">
+        <h1>创建账号</h1>
+        <p>注册后即可创建或加入企业，开始管理团队资源</p>
       </div>
-      <div class="form-group">
-        <label class="form-label">手机号</label>
-        <input v-model="form.phone" class="form-input" type="tel" placeholder="请输入手机号（可选）" />
+      <div class="auth-form active">
+        <div class="form-group">
+          <label>姓名</label>
+          <div class="input-with-icon">
+            <svg class="input-icon" width="18" height="18" viewBox="0 0 20 20" fill="none">
+              <circle cx="10" cy="7" r="3" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M3 18c0-3.3 2.7-6 7-6s7 2.7 7 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <input v-model="form.name" type="text" class="text-input" placeholder="请输入姓名" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>手机号 <span class="label-optional">选填</span></label>
+            <div class="input-with-icon">
+              <svg class="input-icon" width="18" height="18" viewBox="0 0 20 20" fill="none">
+                <rect x="5" y="1" width="10" height="18" rx="2" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M9 16h2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+              <input v-model="form.phone" type="text" class="text-input" placeholder="手机号" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>邮箱 <span class="label-optional">选填</span></label>
+            <div class="input-with-icon">
+              <svg class="input-icon" width="18" height="18" viewBox="0 0 20 20" fill="none">
+                <rect x="2" y="4" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M2 6l8 5 8-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <input v-model="form.email" type="email" class="text-input" placeholder="邮箱地址" />
+            </div>
+          </div>
+        </div>
+        <div class="auth-field-note">手机号和邮箱请至少填写一项，用于登录</div>
+        <div class="form-group">
+          <label>密码</label>
+          <div class="input-with-icon">
+            <svg class="input-icon" width="18" height="18" viewBox="0 0 20 20" fill="none">
+              <rect x="4" y="9" width="12" height="9" rx="2" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M7 9V6a3 3 0 016 0v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <input v-model="form.password" type="password" class="text-input" placeholder="请设置密码（至少6位）" />
+          </div>
+        </div>
+        <button class="btn btn-primary btn-block" :disabled="loading" @click="handleRegister">
+          {{ loading ? '注册中...' : '注册' }}
+        </button>
       </div>
-      <div class="form-group">
-        <label class="form-label">邮箱</label>
-        <input v-model="form.email" class="form-input" type="email" placeholder="请输入邮箱（可选）" />
+      <div v-if="error" class="auth-error">{{ error }}</div>
+      <div class="auth-switch">
+        已有账号？<a href="#" @click.prevent="$router.push('/login')">返回登录</a>
       </div>
-      <div class="form-group">
-        <label class="form-label">密码 <span class="required">*</span></label>
-        <input v-model="form.password" class="form-input" type="password" placeholder="至少 6 位" required minlength="6" />
-      </div>
-      <p v-if="error" class="auth-error">{{ error }}</p>
-      <button type="submit" class="btn btn-primary btn-full" :disabled="loading">
-        {{ loading ? '注册中…' : '注册' }}
-      </button>
-    </form>
-    <p class="auth-switch">
-      已有账号？<RouterLink to="/login">立即登录</RouterLink>
-    </p>
+    </div>
   </AuthLayout>
 </template>
 
@@ -44,10 +76,9 @@ const loading = ref(false)
 
 async function handleRegister() {
   error.value = ''
-  if (!form.phone && !form.email) {
-    error.value = '请填写手机号或邮箱'
-    return
-  }
+  if (!form.name) { error.value = '请填写姓名'; return }
+  if (!form.phone && !form.email) { error.value = '手机号和邮箱请至少填写一项'; return }
+  if (!form.password || form.password.length < 6) { error.value = '密码至少6位'; return }
   loading.value = true
   try {
     await auth.register({
@@ -58,18 +89,9 @@ async function handleRegister() {
     })
     router.push('/')
   } catch (e) {
-    error.value = e.message
+    error.value = e.message || '注册失败，请重试'
   } finally {
     loading.value = false
   }
 }
 </script>
-
-<style scoped>
-.auth-title { font-size: 22px; font-weight: 700; margin: 0 0 22px; color: var(--text); }
-.auth-error { color: #ef4444; font-size: 13px; margin: -4px 0 10px; }
-.auth-switch { margin-top: 18px; text-align: center; font-size: 13px; color: var(--text-secondary); }
-.auth-switch a { color: var(--primary); text-decoration: none; font-weight: 500; }
-.required { color: #ef4444; }
-.btn-full { width: 100%; margin-top: 8px; }
-</style>

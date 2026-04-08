@@ -31,12 +31,13 @@
     <WeekView
       v-if="store.view === 'week'"
       :days="store.days"
-      :resources="store.resources"
+      :teams="store.teams"
       :bookings="store.bookings"
       :leave="store.leave"
       :holidays="store.holidays"
       @open-create="openCreate"
       @open-edit="openEdit"
+      @open-leave="openLeave"
       @resize-done="handleResizeDone"
       @move-done="handleMoveDone"
     />
@@ -74,7 +75,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useScheduleStore } from '@/stores/schedule'
-import { projectApi, bookingApi } from '@/api'
+import { projectApi, bookingApi, leaveApi } from '@/api'
 import { fmt } from '@/utils/date'
 import { useToast } from '@/composables/useToast'
 import WeekView from '@/components/schedule/WeekView.vue'
@@ -125,6 +126,13 @@ function openEdit(booking) {
   editingBooking.value = booking
   createDefaults.value = {}
   showModal.value = true
+}
+
+function openLeave(leave) {
+  // Leave deletion handled via confirmation
+  if (confirm(`确认删除 ${leave.type} 记录？`)) {
+    leaveApi.remove(leave.resource_id, leave.date).then(() => store.load()).catch(e => toast(e.message, 'error'))
+  }
 }
 
 // ── Resize start (from MonthView) ────────────────────────────────

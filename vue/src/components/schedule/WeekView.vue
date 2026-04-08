@@ -1,269 +1,401 @@
 <template>
-  <div class="week-view">
-    <!-- Header row -->
-    <div class="week-grid" :style="gridStyle">
-      <div class="cell-name cell-header">人员</div>
-      <div
-        v-for="d in days"
-        :key="fmt(d)"
-        class="cell-header day-header"
-        :class="{
-          'is-today': fmt(d) === todayStr,
-          'is-weekend': d.getDay() === 0 || d.getDay() === 6,
-          'is-holiday': holidays[fmt(d)],
-        }"
-      >
-        <span class="day-name">{{ CN_DAYS[d.getDay()] }}</span>
-        <span class="day-num">{{ d.getDate() }}</span>
-        <span v-if="holidays[fmt(d)]" class="holiday-dot" :title="holidays[fmt(d)]?.name">假</span>
-      </div>
-    </div>
+  <div class="schedule-wrap">
+    <table class="schedule-table">
+      <!-- ── Sticky header ── -->
+      <thead>
+        <tr>
+          <th class="col-name">人员</th>
+          <th
+            v-for="d in days"
+            :key="fmtDate(d)"
+            :class="['col-day', { today: isToday(d), weekend: isWeekend(d) }]"
+          >
+            {{ shortDay(d) }}<br />{{ fmtDate(d) }}
+            <template v-if="holidays[fmtDate(d)]">
+              <br />
+              <span
+                class="holiday-marker"
+                :class="holidays[fmtDate(d)].type === 'workday' ? 'workday' : 'holiday'"
+              >{{ holidays[fmtDate(d)].type === 'workday' ? '调休上班' : holidays[fmtDate(d)].name }}</span>
+            </template>
+          </th>
+        </tr>
+      </thead>
 
-    <!-- Resource rows -->
-    <div
-      v-for="resource in resources"
-      :key="resource.id"
-      class="week-grid resource-row"
-      :style="gridStyle"
-    >
-      <!-- Name cell -->
-      <div class="cell-name">
-        <span class="resource-dot" :style="{ background: resource.color }"></span>
-        <span class="resource-name">{{ resource.name }}</span>
-        <span class="resource-role">{{ resource.role }}</span>
-      </div>
+      <!-- ── Body ── -->
+      <tbody>
+        <template v-for="(members, teamName) in teams" :key="teamName">
+          <!-- Team divider row -->
+          <tr class="team-divider">
+            <td>
+              <span class="team-label">{{ teamName }}</span>
+            </td>
+            <td v-for="d in days" :key="fmtDate(d)"></td>
+          </tr>
 
-      <!-- Day cells -->
-      <div
-        v-for="d in days"
-        :key="fmt(d)"
-        class="booking-cell"
-        :class="{
-          'is-weekend': d.getDay() === 0 || d.getDay() === 6,
-          'is-holiday': holidays[fmt(d)],
-          'drag-selecting': isDragSelected(resource.id, fmt(d)),
-        }"
-        :data-date="fmt(d)"
-        :data-resource="resource.id"
-        @mousedown="onCellMousedown($event, fmt(d), resource.id, getCellsForResource(resource.id))"
-        @click="onCellClick($event, fmt(d), resource.id)"
-      >
-        <!-- Leave badge -->
-        <div
-          v-if="leaveOnDate(resource.id, fmt(d))"
-          class="leave-badge"
-          :title="leaveOnDate(resource.id, fmt(d))?.type"
-        >休</div>
+          <!-- Resource rows -->
+          <tr v-for="r in members" :key="r.id">
+            <!-- Sticky left: resource info -->
+            <td class="td-name">
+              <div class="resource-cell">
+                <div class="resource-avatar" :style="{ background: r.color || '#4F46E5' }">
+                  {{ r.name.charAt(0) }}
+                </div>
+                <div class="resource-info">
+                  <div class="resource-name">{{ r.name }}</div>
+                  <div class="resource-role">{{ r.role || '' }}</div>
+                </div>
+              </div>
+            </td>
 
-        <!-- Booking blocks -->
-        <template v-for="b in bookingsOnDate(resource.id, fmt(d))" :key="b.id">
-          <BookingBlock
-            :booking="b"
-            :is-moving="isMovingBooking(b)"
-            :is-resizing="isResizingBooking(b)"
-            @click="openEdit(b)"
-            @resize-start="(e) => startResize(e, b, getGroupForBooking(b))"
-            @move-start="(e) => startMove(e, b, getGroupForBooking(b))"
-          />
+            <!-- Day cells -->
+            <td
+              v-for="d in days"
+              :key="fmtDate(d)"
+              class="booking-cell"
+              :class="{
+                weekend: isWeekend(d),
+                'drag-selecting': isDragSelected(r.id, fmtDate(d)),
+                'drag-start': isDragStart(r.id, fmtDate(d)),
+                'drag-end': isDragEnd(r.id, fmtDate(d)),
+              }"
+              :data-resource="r.id"
+              :data-date="fmtDate(d)"
+              @mousedown="onCellMousedown($event, fmtDate(d), r.id)"
+              @click="onCellClick($event, fmtDate(d), r.id)"
+            >
+              <!-- Leave block -->
+              <div
+                v-if="leaveOnDate(r.id, fmtDate(d))"
+                class="booking-block leave-block"
+                :class="leaveOnDate(r.id, fmtDate(d)).type"
+                :data-leave-id="leaveOnDate(r.id, fmtDate(d)).id"
+                :title="leaveLabel(leaveOnDate(r.id, fmtDate(d)).type)"
+                @click.stop="$emit('open-leave', leaveOnDate(r.id, fmtDate(d)))"
+              >
+                {{ leaveLabel(leaveOnDate(r.id, fmtDate(d)).type) }}
+              </div>
+
+              <!-- Booking blocks -->
+              <BookingBlock
+                v-for="b in bookingsOnDate(r.id, fmtDate(d))"
+                :key="b.id"
+                :booking="b"
+                :is-resizing="resizingId === b.id"
+                :is-moving="movingIds.includes(b.id)"
+                @click.stop="$emit('open-edit', b)"
+                @resize-start="(e) => startResize(e, b, getGroup(b))"
+                @move-start="(e) => startMove(e, b, getGroup(b))"
+              />
+
+              <!-- Resize preview overlay -->
+              <div
+                v-if="resizePreviewOnDate(fmtDate(d), r.id)"
+                class="resize-preview"
+                :class="{ 'resize-preview-shrink': resizePreviewOnDate(fmtDate(d), r.id) === 'remove' }"
+              />
+
+              <!-- Move preview overlay -->
+              <div
+                v-if="movePreviewOnDate(fmtDate(d), r.id)"
+                class="move-preview"
+              />
+
+              <!-- Daily total -->
+              <span
+                v-if="dailyTotal(r.id, fmtDate(d)) > 0"
+                class="day-total"
+                :class="{ overbooked: dailyTotal(r.id, fmtDate(d)) > (r.hours_per_day || 8) }"
+              >{{ dailyTotal(r.id, fmtDate(d)) }}h</span>
+            </td>
+          </tr>
         </template>
-
-        <!-- Resize preview -->
-        <div
-          v-if="resizePreviewOnDate(fmt(d), resource.id)"
-          class="resize-preview"
-          :class="resizePreviewOnDate(fmt(d), resource.id) === 'remove' ? 'resize-preview-shrink' : ''"
-        />
-
-        <!-- Move preview -->
-        <div v-if="movePreviewOnDate(fmt(d), resource.id)" class="move-preview" />
-
-        <!-- Daily total -->
-        <div class="day-total">{{ dailyTotal(resource.id, fmt(d)) }}</div>
-      </div>
-    </div>
+      </tbody>
+    </table>
   </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
 import BookingBlock from './BookingBlock.vue'
-import { fmt, CN_DAYS } from '@/utils/date'
 import { useDragSelect } from '@/composables/useDragSelect'
 import { useBookingDrag } from '@/composables/useBookingDrag'
 
 const props = defineProps({
-  days: { type: Array, required: true },
-  resources: { type: Array, default: () => [] },
-  bookings: { type: Array, default: () => [] },
-  leave: { type: Array, default: () => [] },
+  days:     { type: Array,  required: true },
+  teams:    { type: Object, default: () => ({}) },
+  bookings: { type: Array,  default: () => [] },
+  leave:    { type: Array,  default: () => [] },
   holidays: { type: Object, default: () => ({}) },
 })
 
-const emit = defineEmits(['open-create', 'open-edit', 'resize-done', 'move-done'])
+const emit = defineEmits(['open-create', 'open-edit', 'open-leave', 'resize-done', 'move-done'])
 
-const todayStr = fmt(new Date())
+// ── Date helpers ──────────────────────────────────────────────────────
+const CN_DAYS = ['日', '一', '二', '三', '四', '五', '六']
+const todayStr = fmtDate(new Date())
 
-const gridStyle = computed(() => ({
-  gridTemplateColumns: `180px repeat(${props.days.length}, 1fr)`,
-}))
+function fmtDate(d) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+function shortDay(d) { return '周' + CN_DAYS[d.getDay()] }
+function isToday(d)   { return fmtDate(d) === todayStr }
+function isWeekend(d) { return d.getDay() === 0 || d.getDay() === 6 }
 
-// ── Data helpers ──────────────────────────────────────────────────
+// ── Data helpers ──────────────────────────────────────────────────────
 function bookingsOnDate(resourceId, date) {
   return props.bookings.filter(b => b.resource_id === resourceId && b.date === date)
 }
 function leaveOnDate(resourceId, date) {
-  return props.leave.find(l => l.resource_id === resourceId && l.date === date)
+  return props.leave.find(l => l.resource_id === resourceId && l.date === date) || null
 }
 function dailyTotal(resourceId, date) {
-  const total = props.bookings
+  return props.bookings
     .filter(b => b.resource_id === resourceId && b.date === date)
     .reduce((s, b) => s + b.hours, 0)
-  return total > 0 ? `${total}h` : ''
 }
-function getCellsForResource(resourceId) {
-  return props.days.map(d => ({ date: fmt(d), resourceId }))
-}
-function getGroupForBooking(booking) {
+function getGroup(booking) {
   return props.bookings
     .filter(b => b.resource_id === booking.resource_id && b.project_id === booking.project_id)
     .sort((a, b) => a.date.localeCompare(b.date))
 }
+function leaveLabel(type) {
+  const map = { vacation: '休假', sick: '病假', personal: '事假', holiday: '法定假期', other: '请假' }
+  return map[type] || '休假'
+}
 
-// ── Drag select ───────────────────────────────────────────────────
-const { selecting, selectedCells, onCellMousedown: _dragMousedown, clearSelection, isBlockingClick } =
+// ── Drag select ───────────────────────────────────────────────────────
+const { selectedCells, onCellMousedown: _dragMousedown, clearSelection, isBlockingClick } =
   useDragSelect({
     onSelectDone: ({ resourceId, startDate, endDate }) => {
       emit('open-create', { resourceId, startDate, endDate })
     },
   })
 
-function onCellMousedown(e, date, resourceId, cells) {
+function onCellMousedown(e, date, resourceId) {
+  const cells = props.days.map(d => ({ date: fmtDate(d), resourceId }))
   _dragMousedown(e, date, resourceId, cells)
 }
-
 function onCellClick(e, date, resourceId) {
   if (isBlockingClick()) return
   emit('open-create', { resourceId, startDate: date, endDate: date })
 }
-
 function isDragSelected(resourceId, date) {
   return selectedCells.value.some(c => c.resourceId === resourceId && c.date === date)
 }
+function isDragStart(resourceId, date) {
+  const cells = selectedCells.value.filter(c => c.resourceId === resourceId)
+  return cells.length > 0 && cells[0].date === date
+}
+function isDragEnd(resourceId, date) {
+  const cells = selectedCells.value.filter(c => c.resourceId === resourceId)
+  return cells.length > 0 && cells[cells.length - 1].date === date
+}
 
-// ── Drag resize / move ────────────────────────────────────────────
+// ── Drag resize / move ────────────────────────────────────────────────
 const { resizing, resizePreviewCells, startResize, moving, movePreviewCells, startMove } =
   useBookingDrag({
     onResizeDone: (payload) => emit('resize-done', payload),
-    onMoveDone: (payload) => emit('move-done', payload),
+    onMoveDone:   (payload) => emit('move-done', payload),
   })
 
-function isResizingBooking(b) {
-  return resizing.value
-}
-function isMovingBooking(b) {
-  return moving.value
-}
+// Track which booking IDs are being dragged for visual state
+const resizingId = computed(() => {
+  if (!resizing.value) return null
+  return resizing.value?.id ?? null
+})
+const movingIds = computed(() => {
+  if (!moving.value) return []
+  return moving.value?.map ? moving.value.map(b => b.id) : []
+})
 
 function resizePreviewOnDate(date, resourceId) {
-  // Find if any active resize context matches this resource
   const p = resizePreviewCells.value.find(c => c.date === date)
   return p ? p.mode : null
 }
-
 function movePreviewOnDate(date, resourceId) {
   return movePreviewCells.value.includes(date)
-}
-
-function openEdit(booking) {
-  emit('open-edit', booking)
 }
 </script>
 
 <style scoped>
-.week-view { overflow-x: auto; }
-.week-grid {
-  display: grid;
-  min-width: 600px;
-  border-bottom: 1px solid var(--border);
+.schedule-wrap {
+  overflow-x: auto;
+  overflow-y: auto;
+  flex: 1;
 }
-.cell-header {
-  padding: 6px 8px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  background: var(--surface);
-  border-right: 1px solid var(--border);
-  text-align: center;
+
+/* ── Table base ── */
+.schedule-table {
+  border-collapse: collapse;
+  min-width: 700px;
+  width: 100%;
+  table-layout: fixed;
+}
+
+/* ── Header ── */
+.schedule-table thead th {
   position: sticky;
   top: 0;
-  z-index: 2;
-}
-.day-header { display: flex; flex-direction: column; align-items: center; gap: 1px; }
-.day-name { font-size: 10px; }
-.day-num { font-size: 14px; font-weight: 700; }
-.holiday-dot { font-size: 9px; background: #ef4444; color: #fff; border-radius: 3px; padding: 0 3px; }
-.cell-header.is-today .day-num { color: var(--primary); }
-.cell-header.is-weekend, .booking-cell.is-weekend { background: var(--weekend-bg, #f9fafb); }
-.cell-header.is-holiday, .booking-cell.is-holiday { background: #fef3c7; }
-
-.cell-name {
-  padding: 8px 10px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 2px;
-  border-right: 1px solid var(--border);
+  z-index: 3;
   background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 6px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+.schedule-table thead th.col-name {
+  width: 160px;
+  min-width: 160px;
+  text-align: left;
+  padding-left: 12px;
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 4;
+}
+.schedule-table thead th.today {
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+}
+.schedule-table thead th.weekend {
+  background: var(--weekend-bg, #f9fafb);
+}
+
+/* ── Team divider ── */
+.team-divider td {
+  background: var(--bg);
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.team-divider td:first-child {
   position: sticky;
   left: 0;
   z-index: 1;
+  background: var(--bg);
 }
-.resource-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; }
-.resource-name { font-size: 13px; font-weight: 600; color: var(--text); }
-.resource-role { font-size: 11px; color: var(--text-secondary); }
+.team-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.team-label::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary);
+  opacity: .5;
+}
 
+/* ── Sticky name column ── */
+.td-name {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 0;
+  width: 160px;
+  min-width: 160px;
+}
+.resource-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+}
+.resource-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  flex-shrink: 0;
+}
+.resource-info { min-width: 0; }
+.resource-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.resource-role {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Booking cells ── */
 .booking-cell {
   position: relative;
-  min-height: 44px;
-  padding: 3px 4px 18px;
-  border-right: 1px solid var(--border);
+  height: 60px;
+  min-width: 80px;
+  padding: 3px 4px 16px;
+  border: 1px solid var(--border);
+  vertical-align: top;
   cursor: pointer;
   transition: background .1s;
 }
 .booking-cell:hover { background: var(--hover); }
-.booking-cell.drag-selecting { background: rgba(79,70,229,.12); }
+.booking-cell.weekend { background: var(--weekend-bg, #f9fafb); }
+.booking-cell.drag-selecting { background: rgba(79, 70, 229, .12); }
+.booking-cell.drag-start { border-left: 2px solid var(--primary) !important; }
+.booking-cell.drag-end   { border-right: 2px solid var(--primary) !important; }
 
-.leave-badge {
-  position: absolute;
-  top: 2px; right: 2px;
-  background: #fbbf24; color: #fff;
-  font-size: 9px; font-weight: 700;
-  border-radius: 3px; padding: 1px 4px;
-}
-
+/* ── Day total ── */
 .day-total {
   position: absolute;
-  bottom: 2px; right: 4px;
+  bottom: 2px;
+  right: 4px;
   font-size: 10px;
   color: var(--text-secondary);
+  pointer-events: none;
 }
+.day-total.overbooked { color: #ef4444; font-weight: 700; }
 
+/* ── Preview overlays ── */
 .resize-preview {
-  position: absolute; inset: 2px;
-  background: rgba(59,130,246,.2);
+  position: absolute;
+  inset: 2px;
+  background: rgba(59, 130, 246, .2);
   border: 1px dashed #3b82f6;
   border-radius: 4px;
   pointer-events: none;
+  z-index: 1;
 }
 .resize-preview-shrink {
-  background: rgba(239,68,68,.15);
+  background: rgba(239, 68, 68, .15);
   border-color: #ef4444;
 }
 .move-preview {
-  position: absolute; inset: 2px;
-  background: rgba(16,185,129,.2);
+  position: absolute;
+  inset: 2px;
+  background: rgba(16, 185, 129, .2);
   border: 1px dashed #10b981;
   border-radius: 4px;
   pointer-events: none;
+  z-index: 1;
 }
 </style>
