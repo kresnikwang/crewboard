@@ -100,7 +100,7 @@ module.exports = function(db) {
 
     res.json({
       token,
-      user: { id: user.id, name: user.name, phone: user.phone, email: user.email, role: user.role, enterprise_id: user.enterprise_id, resource_id: user.resource_id, avatar: user.avatar || '', perm_book_others: user.perm_book_others, perm_manage_resources: user.perm_manage_resources, perm_view_reports: user.perm_view_reports },
+      user: { id: user.id, name: user.name, phone: user.phone, email: user.email, role: user.role, enterprise_id: user.enterprise_id, resource_id: user.resource_id, avatar: user.avatar || '', perm_book_others: user.perm_book_others, perm_manage_resources: user.perm_manage_resources, perm_view_reports: user.perm_view_reports, must_change_password: user.must_change_password || 0 },
       enterprise,
     });
   });
@@ -338,7 +338,7 @@ module.exports = function(db) {
     res.json({ ok: true, avatar: avatarUrl });
   });
 
-  // Change password
+  // Change password (requires old password)
   router.put('/password', (req, res) => {
     if (!req.user) return res.status(401).json({ error: '未登录' });
     const { old_password, new_password } = req.body;
@@ -351,8 +351,82 @@ module.exports = function(db) {
     }
 
     const newHash = hashPassword(new_password);
-    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(newHash, req.user.id);
+    db.prepare('UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?').run(newHash, req.user.id);
     res.json({ ok: true });
+  });
+
+  // First-login password change (no old password required, only valid when must_change_password=1)
+  router.put('/first-password', (req, res) => {
+    if (!req.user) return res.status(401).json({ error: '未登录' });
+    const userRow = db.prepare('SELECT must_change_password FROM users WHERE id = ?').get(req.user.id);
+    if (!userRow || !userRow.must_change_password) {
+      return res.status(400).json({ error: '无需修改初始密码' });
+    }
+    const { new_password } = req.body;
+    if (!new_password) return res.status(400).json({ error: '请输入新密码' });
+    if (new_password.length < 6) return res.status(400).json({ error: '密码至少6位' });
+
+    const newHash = hashPassword(new_password);
+    db.prepare('UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?').run(newHash, req.user.id);
+    res.json({ ok: true });
+  });
+
+  // === BULK CREATE MEMBERS ===
+  // POST /api/auth/enterprises/bulk-create
+  // Body: { members: [{ email, name, title, team, phone? }], initial_password? }
+  router.post('/enterprises/bulk-create', (req, res) => {
+    if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
+    if (req.user.role !== 'owner' && req.user.role !== 'admin') return res.status(403).json({ error: '仅管理员可操作' });
+
+    const { members, initial_password } = req.body;
+    if (!Array.isArray(members) || members.length === 0) {
+      return res.status(400).json({ error: '请提供成员列表' });
+    }
+    const pwd = initial_password || 'Crewboard@2026';
+    if (pwd.length < 6) return res.status(400).json({ error: '初始密码至少6位' });
+
+    const results = [];
+    const errors = [];
+
+    const transaction = db.transaction(() => {
+      members.forEach((m, idx) => {
+        const { email, name, title, team, phone } = m;
+        if (!name) { errors.push({ idx, reason: '姓名不能为空' }); return; }
+        if (!email && !phone) { errors.push({ idx, name, reason: '邮箱或手机号至少填一项' }); return; }
+
+        // Check duplicate
+        if (email) {
+          const dup = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+          if (dup) { errors.push({ idx, name, reason: `邮箱 ${email} 已存在` }); return; }
+        }
+        if (phone) {
+          const dup = db.prepare('SELECT id FROM users WHERE phone = ?').get(phone);
+          if (dup) { errors.push({ idx, name, reason: `手机号 ${phone} 已存在` }); return; }
+        }
+
+        const hash = hashPassword(pwd);
+        // Create user with must_change_password = 1
+        const userResult = db.prepare(
+          `INSERT INTO users (phone, email, password_hash, name, enterprise_id, role,
+            perm_book_others, perm_manage_resources, perm_view_reports, status, must_change_password)
+           VALUES (?, ?, ?, ?, ?, 'member', 0, 0, 0, 'active', 1)`
+        ).run(phone || null, email || null, hash, name, req.user.enterprise_id);
+
+        // Create linked resource entry
+        const resResult = db.prepare(
+          'INSERT INTO resources (name, email, role, team, enterprise_id) VALUES (?, ?, ?, ?, ?)'
+        ).run(name, email || '', title || '', team || '', req.user.enterprise_id);
+
+        // Link resource to user
+        db.prepare('UPDATE users SET resource_id = ? WHERE id = ?')
+          .run(resResult.lastInsertRowid, userResult.lastInsertRowid);
+
+        results.push({ name, email: email || null, phone: phone || null, user_id: userResult.lastInsertRowid });
+      });
+    });
+
+    transaction();
+    res.json({ ok: true, created: results, errors });
   });
 
   // === INVITATIONS ===

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>神马排班CrewBoard</title>
-  <link rel="stylesheet" href="/css/style.css?v=20260408f">
+  <link rel="stylesheet" href="/css/style.css?v=20260408g">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -132,6 +132,33 @@
           <div class="auth-switch">
             已有账号？<a href="#" id="link-to-login">返回登录</a>
           </div>
+        </div>
+
+        <!-- FIRST LOGIN — CHANGE PASSWORD PAGE -->
+        <div class="auth-view" id="view-first-login">
+          <div class="auth-card-header">
+            <h1>设置您的密码</h1>
+            <p>您正在使用初始密码登录，请立即设置一个专属密码以保障账号安全。</p>
+          </div>
+          <div class="first-login-user" id="first-login-user"></div>
+          <div class="auth-form">
+            <div class="form-group">
+              <label>新密码</label>
+              <div class="input-with-icon">
+                <svg class="input-icon" width="18" height="18" viewBox="0 0 20 20" fill="none"><rect x="4" y="9" width="12" height="9" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M7 9V6a3 3 0 016 0v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                <input type="password" id="first-new-password" class="text-input" placeholder="请设置新密码（至少6位）">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>确认新密码</label>
+              <div class="input-with-icon">
+                <svg class="input-icon" width="18" height="18" viewBox="0 0 20 20" fill="none"><rect x="4" y="9" width="12" height="9" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M7 9V6a3 3 0 016 0v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                <input type="password" id="first-confirm-password" class="text-input" placeholder="再次输入新密码">
+              </div>
+            </div>
+            <button class="btn btn-primary btn-block" id="btn-first-password">确认设置密码</button>
+          </div>
+          <div class="auth-error" id="auth-error-first-login"></div>
         </div>
 
         <div class="auth-footer">
@@ -314,11 +341,11 @@
     </div>
   </div>
 
-  <script src="/js/core.js?v=20260408f"></script>
-  <script src="/js/schedule.js?v=20260408f"></script>
-  <script src="/js/timesheets.js?v=20260408f"></script>
-  <script src="/js/reports.js?v=20260408f"></script>
-  <script src="/js/manage.js?v=20260408f"></script>
-  <script src="/js/enterprise.js?v=20260408f"></script>
+  <script src="/js/core.js?v=20260408g"></script>
+  <script src="/js/schedule.js?v=20260408g"></script>
+  <script src="/js/timesheets.js?v=20260408g"></script>
+  <script src="/js/reports.js?v=20260408g"></script>
+  <script src="/js/manage.js?v=20260408g"></script>
+  <script src="/js/enterprise.js?v=20260408g"></script>
 </body>
 </html>

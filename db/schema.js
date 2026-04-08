@@ -192,6 +192,12 @@ function migrate(db) {
     db.exec("ALTER TABLE clients ADD COLUMN details TEXT DEFAULT ''");
   }
 
+  // Add must_change_password column to users table
+  const userCols2 = db.prepare('PRAGMA table_info(users)').all();
+  if (!userCols2.find(c => c.name === 'must_change_password')) {
+    db.exec('ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT 0');
+  }
+
   // Add is_archived column to projects and clients tables
   const projCols2 = db.prepare('PRAGMA table_info(projects)').all();
   if (!projCols2.find(c => c.name === 'is_archived')) {
