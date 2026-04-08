@@ -144,11 +144,15 @@ window.closeModal = function closeModal() {
 function showAuthView(view) {
   document.getElementById('view-login').classList.toggle('active', view === 'login');
   document.getElementById('view-register').classList.toggle('active', view === 'register');
+  var firstLogin = document.getElementById('view-first-login');
+  if (firstLogin) firstLogin.classList.toggle('active', view === 'first-login');
   // Clear errors on switch
   var errLogin = document.getElementById('auth-error-login');
   var errReg = document.getElementById('auth-error-register');
+  var errFirst = document.getElementById('auth-error-first-login');
   if (errLogin) errLogin.textContent = '';
   if (errReg) errReg.textContent = '';
+  if (errFirst) errFirst.textContent = '';
 }
 
 function initAuthSwitchLinks() {
@@ -192,7 +196,11 @@ function initLoginHandler() {
       setToken(data.token);
       window.state.user = data.user;
       window.state.enterprise = data.enterprise;
-      enterApp();
+      if (data.user && data.user.must_change_password) {
+        showFirstLoginView(data.user);
+      } else {
+        enterApp();
+      }
     } catch (err) {
       showAuthError(err.message || '登录失败', 'login');
     }
@@ -252,7 +260,11 @@ async function restoreSession() {
     const data = await api('/api/auth/me');
     window.state.user = data.user;
     window.state.enterprise = data.enterprise;
-    enterApp();
+    if (data.user && data.user.must_change_password) {
+      showFirstLoginView(data.user);
+    } else {
+      enterApp();
+    }
   } catch (_) {
     clearToken();
   }
@@ -378,12 +390,83 @@ function updateNavVisibility() {
 
 window.enterApp = enterApp;
 
+// --------------- First Login: Force Password Change ---------------
+function showFirstLoginView(user) {
+  // Show auth page (in case we came from session restore)
+  document.getElementById('auth-page').style.display = 'flex';
+  document.getElementById('main-app').style.display = 'none';
+
+  // Populate user greeting
+  var greetEl = document.getElementById('first-login-user');
+  if (greetEl && user) {
+    greetEl.innerHTML =
+      '<div class="first-login-greeting">' +
+      '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" style="vertical-align:-2px;margin-right:6px">' +
+      '<circle cx="10" cy="7" r="3" stroke="currentColor" stroke-width="1.5"/>' +
+      '<path d="M3 18c0-3.3 2.7-6 7-6s7 2.7 7 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>' +
+      '</svg>' +
+      '您好，<strong>' + (user.name || '') + '</strong>' +
+      (user.email ? '<span class="first-login-email"> &lt;' + user.email + '&gt;</span>' : '') +
+      '</div>';
+  }
+
+  // Clear fields and errors
+  var np = document.getElementById('first-new-password');
+  var cp = document.getElementById('first-confirm-password');
+  var err = document.getElementById('auth-error-first-login');
+  if (np) np.value = '';
+  if (cp) cp.value = '';
+  if (err) err.textContent = '';
+
+  showAuthView('first-login');
+}
+
+function initFirstLoginHandler() {
+  var btn = document.getElementById('btn-first-password');
+  if (!btn) return;
+  btn.addEventListener('click', async function () {
+    var err = document.getElementById('auth-error-first-login');
+    if (err) err.textContent = '';
+    var newPwd = document.getElementById('first-new-password').value;
+    var confirmPwd = document.getElementById('first-confirm-password').value;
+    if (!newPwd || !confirmPwd) {
+      if (err) err.textContent = '请填写新密码和确认密码';
+      return;
+    }
+    if (newPwd.length < 6) {
+      if (err) err.textContent = '密码至少6位';
+      return;
+    }
+    if (newPwd !== confirmPwd) {
+      if (err) err.textContent = '两次输入的密码不一致';
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = '设置中...';
+    try {
+      await api('/api/auth/first-password', {
+        method: 'PUT',
+        body: { new_password: newPwd },
+      });
+      // Clear must_change_password flag in local state
+      if (window.state.user) window.state.user.must_change_password = 0;
+      toast('密码设置成功，欢迎使用神马排班！');
+      enterApp();
+    } catch (e) {
+      if (err) err.textContent = e.message || '设置失败，请重试';
+      btn.disabled = false;
+      btn.textContent = '确认设置密码';
+    }
+  });
+}
+
 // --------------- Init ---------------
 document.addEventListener('DOMContentLoaded', () => {
   initAuthSwitchLinks();
   initLoginHandler();
   initRegisterHandler();
   initLogoutHandler();
+  initFirstLoginHandler();
   initNavigation();
 
   // User-info click -> account page
