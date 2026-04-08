@@ -379,9 +379,12 @@
     }
     function applyPreview(hoverIndex) {
       clearPreview();
-      var lo = Math.min(originalIndex, hoverIndex);
-      var hi = Math.max(originalIndex, hoverIndex);
+      if (hoverIndex === originalIndex) return; // 没有变化，不高亮
       var isShrink = hoverIndex < originalIndex;
+      // 延长：高亮 originalIndex+1 到 hoverIndex（新增的天）
+      // 缩短：高亮 hoverIndex+1 到 originalIndex（将被删除的天）
+      var lo = isShrink ? hoverIndex + 1 : originalIndex + 1;
+      var hi = isShrink ? originalIndex  : hoverIndex;
       for (var i = lo; i <= hi; i++) {
         var c = dateMap[dates[i]];
         if (c) {
