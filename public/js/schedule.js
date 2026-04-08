@@ -814,21 +814,25 @@
       endCell = cell;
     }
 
+    // Expose a way to clear highlights from outside (e.g. when modal is closed)
+    function clearDragHighlight() {
+      selectedCells.forEach(function (c) {
+        c.classList.remove('drag-selecting', 'drag-start', 'drag-end');
+      });
+      selectedCells = [];
+    }
+    // Store reference so closeModal can call it
+    window._clearDragHighlight = clearDragHighlight;
+
     function handleMouseUp(e) {
       if (!isDragging) return;
 
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
 
-      // Clear selection after delay
-      setTimeout(function () {
-        selectedCells.forEach(function (c) {
-          c.classList.remove('drag-selecting', 'drag-start', 'drag-end');
-        });
-      }, 300);
-
       // Only proceed if we have at least 2 cells selected
       if (selectedCells.length < 2) {
+        clearDragHighlight();
         isDragging = false;
         return;
       }
@@ -837,13 +841,13 @@
       var startDate = startCell.dataset.date;
       var endDate = endCell.dataset.date;
 
-      // Show booking modal for the date range
-      showBookingModal(null, rid, startDate, endDate);
-
+      // Keep highlight visible until modal is closed (cleared by closeModal)
       isDragging = false;
       startCell = null;
       endCell = null;
-      selectedCells = [];
+
+      // Show booking modal for the date range
+      showBookingModal(null, rid, startDate, endDate);
     }
   }
 

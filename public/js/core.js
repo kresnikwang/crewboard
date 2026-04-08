@@ -134,6 +134,10 @@ window.closeModal = function closeModal() {
   document.getElementById('modal-overlay').style.display = 'none';
   document.getElementById('modal-body').innerHTML = '';
   document.getElementById('modal-footer').innerHTML = '';
+  // Clear any drag-selection highlights left on the schedule grid
+  if (typeof window._clearDragHighlight === 'function') {
+    window._clearDragHighlight();
+  }
 };
 
 // --------------- Auth View Switching ---------------
