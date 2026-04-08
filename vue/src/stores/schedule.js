@@ -25,6 +25,17 @@ export const useScheduleStore = defineStore('schedule', () => {
     return Array.from({ length: 7 }, (_, i) => addDays(weekStart.value, i))
   })
 
+  // Group resources by team for month view
+  const teams = computed(() => {
+    const result = {}
+    resources.value.forEach(r => {
+      const team = r.team || '未分组'
+      if (!result[team]) result[team] = []
+      result[team].push(r)
+    })
+    return result
+  })
+
   const startStr = computed(() => fmt(days.value[0]))
   const endStr = computed(() => fmt(days.value[days.value.length - 1]))
 
@@ -56,7 +67,7 @@ export const useScheduleStore = defineStore('schedule', () => {
   }
 
   return {
-    view, weekStart, resources, bookings, leave, holidays, loading,
+    view, weekStart, resources, teams, bookings, leave, holidays, loading,
     days, startStr, endStr,
     load, prevPeriod, nextPeriod, goToday, setView,
   }

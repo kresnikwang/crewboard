@@ -1,295 +1,292 @@
 <template>
-  <div class="month-view">
-    <!-- Header: weekday labels -->
-    <div class="month-header-row">
-      <div class="m-name-col"></div>
-      <div v-for="d in headerDays" :key="d" class="m-day-header">{{ CN_DAYS[d] }}</div>
+  <div class="month-schedule" ref="containerRef">
+    <div class="month-scroll" ref="scrollRef">
+      <table class="month-table">
+        <thead>
+          <!-- Month label row -->
+          <tr class="m-month-row">
+            <th class="m-res-hd"></th>
+            <th
+              v-for="ms in monthSpans"
+              :key="ms.month + '-' + ms.year"
+              :colspan="ms.span"
+            >
+              <span class="m-month-label">{{ MONTH_NAMES[ms.month] }} {{ ms.year }}</span>
+            </th>
+          </tr>
+          <!-- Day header row -->
+          <tr class="m-day-row">
+            <th class="m-res-hd">人员</th>
+            <th
+              v-for="(d, idx) in days"
+              :key="fmt(d)"
+              :class="dayHeaderClass(d)"
+              style="position:relative"
+            >
+              <span v-if="idx % 7 === 0" class="m-week-label">W{{ getWeekNumber(d) }}</span>
+              <span class="m-day-name">{{ DAY_SHORT[d.getDay()] }}</span>
+              <span class="m-day-num">{{ d.getDate() }}</span>
+              <span v-if="holidayMap[fmt(d)] && holidayMap[fmt(d)].type === 'holiday'" class="m-holiday-dot" :title="holidayMap[fmt(d)].name"></span>
+              <span v-else-if="holidayMap[fmt(d)] && holidayMap[fmt(d)].type === 'workday'" class="m-makeup-dot" :title="holidayMap[fmt(d)].name"></span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <template v-for="(members, teamName) in teams" :key="teamName">
+            <!-- Team divider -->
+            <tr class="m-team-row">
+              <td class="m-res-cell m-team-label">
+                <span class="team-label">{{ teamName }}</span>
+              </td>
+              <td v-for="d in days" :key="fmt(d)"></td>
+            </tr>
+            <!-- Resource rows -->
+            <tr v-for="r in members" :key="r.id">
+              <td class="m-res-cell">
+                <div class="m-res-inner">
+                  <div class="m-res-avatar" :style="{ background: r.color || '#4F46E5' }">
+                    {{ r.name.charAt(0) }}
+                  </div>
+                  <div>
+                    <div class="m-res-name">{{ r.name }}</div>
+                    <div class="m-res-role">{{ r.role || '' }}</div>
+                  </div>
+                </div>
+              </td>
+              <td
+                v-for="d in days"
+                :key="fmt(d)"
+                :class="dayCellClass(d)"
+                :data-resource="r.id"
+                :data-date="fmt(d)"
+                @mousedown="onCellMouseDown($event, r, d)"
+              >
+                <!-- Leave block -->
+                <div
+                  v-if="leaveOnDate(r.id, d)"
+                  :class="leaveClass(leaveOnDate(r.id, d))"
+                  :data-leave-id="leaveOnDate(r.id, d).id"
+                >{{ leaveLabel(leaveOnDate(r.id, d).type).charAt(0) }}</div>
+
+                <!-- Booking blocks -->
+                <div
+                  v-for="b in bookingsOnDate(r.id, d)"
+                  :key="b.id"
+                  class="m-booking"
+                  :class="{ moving: movingIds.has(b.id), resizing: resizingId === b.id }"
+                  :data-booking-id="b.id"
+                  :data-resource-id="b.resource_id"
+                  :data-date="b.date"
+                  :style="bookingStyle(b)"
+                  :title="b.hours + 'h ' + b.project_name + (b.client_name ? ' | ' + b.client_name : '')"
+                  @mousedown.stop="onBookingMouseDown($event, b)"
+                  @click.stop="$emit('edit', b)"
+                >
+                  <span class="m-booking-hours">{{ b.hours }}h</span>
+                  {{ truncate(b.project_name, 25) }}
+                  <div
+                    class="resize-handle"
+                    @mousedown.stop="$emit('resize-start', { event: $event, booking: b })"
+                  ></div>
+                </div>
+
+                <!-- Resize / move preview overlays -->
+                <div v-if="isResizePreview(r.id, d)" class="resize-preview-overlay"></div>
+                <div v-if="isResizeShrinkPreview(r.id, d)" class="resize-shrink-overlay"></div>
+                <div v-if="isMovePreview(r.id, d)" class="move-preview-overlay"></div>
+
+                <!-- Utilization bar -->
+                <div v-if="dailyTotal(r.id, d) > 0 && !isWeekend(d)" class="m-util-bar">
+                  <div
+                    class="m-util-fill"
+                    :class="utilClass(r, d)"
+                    :style="{ width: utilPct(r, d) + '%' }"
+                  ></div>
+                </div>
+
+                <!-- Daily total -->
+                <span v-if="dailyTotal(r.id, d) > 0" class="day-total" :class="{ overbooked: dailyTotal(r.id, d) > (r.hours_per_day || 8) }">
+                  {{ dailyTotal(r.id, d) }}h
+                </span>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
     </div>
-
-    <!-- Week sub-headers (dates) -->
-    <template v-for="(week, wi) in weeks" :key="wi">
-      <div class="month-date-row">
-        <div class="m-name-col m-week-label">第{{ wi + 1 }}周</div>
-        <div
-          v-for="d in week"
-          :key="fmt(d)"
-          class="m-date-cell"
-          :class="{
-            'is-today': fmt(d) === todayStr,
-            'is-weekend': d.getDay() === 0 || d.getDay() === 6,
-            'is-holiday': holidays[fmt(d)],
-          }"
-        >
-          <span>{{ d.getDate() }}</span>
-          <span v-if="holidays[fmt(d)]" class="m-holiday-dot">假</span>
-        </div>
-      </div>
-
-      <!-- Resource rows for this week -->
-      <div
-        v-for="resource in resources"
-        :key="`${wi}-${resource.id}`"
-        class="month-resource-row"
-      >
-        <div class="m-name-col">
-          <span v-if="wi === 0" class="resource-name">{{ resource.name }}</span>
-        </div>
-        <td
-          v-for="d in week"
-          :key="fmt(d)"
-          class="m-day-cell"
-          :class="{
-            'is-weekend': d.getDay() === 0 || d.getDay() === 6,
-            'is-holiday': holidays[fmt(d)],
-            'drag-selecting': isDragSelected(resource.id, fmt(d)),
-          }"
-          :data-date="fmt(d)"
-          :data-resource="resource.id"
-          @mousedown="onCellMousedown($event, fmt(d), resource.id, getCellsForResource(resource.id, wi))"
-          @click="onCellClick($event, fmt(d), resource.id)"
-        >
-          <!-- Leave -->
-          <div v-if="leaveOnDate(resource.id, fmt(d))" class="m-leave-badge">休</div>
-
-          <!-- Bookings -->
-          <div
-            v-for="b in bookingsOnDate(resource.id, fmt(d))"
-            :key="b.id"
-            class="m-booking"
-            :style="{ background: b.project_color || '#8B5CF6', color: readableColor(b.project_color) }"
-            :title="b.project_name"
-            @click.stop="openEdit(b)"
-            @mousedown.stop="(e) => startMove(e, b, getGroupForBooking(b))"
-          >
-            <span class="m-booking-label">{{ truncate(b.project_name, 18) }}</span>
-            <div
-              class="resize-handle"
-              @mousedown.stop="(e) => startResize(e, b, getGroupForBooking(b))"
-            />
-          </div>
-
-          <!-- Resize preview -->
-          <div
-            v-if="resizePreviewOnDate(fmt(d))"
-            class="resize-preview"
-            :class="resizePreviewOnDate(fmt(d)) === 'remove' ? 'resize-preview-shrink' : ''"
-          />
-          <!-- Move preview -->
-          <div v-if="movePreviewOnDate(fmt(d))" class="move-preview" />
-
-          <!-- Daily total -->
-          <div class="m-day-total">{{ dailyTotal(resource.id, fmt(d)) }}</div>
-        </td>
-      </div>
-    </template>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { fmt, CN_DAYS } from '@/utils/date'
-import { truncate, readableColor } from '@/utils'
+import { ref, computed } from 'vue'
 import { useDragSelect } from '@/composables/useDragSelect'
-import { useBookingDrag } from '@/composables/useBookingDrag'
 
 const props = defineProps({
-  days: { type: Array, required: true }, // 28 days
-  resources: { type: Array, default: () => [] },
+  days: { type: Array, required: true },
+  teams: { type: Object, required: true },
   bookings: { type: Array, default: () => [] },
-  leave: { type: Array, default: () => [] },
-  holidays: { type: Object, default: () => ({}) },
+  leaves: { type: Array, default: () => [] },
+  holidayMap: { type: Object, default: () => ({}) },
+  resizePreviewCells: { type: Array, default: () => [] },
+  resizeShrinkCells: { type: Array, default: () => [] },
+  movePreviewCells: { type: Array, default: () => [] },
+  movingIds: { type: Set, default: () => new Set() },
+  resizingId: { type: Number, default: null },
 })
 
-const emit = defineEmits(['open-create', 'open-edit', 'resize-done', 'move-done'])
+const emit = defineEmits(['create', 'edit', 'resize-start', 'move-start'])
 
-const todayStr = fmt(new Date())
-const headerDays = [1, 2, 3, 4, 5, 6, 0] // Mon-Sun
+const containerRef = ref(null)
+const scrollRef = ref(null)
 
-const weeks = computed(() => {
-  const result = []
-  for (let w = 0; w < 4; w++) {
-    result.push(props.days.slice(w * 7, w * 7 + 7))
-  }
-  return result
+const DAY_SHORT = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+const monthSpans = computed(() => {
+  const spans = []
+  let curMonth = -1, curYear = -1, curSpan = 0
+  props.days.forEach(d => {
+    const m = d.getMonth(), y = d.getFullYear()
+    if (m === curMonth && y === curYear) {
+      curSpan++
+    } else {
+      if (curSpan > 0) spans.push({ month: curMonth, year: curYear, span: curSpan })
+      curMonth = m; curYear = y; curSpan = 1
+    }
+  })
+  if (curSpan > 0) spans.push({ month: curMonth, year: curYear, span: curSpan })
+  return spans
 })
 
-// ── Data helpers ──────────────────────────────────────────────────
-function bookingsOnDate(resourceId, date) {
-  return props.bookings.filter(b => b.resource_id === resourceId && b.date === date)
-}
-function leaveOnDate(resourceId, date) {
-  return props.leave.find(l => l.resource_id === resourceId && l.date === date)
-}
-function dailyTotal(resourceId, date) {
-  const total = props.bookings
-    .filter(b => b.resource_id === resourceId && b.date === date)
-    .reduce((s, b) => s + b.hours, 0)
-  return total > 0 ? `${total}h` : ''
-}
-function getCellsForResource(resourceId, weekIndex) {
-  return weeks.value[weekIndex].map(d => ({ date: fmt(d), resourceId }))
-}
-function getGroupForBooking(booking) {
-  return props.bookings
-    .filter(b => b.resource_id === booking.resource_id && b.project_id === booking.project_id)
-    .sort((a, b) => a.date.localeCompare(b.date))
+function fmt(d) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
-// ── Drag select ───────────────────────────────────────────────────
-const { selectedCells, onCellMousedown: _dragMousedown, isBlockingClick } =
-  useDragSelect({
-    onSelectDone: ({ resourceId, startDate, endDate }) => {
-      emit('open-create', { resourceId, startDate, endDate })
-    },
-  })
-
-function onCellMousedown(e, date, resourceId, cells) {
-  _dragMousedown(e, date, resourceId, cells)
-}
-function onCellClick(e, date, resourceId) {
-  if (isBlockingClick()) return
-  emit('open-create', { resourceId, startDate: date, endDate: date })
-}
-function isDragSelected(resourceId, date) {
-  return selectedCells.value.some(c => c.resourceId === resourceId && c.date === date)
+function isToday(d) {
+  const t = new Date()
+  return d.getFullYear() === t.getFullYear() && d.getMonth() === t.getMonth() && d.getDate() === t.getDate()
 }
 
-// ── Drag resize / move ────────────────────────────────────────────
-const { resizePreviewCells, startResize, movePreviewCells, startMove } =
-  useBookingDrag({
-    onResizeDone: (payload) => emit('resize-done', payload),
-    onMoveDone: (payload) => emit('move-done', payload),
-  })
+function isWeekend(d) {
+  return d.getDay() === 0 || d.getDay() === 6
+}
 
-function resizePreviewOnDate(date) {
-  const p = resizePreviewCells.value.find(c => c.date === date)
-  return p ? p.mode : null
+function getWeekNumber(d) {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
+  date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7))
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1))
+  return Math.ceil((((date - yearStart) / 86400000) + 1) / 7)
 }
-function movePreviewOnDate(date) {
-  return movePreviewCells.value.includes(date)
+
+function truncate(str, n) {
+  if (!str) return ''
+  return str.length > n ? str.slice(0, n) + '\u2026' : str
 }
-function openEdit(booking) {
-  emit('open-edit', booking)
+
+function dayHeaderClass(d) {
+  const cls = []
+  if (isToday(d)) cls.push('m-today')
+  if (isWeekend(d)) cls.push('m-weekend')
+  const h = props.holidayMap[fmt(d)]
+  if (h && h.type === 'holiday') cls.push('m-holiday')
+  if (h && h.type === 'workday') cls.push('m-makeup')
+  return cls
+}
+
+function dayCellClass(d) {
+  const cls = ['m-day-cell']
+  if (isWeekend(d)) cls.push('m-weekend')
+  return cls
+}
+
+function leaveClass(leave) {
+  const cls = ['m-leave']
+  if (leave.type === 'sick') cls.push('sick')
+  else if (leave.type === 'personal') cls.push('personal')
+  else if (leave.type === 'holiday') cls.push('holiday')
+  return cls
+}
+
+function leaveLabel(type) {
+  return { vacation: '\u4f11\u5047', sick: '\u75c5\u5047', personal: '\u4e8b\u5047', holiday: '\u6cd5\u5b9a\u5047\u671f', other: '\u8bf7\u5047' }[type] || '\u4f11\u5047'
+}
+
+function bookingStyle(b) {
+  const bg = (b.project_color || '#6366F1') + '33'
+  const fg = b.project_color || '#6366F1'
+  return { background: bg, color: fg, borderLeft: `2px solid ${fg}` }
+}
+
+function bookingsOnDate(resourceId, d) {
+  const dateStr = fmt(d)
+  return props.bookings.filter(b => b.resource_id === resourceId && b.date === dateStr)
+}
+
+function leaveOnDate(resourceId, d) {
+  const dateStr = fmt(d)
+  return props.leaves.find(l => l.resource_id === resourceId && l.date === dateStr) || null
+}
+
+function dailyTotal(resourceId, d) {
+  return bookingsOnDate(resourceId, d).reduce((s, b) => s + (b.hours || 0), 0)
+}
+
+function utilPct(r, d) {
+  const total = dailyTotal(r.id, d)
+  const max = r.hours_per_day || 8
+  return Math.min(Math.round((total / max) * 100), 100)
+}
+
+function utilClass(r, d) {
+  const pct = utilPct(r, d)
+  return pct >= 100 ? 'red' : pct >= 75 ? 'yellow' : 'green'
+}
+
+function isResizePreview(resourceId, d) {
+  const dateStr = fmt(d)
+  return props.resizePreviewCells.some(c => c.resourceId === resourceId && c.date === dateStr)
+}
+function isResizeShrinkPreview(resourceId, d) {
+  const dateStr = fmt(d)
+  return props.resizeShrinkCells.some(c => c.resourceId === resourceId && c.date === dateStr)
+}
+function isMovePreview(resourceId, d) {
+  const dateStr = fmt(d)
+  return props.movePreviewCells.some(c => c.resourceId === resourceId && c.date === dateStr)
+}
+
+// Drag select
+const { onCellMouseDown: dragSelectMouseDown } = useDragSelect(
+  scrollRef,
+  (resourceId, startDate, endDate) => emit('create', { resourceId, startDate, endDate })
+)
+
+function onCellMouseDown(e, r, d) {
+  if (e.target.closest('.m-booking, .m-leave')) return
+  dragSelectMouseDown(e, r.id, fmt(d))
+}
+
+function onBookingMouseDown(e, b) {
+  if (e.target.closest('.resize-handle')) return
+  emit('move-start', { event: e, booking: b })
 }
 </script>
 
 <style scoped>
-.month-view { overflow-x: auto; }
-
-.month-header-row, .month-date-row, .month-resource-row {
-  display: grid;
-  grid-template-columns: 120px repeat(7, 1fr);
-  border-bottom: 1px solid var(--border);
+.resize-preview-overlay {
+  position: absolute; inset: 0; background: rgba(79,70,229,.15);
+  border: 1px solid rgba(79,70,229,.4); pointer-events: none; z-index: 5;
 }
-
-.m-name-col {
-  padding: 4px 8px;
-  border-right: 1px solid var(--border);
-  background: var(--surface);
-  position: sticky;
-  left: 0;
-  z-index: 1;
-  display: flex;
-  align-items: center;
+.resize-shrink-overlay {
+  position: absolute; inset: 0; background: rgba(239,68,68,.15);
+  border: 1px solid rgba(239,68,68,.4); pointer-events: none; z-index: 5;
 }
-.m-week-label { font-size: 11px; color: var(--text-secondary); }
-.resource-name { font-size: 12px; font-weight: 600; color: var(--text); }
-
-.m-day-header {
-  text-align: center;
-  padding: 6px 4px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  border-right: 1px solid var(--border);
-  background: var(--surface);
-  position: sticky;
-  top: 0;
-  z-index: 2;
-}
-
-.m-date-cell {
-  text-align: center;
-  padding: 3px 4px;
-  font-size: 11px;
-  color: var(--text-secondary);
-  border-right: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-}
-.m-date-cell.is-today { color: var(--primary); font-weight: 700; }
-.m-date-cell.is-weekend, .m-day-cell.is-weekend { background: var(--weekend-bg, #f9fafb); }
-.m-date-cell.is-holiday, .m-day-cell.is-holiday { background: #fef3c7; }
-.m-holiday-dot { font-size: 9px; background: #ef4444; color: #fff; border-radius: 3px; padding: 0 2px; }
-
-.m-day-cell {
-  position: relative;
-  min-height: 36px;
-  padding: 2px 4px 14px;
-  border-right: 1px solid var(--border);
-  cursor: pointer;
-  transition: background .1s;
-}
-.m-day-cell:hover { background: var(--hover); }
-.m-day-cell.drag-selecting { background: rgba(79,70,229,.12); }
-
-.m-leave-badge {
-  position: absolute; top: 1px; right: 1px;
-  background: #fbbf24; color: #fff;
-  font-size: 8px; font-weight: 700;
-  border-radius: 2px; padding: 0 3px;
-}
-
-.m-booking {
-  position: relative;
-  border-radius: 3px;
-  padding: 1px 16px 1px 4px;
-  font-size: 10px;
-  font-weight: 500;
-  margin-bottom: 1px;
-  height: 16px;
-  line-height: 14px;
-  overflow: hidden;
-  white-space: nowrap;
-  cursor: grab;
-  user-select: none;
-}
-.m-booking:hover .resize-handle { opacity: 1; }
-.m-booking-label { pointer-events: none; }
-
-.resize-handle {
-  position: absolute;
-  right: 0; top: 0; bottom: 0;
-  width: 8px;
-  cursor: col-resize;
-  opacity: 0;
-  transition: opacity .15s;
-  background: rgba(255,255,255,.35);
-  border-radius: 0 3px 3px 0;
-}
-
-.m-day-total {
-  position: absolute;
-  bottom: 1px; right: 3px;
-  font-size: 9px;
-  color: var(--text-secondary);
-}
-
-.resize-preview {
-  position: absolute; inset: 1px;
-  background: rgba(59,130,246,.2);
-  border: 1px dashed #3b82f6;
-  border-radius: 3px;
-  pointer-events: none;
-}
-.resize-preview-shrink { background: rgba(239,68,68,.15); border-color: #ef4444; }
-.move-preview {
-  position: absolute; inset: 1px;
-  background: rgba(16,185,129,.2);
-  border: 1px dashed #10b981;
-  border-radius: 3px;
-  pointer-events: none;
+.move-preview-overlay {
+  position: absolute; inset: 0; background: rgba(16,185,129,.15);
+  border: 1px solid rgba(16,185,129,.4); pointer-events: none; z-index: 5;
 }
 </style>

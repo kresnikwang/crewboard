@@ -1,45 +1,47 @@
 <template>
-  <div class="app-layout">
+  <div class="app" :class="themeClass">
     <!-- Sidebar -->
     <aside class="sidebar">
-      <div class="sidebar-logo">
-        <img src="/img/logo.svg" alt="crewboard" class="logo-img" />
-        <span class="logo-text">Crewboard</span>
+      <div class="sidebar-header">
+        <div class="logo">
+          <img src="/img/logo.svg" alt="crewboard" width="24" height="24" />
+          <span>Crewboard</span>
+        </div>
       </div>
 
-      <nav class="sidebar-nav">
-        <RouterLink
+      <ul class="nav-menu">
+        <li
           v-for="item in navItems"
           :key="item.to"
-          :to="item.to"
           class="nav-item"
           :class="{ active: isActive(item.to) }"
+          @click="router.push(item.to)"
         >
-          <span class="nav-icon">{{ item.icon }}</span>
-          <span class="nav-label">{{ item.label }}</span>
-        </RouterLink>
-      </nav>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" v-html="item.icon"></svg>
+          <span>{{ item.label }}</span>
+        </li>
+      </ul>
 
       <div class="sidebar-footer">
-        <div class="user-info" @click="showUserMenu = !showUserMenu">
-          <div class="user-avatar">{{ userInitial }}</div>
-          <div class="user-meta">
-            <span class="user-name">{{ auth.user?.name || auth.user?.email }}</span>
-            <span class="user-role">{{ roleLabel }}</span>
+        <div class="sidebar-user-row" style="cursor:pointer" @click="showUserMenu = !showUserMenu">
+          <div class="sidebar-avatar-text">{{ userInitial }}</div>
+          <div class="user-info" style="margin-bottom:0;flex:1;min-width:0">
+            <strong>{{ auth.user?.name || auth.user?.email }}</strong><br />
+            <span style="font-size:11px;opacity:.6">{{ roleLabel }}</span>
           </div>
-          <span class="chevron">⌄</span>
         </div>
-        <div v-if="showUserMenu" class="user-menu">
-          <button class="menu-item" @click="goProfile">个人设置</button>
-          <button class="menu-item danger" @click="logout">退出登录</button>
+        <div v-if="auth.enterprise" class="sidebar-enterprise">{{ auth.enterprise.name }}</div>
+        <div v-if="showUserMenu" class="user-dropdown">
+          <button class="user-dropdown-item" @click="goProfile">个人设置</button>
+          <button class="user-dropdown-item danger" @click="logout">退出登录</button>
         </div>
       </div>
     </aside>
 
     <!-- Main content -->
-    <main class="main-content">
+    <div class="main-content">
       <RouterView />
-    </main>
+    </div>
   </div>
 </template>
 
@@ -54,11 +56,31 @@ const route = useRoute()
 const showUserMenu = ref(false)
 
 const navItems = [
-  { to: '/schedule', icon: '📅', label: '资源排程' },
-  { to: '/timesheets', icon: '⏱️', label: '工时填报' },
-  { to: '/reports', icon: '📊', label: '数据报表' },
-  { to: '/manage', icon: '👥', label: '人员 & 项目' },
-  { to: '/enterprise', icon: '🏢', label: '企业管理' },
+  {
+    to: '/schedule',
+    label: '资源排程',
+    icon: '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line>',
+  },
+  {
+    to: '/timesheets',
+    label: '工时填报',
+    icon: '<circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline>',
+  },
+  {
+    to: '/reports',
+    label: '数据报表',
+    icon: '<line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line>',
+  },
+  {
+    to: '/manage',
+    label: '人员 & 项目',
+    icon: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path>',
+  },
+  {
+    to: '/enterprise',
+    label: '企业管理',
+    icon: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline>',
+  },
 ]
 
 const userInitial = computed(() => {
@@ -70,7 +92,14 @@ const roleLabel = computed(() => {
   return { owner: '所有者', admin: '管理员', member: '成员' }[auth.user?.role] || ''
 })
 
-function isActive(path) { return route.path.startsWith(path) }
+const themeClass = computed(() => {
+  const t = auth.enterprise?.theme_color
+  return t ? `theme-${t}` : ''
+})
+
+function isActive(path) {
+  return route.path.startsWith(path)
+}
 
 function goProfile() {
   showUserMenu.value = false
@@ -85,111 +114,22 @@ async function logout() {
 </script>
 
 <style scoped>
-.app-layout {
-  display: flex;
-  height: 100vh;
-  overflow: hidden;
-}
-
-.sidebar {
-  width: 200px;
-  min-width: 200px;
-  background: var(--sidebar-bg, #1e1e2e);
-  color: #fff;
-  display: flex;
-  flex-direction: column;
-  border-right: 1px solid rgba(255,255,255,.08);
-}
-
-.sidebar-logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 18px 16px;
-  border-bottom: 1px solid rgba(255,255,255,.08);
-}
-.logo-img { width: 28px; height: 28px; }
-.logo-text { font-size: 16px; font-weight: 700; color: #fff; }
-
-.sidebar-nav {
-  flex: 1;
-  padding: 12px 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  overflow-y: auto;
-}
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 12px;
-  border-radius: 8px;
-  color: rgba(255,255,255,.65);
-  text-decoration: none;
-  font-size: 13px;
-  font-weight: 500;
-  transition: all .15s;
-}
-.nav-item:hover { background: rgba(255,255,255,.08); color: #fff; }
-.nav-item.active { background: var(--primary, #6366f1); color: #fff; }
-.nav-icon { font-size: 15px; width: 20px; text-align: center; }
-
-.sidebar-footer {
-  padding: 12px 8px;
-  border-top: 1px solid rgba(255,255,255,.08);
-  position: relative;
-}
-
-.user-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background .15s;
-}
-.user-info:hover { background: rgba(255,255,255,.08); }
-.user-avatar {
-  width: 30px; height: 30px;
-  border-radius: 50%;
-  background: var(--primary, #6366f1);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0;
-}
-.user-meta { flex: 1; min-width: 0; }
-.user-name { display: block; font-size: 12px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.user-role { font-size: 10px; color: rgba(255,255,255,.5); }
-.chevron { font-size: 12px; color: rgba(255,255,255,.5); }
-
-.user-menu {
-  position: absolute;
-  bottom: 60px; left: 8px; right: 8px;
+/* User dropdown (not in original, minimal addition) */
+.user-dropdown {
+  margin-top: 6px;
   background: #fff;
   border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0,0,0,.15);
+  border-radius: 6px;
   overflow: hidden;
-  z-index: 100;
+  box-shadow: 0 4px 16px rgba(0,0,0,.12);
 }
-.menu-item {
+.user-dropdown-item {
   display: block; width: 100%;
-  padding: 10px 14px;
-  text-align: left;
+  padding: 9px 14px; text-align: left;
   background: none; border: none;
   font-size: 13px; color: var(--text);
-  cursor: pointer;
+  cursor: pointer; font-family: var(--font);
 }
-.menu-item:hover { background: var(--hover); }
-.menu-item.danger { color: #ef4444; }
-
-.main-content {
-  flex: 1;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  background: var(--bg, #f8fafc);
-}
+.user-dropdown-item:hover { background: var(--bg); }
+.user-dropdown-item.danger { color: #EF4444; }
 </style>

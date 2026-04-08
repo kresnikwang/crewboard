@@ -45,14 +45,14 @@
     <MonthView
       v-else
       :days="store.days"
-      :resources="store.resources"
+      :teams="store.teams"
       :bookings="store.bookings"
-      :leave="store.leave"
-      :holidays="store.holidays"
-      @open-create="openCreate"
-      @open-edit="openEdit"
-      @resize-done="handleResizeDone"
-      @move-done="handleMoveDone"
+      :leaves="store.leave"
+      :holiday-map="store.holidays"
+      @create="openCreate"
+      @edit="openEdit"
+      @resize-start="handleResizeStart"
+      @move-start="handleMoveStart"
     />
 
     <!-- Booking modal -->
@@ -125,6 +125,18 @@ function openEdit(booking) {
   editingBooking.value = booking
   createDefaults.value = {}
   showModal.value = true
+}
+
+// ── Resize start (from MonthView) ────────────────────────────────
+function handleResizeStart({ event, booking }) {
+  // Delegate to the vanilla-style resize logic via composable
+  // For now, use the same approach as WeekView
+  // This will be wired to useBookingDrag in a follow-up
+}
+
+// ── Move start (from MonthView) ───────────────────────────────────
+function handleMoveStart({ event, booking }) {
+  // Delegate to move logic
 }
 
 // ── Resize done ────────────────────────────────────────────────────
