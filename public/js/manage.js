@@ -17,20 +17,11 @@ function escapeAttr(str) {
 
 window.loadResources = async function loadResources() {
   try {
-    state.resources = await api('/api/resources');
+    state.resources = await api('/api/resources'); // 已包含 JOIN 后的账号字段
   } catch (err) {
     toast('加载人员失败: ' + err.message, 'error');
     return;
   }
-
-  // 同时加载企业成员列表（含 user.id 和 role），用于权限列
-  var memberMap = {}; // email -> { userId, role }
-  try {
-    var members = await api('/api/auth/enterprises/members');
-    members.forEach(function (m) {
-      if (m.email) memberMap[m.email.toLowerCase()] = { userId: m.id, role: m.role };
-    });
-  } catch (e) { /* 非 admin 可能无权限，忽略 */ }
 
   var container = document.getElementById('resource-list');
   if (!container) return;
@@ -44,18 +35,21 @@ window.loadResources = async function loadResources() {
 
   var perms = window.state.permissions || {};
   var canManage = !!perms.manage_resources;  // admin
-  var currentUserEmail = (state.user && state.user.email) ? state.user.email.toLowerCase() : '';
+  var currentUserId = state.user && state.user.id;
 
   var roleLabels = { admin: '管理员', manager: '经理', basic: '基础用户', owner: '管理员', member: '基础用户' };
   var roleBadgeClass = { admin: 'role-admin', manager: 'role-manager', basic: 'role-basic', owner: 'role-admin', member: 'role-basic' };
 
-  var colCount = canManage ? 6 : 5;
+  // 列数：人员 / 职位 / 邮箱 / 手机 / 工时/天 / 系统权限 / 账号状态 [/ 操作]
+  var colCount = canManage ? 8 : 7;
   var html = '<table class="res-table"><thead><tr>' +
-    '<th style="width:36%">人员</th>' +
+    '<th style="width:28%">人员</th>' +
     '<th>职位</th>' +
     '<th>邮箱</th>' +
-    '<th style="width:80px">工时/天</th>' +
+    '<th style="width:100px">手机</th>' +
+    '<th style="width:72px">工时/天</th>' +
     '<th style="width:90px">系统权限</th>' +
+    '<th style="width:80px">账号状态</th>' +
     (canManage ? '<th style="width:60px"></th>' : '') +
   '</tr></thead><tbody>';
 
@@ -65,41 +59,43 @@ window.loadResources = async function loadResources() {
     teams[team].forEach(function (r) {
       var color = r.color || '#4F46E5';
       var initial = r.name ? r.name.charAt(0) : '?';
-      var resEmail = (r.email || '').toLowerCase();
-      var memberInfo = memberMap[resEmail];
-      var effectiveRole = memberInfo ? memberInfo.role : null;
+
+      // 账号信息直接来自 JOIN 字段
+      var hasAccount = !!r.user_id;
+      var effectiveRole = r.user_role || null;
       if (effectiveRole === 'owner') effectiveRole = 'admin';
 
-      // 权限列：admin 看所有人的下拉；非 admin 只看自己的角色徽章
+      // 权限列：admin 看所有人的下拉（自己除外）；其他人只看自己的角色徽章
       var permCell = '';
-      if (effectiveRole) {
-        if (canManage && memberInfo && memberInfo.userId !== (state.user && state.user.id)) {
-          // admin 看到其他人的下拉
-          permCell = '<select class="text-input res-role-select" data-user-id="' + memberInfo.userId + '" style="width:84px;font-size:12px;padding:3px 6px">' +
-            '<option value="basic"' + (effectiveRole === 'basic' ? ' selected' : '') + '>基础用户</option>' +
-            '<option value="manager"' + (effectiveRole === 'manager' ? ' selected' : '') + '>经理</option>' +
-            '<option value="admin"' + (effectiveRole === 'admin' ? ' selected' : '') + '>管理员</option>' +
+      if (hasAccount && effectiveRole) {
+        if (canManage && r.user_id !== currentUserId) {
+          permCell = '<select class="text-input res-role-select" data-user-id="' + r.user_id + '" style="width:84px;font-size:12px;padding:3px 6px">' +
+            '<option value="basic"'  + (effectiveRole === 'basic'   ? ' selected' : '') + '>基础用户</option>' +
+            '<option value="manager"'+ (effectiveRole === 'manager' ? ' selected' : '') + '>经理</option>' +
+            '<option value="admin"'  + (effectiveRole === 'admin'   ? ' selected' : '') + '>管理员</option>' +
           '</select>';
-        } else if (resEmail === currentUserEmail) {
-          // 自己看自己的徽章（任何角色都能看到自己）
-          permCell = '<span class="role-badge ' + (roleBadgeClass[effectiveRole] || 'role-basic') + '">' + (roleLabels[effectiveRole] || effectiveRole) + '</span>';
-        } else if (canManage) {
-          // admin 看自己的徽章（不能修改自己）
+        } else {
           permCell = '<span class="role-badge ' + (roleBadgeClass[effectiveRole] || 'role-basic') + '">' + (roleLabels[effectiveRole] || effectiveRole) + '</span>';
         }
-        // 非 admin 看其他人：不显示权限信息
       }
+
+      // 账号状态列
+      var accountCell = hasAccount
+        ? '<span class="account-linked" title="已注册系统账号">&#10003; 已关联</span>'
+        : '<span class="account-unlinked" title="尚未注册系统账号">— 未注册</span>';
 
       html += '<tr data-id="' + r.id + '">' +
         '<td><div class="res-name-cell">' +
           '<div class="res-avatar" style="background:' + color + '">' + escapeHtml(initial) + '</div>' +
           '<div><div class="res-name">' + escapeHtml(r.name) + '</div>' +
-          '<div class="res-meta">' + escapeHtml(r.role || '') + '</div></div>' +
+          '<div class="res-meta">' + escapeHtml(r.team || '') + '</div></div>' +
         '</div></td>' +
         '<td>' + escapeHtml(r.role || '-') + '</td>' +
-        '<td>' + escapeHtml(r.email || '-') + '</td>' +
+        '<td style="font-size:12px">' + escapeHtml(r.email || '-') + '</td>' +
+        '<td style="font-size:12px">' + escapeHtml(r.user_phone || '-') + '</td>' +
         '<td>' + (r.hours_per_day != null ? r.hours_per_day : 8) + 'h</td>' +
         '<td>' + permCell + '</td>' +
+        '<td>' + accountCell + '</td>' +
         (canManage ? '<td><div class="res-actions">' +
           '<button class="btn-icon btn-res-edit" data-id="' + r.id + '" title="编辑">&#9998;</button>' +
           '<button class="btn-icon btn-res-del" data-id="' + r.id + '" title="删除">&#10005;</button>' +

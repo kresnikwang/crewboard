@@ -48,7 +48,22 @@ module.exports = function(db) {
   router.get('/resources', (req, res) => {
     const entId = req.user?.enterprise_id;
     if (!entId) return res.json([]);
-    const resources = db.prepare('SELECT * FROM resources WHERE is_active = 1 AND enterprise_id = ? ORDER BY team, name').all(entId);
+    // LEFT JOIN users to include linked account info (matched by email)
+    const resources = db.prepare(`
+      SELECT r.*,
+             u.id        AS user_id,
+             u.phone     AS user_phone,
+             u.role      AS user_role,
+             u.status    AS user_status,
+             u.created_at AS user_joined_at
+      FROM resources r
+      LEFT JOIN users u
+        ON lower(r.email) = lower(u.email)
+        AND u.enterprise_id = r.enterprise_id
+        AND u.status = 'active'
+      WHERE r.is_active = 1 AND r.enterprise_id = ?
+      ORDER BY r.team, r.name
+    `).all(entId);
     res.json(resources);
   });
 

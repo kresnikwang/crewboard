@@ -95,7 +95,6 @@ window.loadEnterprise = async function loadEnterprise() {
       '<h3>企业信息</h3>' +
       '<div class="info-row"><span class="info-label">企业名称</span><span class="info-value">' + escHtml(ent.name) + '</span></div>' +
       '<div class="info-row"><span class="info-label">邀请码（分享给同事加入）</span><span class="info-value" style="font-family:monospace;font-weight:600">' + escHtml(ent.code) + '</span></div>' +
-      '<div class="info-row"><span class="info-label">成员数量</span><span class="info-value" id="ent-member-count">加载中...</span></div>' +
     '</div>';
 
   if (isOwnerOrAdmin()) {
@@ -126,9 +125,6 @@ window.loadEnterprise = async function loadEnterprise() {
   }
 
   container.innerHTML = html;
-
-  // 只加载成员数量（列表已移至人员管理）
-  loadEnterpriseMemberCount();
 
   // Load requests if admin/owner
   if (isOwnerOrAdmin()) {
@@ -232,17 +228,6 @@ window.loadEnterprise = async function loadEnterprise() {
   }
 };
 
-// 只更新成员数量（列表已移至人员管理页面）
-async function loadEnterpriseMemberCount() {
-  try {
-    var members = await api('/api/auth/enterprises/members');
-    var countEl = document.getElementById('ent-member-count');
-    if (countEl) countEl.textContent = members.length + ' 人';
-  } catch (e) {
-    var countEl = document.getElementById('ent-member-count');
-    if (countEl) countEl.textContent = '-';
-  }
-}
 
 async function loadEnterpriseRequests() {
   try {
