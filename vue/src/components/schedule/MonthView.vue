@@ -66,7 +66,7 @@
                   class="booking-block leave-block"
                   :class="leaveOnDate(r.id, d).type"
                   :title="leaveLabel(leaveOnDate(r.id, d).type)"
-                  @click.stop="$emit('edit-leave', leaveOnDate(r.id, d))"
+                  @click.stop="!props.readonly && $emit('edit-leave', leaveOnDate(r.id, d))"
                 >
                   {{ leaveLabel(leaveOnDate(r.id, d).type) }}
                 </div>
@@ -78,13 +78,14 @@
                   :data-booking-id="b.id"
                   :style="bookingStyle(b)"
                   :title="b.hours + 'h ' + b.project_name + (b.client_name ? ' | ' + b.client_name : '')"
-                  @mousedown.stop="onBookingMouseDown($event, b)"
+                  @mousedown.stop="!props.readonly && onBookingMouseDown($event, b)"
                   @click.stop="$emit('edit', b)"
                 >
                   <span class="booking-hours">{{ b.hours }}h</span>
                   {{ truncate(b.project_name, 25) }}
                   <div
                     class="resize-handle"
+                    v-if="!props.readonly"
                     @mousedown.stop="$emit('resize-start', { event: $event, booking: b })"
                   ></div>
                 </div>
@@ -120,6 +121,7 @@ const props = defineProps({
   movePreviewCells:   { type: Array,  default: () => [] },
   movingIds:          { type: Object, default: () => new Set() },
   resizingId:         { type: Number, default: null },
+  readonly:           { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['create', 'edit', 'edit-leave', 'resize-start', 'move-start'])
@@ -214,10 +216,12 @@ function isDragSelected(resourceId, dateStr) {
   return selectedCells.value.some(c => String(c.resourceId)===String(resourceId) && c.date===dateStr)
 }
 function onCellMouseDown(e, r, d) {
+  if (props.readonly) return
   if (e.target.closest('.booking-block,.m-leave')) return
   dragSelectMouseDown(e, r.id, fmt(d))
 }
 function onBookingMouseDown(e, b) {
+  if (props.readonly) return
   if (e.target.closest('.resize-handle')) return
   emit('move-start', { event: e, booking: b })
 }

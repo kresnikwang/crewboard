@@ -61,8 +61,8 @@
               }"
               :data-resource="r.id"
               :data-date="fmtDate(d)"
-              @mousedown="onCellMousedown($event, fmtDate(d), r.id)"
-              @click="onCellClick($event, fmtDate(d), r.id)"
+              @mousedown="!props.readonly && onCellMousedown($event, fmtDate(d), r.id)"
+              @click="!props.readonly && onCellClick($event, fmtDate(d), r.id)"
             >
               <!-- Leave block -->
               <div
@@ -71,7 +71,7 @@
                 :class="leaveOnDate(r.id, fmtDate(d)).type"
                 :data-leave-id="leaveOnDate(r.id, fmtDate(d)).id"
                 :title="leaveLabel(leaveOnDate(r.id, fmtDate(d)).type)"
-                @click.stop="$emit('open-leave', leaveOnDate(r.id, fmtDate(d)))"
+                @click.stop="!props.readonly && $emit('open-leave', leaveOnDate(r.id, fmtDate(d)))"
               >
                 {{ leaveLabel(leaveOnDate(r.id, fmtDate(d)).type) }}
               </div>
@@ -84,8 +84,9 @@
                 :is-resizing="resizingId === b.id"
                 :is-moving="movingIds.includes(b.id)"
                 @click.stop="$emit('open-edit', b)"
-                @resize-start="(e) => startResize(e, b, getGroup(b))"
-                @move-start="(e) => startMove(e, b, getGroup(b))"
+                :readonly="props.readonly"
+                @resize-start="(e) => !props.readonly && startResize(e, b, getGroup(b))"
+                @move-start="(e) => !props.readonly && startMove(e, b, getGroup(b))"
               />
 
               <!-- Resize preview overlay -->
@@ -127,6 +128,7 @@ const props = defineProps({
   bookings: { type: Array,  default: () => [] },
   leave:    { type: Array,  default: () => [] },
   holidays: { type: Object, default: () => ({}) },
+  readonly: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['open-create', 'open-edit', 'open-leave', 'resize-done', 'move-done'])
@@ -176,10 +178,12 @@ const { selectedCells, onCellMousedown: _dragMousedown, clearSelection, isBlocki
   })
 
 function onCellMousedown(e, date, resourceId) {
+  if (props.readonly) return
   const cells = props.days.map(d => ({ date: fmtDate(d), resourceId }))
   _dragMousedown(e, date, resourceId, cells)
 }
 function onCellClick(e, date, resourceId) {
+  if (props.readonly) return
   if (isBlockingClick()) return
   emit('open-create', { resourceId, startDate: date, endDate: date })
 }

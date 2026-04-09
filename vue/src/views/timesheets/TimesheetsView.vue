@@ -9,10 +9,12 @@
         <span class="period-label">{{ periodLabel }}</span>
       </div>
       <div class="toolbar-right">
-        <button class="btn btn-secondary btn-sm" @click="copyFromSchedule" :disabled="copying">
-          {{ copying ? '复制中…' : '从排程复制' }}
-        </button>
-        <button class="btn btn-primary btn-sm" @click="openAdd">+ 新增工时</button>
+        <template v-if="!auth.isBasic">
+          <button class="btn btn-secondary btn-sm" @click="copyFromSchedule" :disabled="copying">
+            {{ copying ? '复制中…' : '从排程复制' }}
+          </button>
+          <button class="btn btn-primary btn-sm" @click="openAdd">+ 新增工时</button>
+        </template>
       </div>
     </div>
 
@@ -46,7 +48,7 @@
               :key="fmt(d)"
               class="ts-day-cell"
               :class="{ 'is-weekend': isWeekend(d) }"
-              @click="openAddForCell(resource.id, fmt(d))"
+              @click="!auth.isBasic && openAddForCell(resource.id, fmt(d))"
             >
               <div
                 v-for="ts in timesheetsOnDate(resource.id, fmt(d))"
@@ -54,7 +56,7 @@
                 class="ts-entry"
                 :style="{ background: ts.project_color || '#8B5CF6', color: readableColor(ts.project_color) }"
                 :title="ts.project_name"
-                @click.stop="openEdit(ts)"
+                @click.stop="!auth.isBasic && openEdit(ts)"
               >
                 {{ ts.hours }}h {{ truncate(ts.project_name, 16) }}
               </div>
@@ -68,8 +70,8 @@
       </table>
     </div>
 
-    <!-- Modal -->
-    <AppModal v-model="showModal" :title="editingTs ? '编辑工时' : '新增工时'" width="440px">
+    <!-- Modal (only for manager/admin) -->
+    <AppModal v-if="!auth.isBasic" v-model="showModal" :title="editingTs ? '编辑工时' : '新增工时'" width="440px">
       <form @submit.prevent="handleSave">
         <div class="form-group">
           <label class="form-label">人员</label>
@@ -118,9 +120,11 @@ import { timesheetApi, bookingApi, resourceApi, projectApi } from '@/api'
 import { fmt, CN_DAYS, getMonday, addDays, rangeLabel } from '@/utils/date'
 import { truncate, readableColor } from '@/utils'
 import { useToast } from '@/composables/useToast'
+import { useAuthStore } from '@/stores/auth'
 import AppModal from '@/components/common/AppModal.vue'
 
 const { toast } = useToast()
+const auth = useAuthStore()
 
 const weekStart = ref(getMonday(new Date()))
 const resources = ref([])

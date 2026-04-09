@@ -105,19 +105,32 @@
     /* ---- render table ---- */
     gridEl.innerHTML = buildTable(days, relevantProjects, tsMap, scheduleMap);
 
+    /* ---- permission check: basic users are read-only ---- */
+    var perms = window.state.permissions || {};
+    var isReadOnly = !perms.book_others;
+
     /* ---- attach save handler ---- */
     var saveBtn = document.getElementById('ts-save');
     if (saveBtn) {
-      saveBtn.onclick = function () {
-        handleSave(days);
-      };
+      if (isReadOnly) {
+        saveBtn.style.display = 'none';
+      } else {
+        saveBtn.onclick = function () {
+          handleSave(days);
+        };
+      }
     }
 
-    /* ---- update totals on input change ---- */
+    /* ---- disable inputs for read-only users ---- */
     gridEl.querySelectorAll('.ts-input').forEach(function (input) {
-      input.addEventListener('input', function () {
-        updateTotals(days, relevantProjects);
-      });
+      if (isReadOnly) {
+        input.disabled = true;
+        input.style.cursor = 'default';
+      } else {
+        input.addEventListener('input', function () {
+          updateTotals(days, relevantProjects);
+        });
+      }
     });
   };
 
@@ -347,7 +360,13 @@
       });
     }
     if (copyBtn) {
-      copyBtn.addEventListener('click', copyFromSchedule);
+      /* Hide copy button for read-only (basic) users */
+      var permsForCopy = window.state.permissions || {};
+      if (!permsForCopy.book_others) {
+        copyBtn.style.display = 'none';
+      } else {
+        copyBtn.addEventListener('click', copyFromSchedule);
+      }
     }
   });
 

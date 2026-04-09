@@ -43,16 +43,19 @@ const routes = [
         path: 'reports',
         name: 'Reports',
         component: () => import('@/views/reports/ReportsView.vue'),
+        meta: { requiresRole: 'manager' },
       },
       {
         path: 'manage',
         name: 'Manage',
         component: () => import('@/views/manage/ManageView.vue'),
+        meta: { requiresRole: 'manager' },
       },
       {
         path: 'enterprise',
         name: 'Enterprise',
         component: () => import('@/views/enterprise/EnterpriseView.vue'),
+        meta: { requiresRole: 'admin' },
       },
       {
         path: 'profile',
@@ -95,6 +98,17 @@ router.beforeEach(async (to) => {
   // Redirect away from first-login if not needed
   if (to.name === 'FirstLogin' && auth.isLoggedIn && !auth.mustChangePassword) {
     return { path: '/' }
+  }
+
+  // Role-based access control
+  if (to.meta.requiresRole && auth.isLoggedIn) {
+    const role = auth.userRole
+    if (to.meta.requiresRole === 'admin' && !auth.isAdmin) {
+      return { path: '/schedule' }
+    }
+    if (to.meta.requiresRole === 'manager' && !auth.isManager) {
+      return { path: '/schedule' }
+    }
   }
 })
 

@@ -33,12 +33,15 @@ window.loadResources = async function loadResources() {
     teams[team].push(r);
   });
 
+  var perms = window.state.permissions || {};
+  var canManage = !!perms.manage_resources;
+
   var html = '<table class="res-table"><thead><tr>' +
     '<th style="width:40%">人员</th>' +
     '<th>角色</th>' +
     '<th>邮箱</th>' +
     '<th style="width:80px">工时/天</th>' +
-    '<th style="width:60px"></th>' +
+    (canManage ? '<th style="width:60px"></th>' : '') +
   '</tr></thead><tbody>';
 
   var teamNames = Object.keys(teams).sort();
@@ -56,10 +59,10 @@ window.loadResources = async function loadResources() {
         '<td>' + escapeHtml(r.role || '-') + '</td>' +
         '<td>' + escapeHtml(r.email || '-') + '</td>' +
         '<td>' + (r.hours_per_day != null ? r.hours_per_day : 8) + 'h</td>' +
-        '<td><div class="res-actions">' +
+        (canManage ? '<td><div class="res-actions">' +
           '<button class="btn-icon btn-res-edit" data-id="' + r.id + '" title="编辑">&#9998;</button>' +
           '<button class="btn-icon btn-res-del" data-id="' + r.id + '" title="删除">&#10005;</button>' +
-        '</div></td>' +
+        '</div></td>' : '<td></td>') +
       '</tr>';
     });
   });
@@ -70,21 +73,23 @@ window.loadResources = async function loadResources() {
   }
   container.innerHTML = html;
 
-  /* Attach click events */
+  /* Attach click events (only for admin/manage permission) */
   container.querySelectorAll('.btn-res-edit').forEach(function (btn) {
     btn.addEventListener('click', function () { showResourceModal(parseInt(btn.dataset.id, 10)); });
   });
   container.querySelectorAll('.btn-res-del').forEach(function (btn) {
     btn.addEventListener('click', function () { deleteResource(parseInt(btn.dataset.id, 10)); });
   });
-  /* Click on row to edit */
-  container.querySelectorAll('tr[data-id]').forEach(function (row) {
-    row.style.cursor = 'pointer';
-    row.addEventListener('click', function (e) {
-      if (e.target.closest('.btn-icon')) return;
-      showResourceModal(parseInt(row.dataset.id, 10));
+  /* Click on row to edit — only for admin */
+  if (canManage) {
+    container.querySelectorAll('tr[data-id]').forEach(function (row) {
+      row.style.cursor = 'pointer';
+      row.addEventListener('click', function (e) {
+        if (e.target.closest('.btn-icon')) return;
+        showResourceModal(parseInt(row.dataset.id, 10));
+      });
     });
-  });
+  }
 };
 
 window.showResourceModal = function showResourceModal(id) {
@@ -318,6 +323,8 @@ function renderPCPage() {
 }
 
 function renderProjectsTable(container) {
+  var permsPC = window.state.permissions || {};
+  var canManagePC = !!permsPC.manage_resources;
   var query = pcSearchQuery.toLowerCase();
   var filtered = state.projects.filter(function (p) {
     if (!query) return true;
@@ -362,20 +369,22 @@ function renderProjectsTable(container) {
       '<td class="col-code">' + escapeHtml(p.code || '') + '</td>' +
       '<td class="col-dates">' + escapeHtml(dateRange) + '</td>' +
       '<td class="col-billable">' + (p.billable ? 'Yes' : 'No') + '</td>' +
-      '<td class="col-actions">' +
+      (canManagePC ? '<td class="col-actions">' +
         '<button class="btn-icon btn-edit" title="编辑">&#9998;</button>' +
         '<button class="btn-icon btn-archive" title="存档">&#128451;</button>' +
-      '</td>';
-    tr.querySelector('.btn-edit').addEventListener('click', function (e) {
-      e.stopPropagation();
-      showProjectModal(p.id);
-    });
-    tr.querySelector('.btn-archive').addEventListener('click', function (e) {
-      e.stopPropagation();
-      archiveProject(p.id);
-    });
-    // Click row to edit
-    tr.addEventListener('click', function () { showProjectModal(p.id); });
+      '</td>' : '<td></td>');
+    if (canManagePC) {
+      tr.querySelector('.btn-edit').addEventListener('click', function (e) {
+        e.stopPropagation();
+        showProjectModal(p.id);
+      });
+      tr.querySelector('.btn-archive').addEventListener('click', function (e) {
+        e.stopPropagation();
+        archiveProject(p.id);
+      });
+      // Click row to edit
+      tr.addEventListener('click', function () { showProjectModal(p.id); });
+    }
     tbody.appendChild(tr);
   });
   table.appendChild(tbody);
@@ -383,6 +392,8 @@ function renderProjectsTable(container) {
 }
 
 function renderClientsTable(container) {
+  var permsClient = window.state.permissions || {};
+  var canManageClient = !!permsClient.manage_resources;
   var query = pcSearchQuery.toLowerCase();
   var filtered = state.clients.filter(function (c) {
     if (!query) return true;
@@ -418,19 +429,21 @@ function renderClientsTable(container) {
       '</td>' +
       '<td class="col-projects">' + projectCount + ' 个项目</td>' +
       '<td class="col-details">' + escapeHtml(c.details || '') + '</td>' +
-      '<td class="col-actions">' +
+      (canManageClient ? '<td class="col-actions">' +
         '<button class="btn-icon btn-edit" title="编辑">&#9998;</button>' +
         '<button class="btn-icon btn-archive" title="存档">&#128451;</button>' +
-      '</td>';
-    tr.querySelector('.btn-edit').addEventListener('click', function (e) {
-      e.stopPropagation();
-      showClientModal(c.id);
-    });
-    tr.querySelector('.btn-archive').addEventListener('click', function (e) {
-      e.stopPropagation();
-      archiveClient(c.id);
-    });
-    tr.addEventListener('click', function () { showClientModal(c.id); });
+      '</td>' : '<td></td>');
+    if (canManageClient) {
+      tr.querySelector('.btn-edit').addEventListener('click', function (e) {
+        e.stopPropagation();
+        showClientModal(c.id);
+      });
+      tr.querySelector('.btn-archive').addEventListener('click', function (e) {
+        e.stopPropagation();
+        archiveClient(c.id);
+      });
+      tr.addEventListener('click', function () { showClientModal(c.id); });
+    }
     tbody.appendChild(tr);
   });
   table.appendChild(tbody);
@@ -775,10 +788,17 @@ function renderArchivedPage(container) {
 
 // ===================== Event Listeners =====================
 document.addEventListener('DOMContentLoaded', function () {
-  // Resource add button
+  var permsDOM = window.state.permissions || {};
+  var canManageDOM = !!permsDOM.manage_resources;
+
+  // Resource add button — only for admin
   var btnAddResource = document.getElementById('btn-add-resource');
   if (btnAddResource) {
-    btnAddResource.addEventListener('click', function () { showResourceModal(); });
+    if (!canManageDOM) {
+      btnAddResource.style.display = 'none';
+    } else {
+      btnAddResource.addEventListener('click', function () { showResourceModal(); });
+    }
   }
 
   // Projects & Clients tabs
@@ -803,16 +823,20 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  // New button — creates project or client depending on active tab
+  // New button — creates project or client depending on active tab (admin only)
   var btnNew = document.getElementById('btn-add-new-pc');
   if (btnNew) {
-    btnNew.addEventListener('click', function () {
-      if (pcActiveTab === 'clients') {
-        showClientModal();
-      } else {
-        showProjectModal();
-      }
-    });
+    if (!canManageDOM) {
+      btnNew.style.display = 'none';
+    } else {
+      btnNew.addEventListener('click', function () {
+        if (pcActiveTab === 'clients') {
+          showClientModal();
+        } else {
+          showProjectModal();
+        }
+      });
+    }
   }
 
   // Close modal — remove rg-modal class

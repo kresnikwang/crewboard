@@ -35,6 +35,7 @@
       :bookings="store.bookings"
       :leave="store.leave"
       :holidays="store.holidays"
+      :readonly="auth.isBasic"
       @open-create="openCreate"
       @open-edit="openEdit"
       @open-leave="openLeave"
@@ -50,14 +51,16 @@
       :bookings="store.bookings"
       :leaves="store.leave"
       :holiday-map="store.holidays"
+      :readonly="auth.isBasic"
       @create="openCreate"
       @edit="openEdit"
       @resize-start="handleResizeStart"
       @move-start="handleMoveStart"
     />
 
-    <!-- Booking modal -->
+    <!-- Booking modal (only for manager/admin) -->
     <BookingModal
+      v-if="!auth.isBasic"
       v-model="showModal"
       :booking="editingBooking"
       :default-date="createDefaults.startDate"
@@ -75,6 +78,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useScheduleStore } from '@/stores/schedule'
+import { useAuthStore } from '@/stores/auth'
 import { projectApi, bookingApi, leaveApi } from '@/api'
 import { fmt } from '@/utils/date'
 import { useToast } from '@/composables/useToast'
@@ -83,6 +87,7 @@ import MonthView from '@/components/schedule/MonthView.vue'
 import BookingModal from '@/components/schedule/BookingModal.vue'
 
 const store = useScheduleStore()
+const auth = useAuthStore()
 const { toast } = useToast()
 
 const projects = ref([])
@@ -117,18 +122,21 @@ function switchView(v) {
 }
 
 function openCreate({ resourceId, startDate, endDate }) {
+  if (auth.isBasic) return
   editingBooking.value = null
   createDefaults.value = { resourceId, startDate, endDate }
   showModal.value = true
 }
 
 function openEdit(booking) {
+  if (auth.isBasic) return
   editingBooking.value = booking
   createDefaults.value = {}
   showModal.value = true
 }
 
 function openLeave(leave) {
+  if (auth.isBasic) return
   // Leave deletion handled via confirmation
   if (confirm(`确认删除 ${leave.type} 记录？`)) {
     leaveApi.remove(leave.resource_id, leave.date).then(() => store.load()).catch(e => toast(e.message, 'error'))

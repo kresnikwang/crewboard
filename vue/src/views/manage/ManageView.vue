@@ -15,7 +15,7 @@
     <div v-if="activeTab === 'resources'" class="tab-content">
       <div class="section-toolbar">
         <h3 class="section-title">人员管理</h3>
-        <button class="btn btn-primary btn-sm" @click="openResourceModal()">+ 添加人员</button>
+        <button v-if="auth.isAdmin" class="btn btn-primary btn-sm" @click="openResourceModal()">+ 添加人员</button>
       </div>
       <div v-if="loadingResources" class="loading-bar">加载中…</div>
       <div v-else class="resource-list">
@@ -31,7 +31,7 @@
               <span class="rc-name">{{ r.name }}</span>
               <span class="rc-meta">{{ r.role }} · {{ r.team }}</span>
             </div>
-            <div class="rc-actions">
+            <div v-if="auth.isAdmin" class="rc-actions">
               <button class="btn-icon" @click="openResourceModal(r)">✏️</button>
               <button class="btn-icon" @click="deleteResource(r)">🗑️</button>
             </div>
@@ -49,17 +49,17 @@
             <input v-model="showArchivedClients" type="checkbox" @change="loadClients" />
             <span>显示已存档</span>
           </label>
-          <button class="btn btn-primary btn-sm" @click="openClientModal()">+ 添加客户</button>
+          <button v-if="auth.isAdmin" class="btn btn-primary btn-sm" @click="openClientModal()">+ 添加客户</button>
         </div>
       </div>
       <div v-if="loadingClients" class="loading-bar">加载中…</div>
       <table v-else class="manage-table">
-        <thead><tr><th>客户名称</th><th>状态</th><th>操作</th></tr></thead>
+        <thead><tr><th>客户名称</th><th>状态</th><th v-if="auth.isAdmin">操作</th></tr></thead>
         <tbody>
           <tr v-for="c in clients" :key="c.id">
             <td>{{ c.name }}</td>
             <td><span class="badge" :class="c.archived ? 'badge-archived' : 'badge-active'">{{ c.archived ? '已存档' : '活跃' }}</span></td>
-            <td>
+            <td v-if="auth.isAdmin">
               <button class="btn-link" @click="openClientModal(c)">编辑</button>
               <button class="btn-link" @click="toggleArchiveClient(c)">{{ c.archived ? '取消存档' : '存档' }}</button>
             </td>
@@ -77,12 +77,12 @@
             <input v-model="showArchivedProjects" type="checkbox" @change="loadProjects" />
             <span>显示已存档</span>
           </label>
-          <button class="btn btn-primary btn-sm" @click="openProjectModal()">+ 添加项目</button>
+          <button v-if="auth.isAdmin" class="btn btn-primary btn-sm" @click="openProjectModal()">+ 添加项目</button>
         </div>
       </div>
       <div v-if="loadingProjects" class="loading-bar">加载中…</div>
       <table v-else class="manage-table">
-        <thead><tr><th>项目名称</th><th>客户</th><th>计费</th><th>预算工时</th><th>状态</th><th>操作</th></tr></thead>
+        <thead><tr><th>项目名称</th><th>客户</th><th>计费</th><th>预算工时</th><th>状态</th><th v-if="auth.isAdmin">操作</th></tr></thead>
         <tbody>
           <tr v-for="p in projects" :key="p.id">
             <td>
@@ -93,7 +93,7 @@
             <td>{{ p.is_billable ? '✓' : '—' }}</td>
             <td>{{ p.budget_hours > 0 ? p.budget_hours + 'h' : '—' }}</td>
             <td><span class="badge" :class="p.archived ? 'badge-archived' : 'badge-active'">{{ p.archived ? '已存档' : '活跃' }}</span></td>
-            <td>
+            <td v-if="auth.isAdmin">
               <button class="btn-link" @click="openProjectModal(p)">编辑</button>
               <button class="btn-link" @click="toggleArchiveProject(p)">{{ p.archived ? '取消存档' : '存档' }}</button>
             </td>
@@ -103,7 +103,7 @@
     </div>
 
     <!-- ── Resource Modal ── -->
-    <AppModal v-model="showResourceModal" :title="editingResource ? '编辑人员' : '添加人员'" width="440px">
+    <AppModal v-if="auth.isAdmin" v-model="showResourceModal" :title="editingResource ? '编辑人员' : '添加人员'" width="440px">
       <form @submit.prevent="saveResource">
         <div class="form-group">
           <label class="form-label">姓名 <span class="req">*</span></label>
@@ -140,7 +140,7 @@
     </AppModal>
 
     <!-- ── Client Modal ── -->
-    <AppModal v-model="showClientModal" :title="editingClient ? '编辑客户' : '添加客户'" width="400px">
+    <AppModal v-if="auth.isAdmin" v-model="showClientModal" :title="editingClient ? '编辑客户' : '添加客户'" width="400px">
       <form @submit.prevent="saveClient">
         <div class="form-group">
           <label class="form-label">客户名称 <span class="req">*</span></label>
@@ -155,7 +155,7 @@
     </AppModal>
 
     <!-- ── Project Modal ── -->
-    <AppModal v-model="showProjectModal" :title="editingProject ? '编辑项目' : '添加项目'" width="480px">
+    <AppModal v-if="auth.isAdmin" v-model="showProjectModal" :title="editingProject ? '编辑项目' : '添加项目'" width="480px">
       <form @submit.prevent="saveProject">
         <div class="form-group">
           <label class="form-label">项目名称 <span class="req">*</span></label>
@@ -204,10 +204,12 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { resourceApi, clientApi, projectApi } from '@/api'
+import { useAuthStore } from '@/stores/auth'
 import { useToast } from '@/composables/useToast'
 import AppModal from '@/components/common/AppModal.vue'
 
 const { toast } = useToast()
+const auth = useAuthStore()
 
 const tabs = [
   { key: 'resources', label: '人员' },
@@ -242,6 +244,7 @@ async function loadResources() {
 }
 
 function openResourceModal(r = null) {
+  if (!auth.isAdmin) return
   editingResource.value = r
   rError.value = ''
   if (r) Object.assign(rForm, { name: r.name, role: r.role || '', team: r.team || '', daily_hours: r.daily_hours || 8, color: r.color || '#8B5CF6' })
@@ -267,6 +270,7 @@ async function saveResource() {
 }
 
 async function deleteResource(r) {
+  if (!auth.isAdmin) return
   if (!confirm(`确认删除人员「${r.name}」？`)) return
   try {
     await resourceApi.remove(r.id)
@@ -295,6 +299,7 @@ async function loadClients() {
 }
 
 function openClientModal(c = null) {
+  if (!auth.isAdmin) return
   editingClient.value = c
   cError.value = ''
   cForm.name = c ? c.name : ''
@@ -319,6 +324,7 @@ async function saveClient() {
 }
 
 async function toggleArchiveClient(c) {
+  if (!auth.isAdmin) return
   try {
     if (c.archived) await clientApi.unarchive(c.id)
     else await clientApi.archive(c.id)
@@ -344,6 +350,7 @@ async function loadProjects() {
 }
 
 function openProjectModal(p = null) {
+  if (!auth.isAdmin) return
   editingProject.value = p
   pError.value = ''
   if (p) Object.assign(pForm, { name: p.name, client_id: p.client_id || '', color: p.color || '#8B5CF6', code: p.code || '', budget_hours: p.budget_hours || 0, is_billable: !!p.is_billable })
@@ -370,6 +377,7 @@ async function saveProject() {
 }
 
 async function toggleArchiveProject(p) {
+  if (!auth.isAdmin) return
   try {
     if (p.archived) await projectApi.unarchive(p.id)
     else await projectApi.archive(p.id)
@@ -379,6 +387,7 @@ async function toggleArchiveProject(p) {
 }
 
 async function deleteProject() {
+  if (!auth.isAdmin) return
   if (!confirm(`确认删除项目「${editingProject.value.name}」？`)) return
   try {
     await projectApi.remove(editingProject.value.id)
@@ -448,5 +457,4 @@ onMounted(() => {
 .req { color: #ef4444; }
 .form-error { color: #ef4444; font-size: 13px; margin-top: 8px; }
 .btn-danger { background: #ef4444; color: #fff; border: none; }
-.btn-danger:hover { background: #dc2626; }
 </style>

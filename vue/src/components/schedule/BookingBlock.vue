@@ -5,14 +5,16 @@
       'is-tentative': booking.is_tentative,
       'is-moving': isMoving,
       'is-resizing': isResizing,
+      'is-readonly': readonly,
     }"
     :style="blockStyle"
     :title="booking.project_name"
-    @mousedown="$emit('move-start', $event)"
+    @mousedown="!readonly && $emit('move-start', $event)"
     @click="$emit('click', $event)"
   >
     <span class="booking-label">{{ label }}</span>
     <div
+      v-if="!readonly"
       class="resize-handle"
       @mousedown.stop="$emit('resize-start', $event)"
     />
@@ -29,6 +31,7 @@ const props = defineProps({
   isMoving: Boolean,
   isResizing: Boolean,
   previewMode: { type: String, default: '' }, // 'add' | 'remove' | ''
+  readonly: { type: Boolean, default: false },
 })
 
 defineEmits(['click', 'resize-start', 'move-start'])
@@ -65,6 +68,7 @@ const label = computed(() => {
   user-select: none;
   box-sizing: border-box;
 }
+.booking-block.is-readonly { cursor: default; padding-right: 6px; }
 .booking-block:hover .resize-handle { opacity: 1; }
 .booking-block.is-tentative { opacity: 0.65; border: 2px dashed rgba(255,255,255,.5); }
 .booking-block.is-resizing { outline: 2px solid #3b82f6; }
