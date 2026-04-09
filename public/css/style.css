@@ -510,6 +510,8 @@ a { text-decoration: none; color: inherit; }
 }
 .role-owner { background: #FEF3C7; color: #92400E; }
 .role-admin { background: #EDE9FE; color: #5B21B6; }
+.role-manager { background: #DCFCE7; color: #166534; }
+.role-basic { background: #F1F5F9; color: #475569; }
 .role-member { background: #E0F2FE; color: #0369A1; }
 .request-row {
   display: flex; align-items: center; justify-content: space-between;

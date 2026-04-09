@@ -23,6 +23,15 @@ window.loadResources = async function loadResources() {
     return;
   }
 
+  // 同时加载企业成员列表（含 user.id 和 role），用于权限列
+  var memberMap = {}; // email -> { userId, role }
+  try {
+    var members = await api('/api/auth/enterprises/members');
+    members.forEach(function (m) {
+      if (m.email) memberMap[m.email.toLowerCase()] = { userId: m.id, role: m.role };
+    });
+  } catch (e) { /* 非 admin 可能无权限，忽略 */ }
+
   var container = document.getElementById('resource-list');
   if (!container) return;
 
@@ -34,22 +43,53 @@ window.loadResources = async function loadResources() {
   });
 
   var perms = window.state.permissions || {};
-  var canManage = !!perms.manage_resources;
+  var canManage = !!perms.manage_resources;  // admin
+  var currentUserEmail = (state.user && state.user.email) ? state.user.email.toLowerCase() : '';
 
+  var roleLabels = { admin: '管理员', manager: '经理', basic: '基础用户', owner: '管理员', member: '基础用户' };
+  var roleBadgeClass = { admin: 'role-admin', manager: 'role-manager', basic: 'role-basic', owner: 'role-admin', member: 'role-basic' };
+
+  var colCount = canManage ? 6 : 5;
   var html = '<table class="res-table"><thead><tr>' +
-    '<th style="width:40%">人员</th>' +
-    '<th>角色</th>' +
+    '<th style="width:36%">人员</th>' +
+    '<th>职位</th>' +
     '<th>邮箱</th>' +
     '<th style="width:80px">工时/天</th>' +
+    '<th style="width:90px">系统权限</th>' +
     (canManage ? '<th style="width:60px"></th>' : '') +
   '</tr></thead><tbody>';
 
   var teamNames = Object.keys(teams).sort();
   teamNames.forEach(function (team) {
-    html += '<tr class="res-team-divider"><td colspan="5">' + escapeHtml(team) + ' (' + teams[team].length + ')</td></tr>';
+    html += '<tr class="res-team-divider"><td colspan="' + colCount + '">' + escapeHtml(team) + ' (' + teams[team].length + ')</td></tr>';
     teams[team].forEach(function (r) {
       var color = r.color || '#4F46E5';
       var initial = r.name ? r.name.charAt(0) : '?';
+      var resEmail = (r.email || '').toLowerCase();
+      var memberInfo = memberMap[resEmail];
+      var effectiveRole = memberInfo ? memberInfo.role : null;
+      if (effectiveRole === 'owner') effectiveRole = 'admin';
+
+      // 权限列：admin 看所有人的下拉；非 admin 只看自己的角色徽章
+      var permCell = '';
+      if (effectiveRole) {
+        if (canManage && memberInfo && memberInfo.userId !== (state.user && state.user.id)) {
+          // admin 看到其他人的下拉
+          permCell = '<select class="text-input res-role-select" data-user-id="' + memberInfo.userId + '" style="width:84px;font-size:12px;padding:3px 6px">' +
+            '<option value="basic"' + (effectiveRole === 'basic' ? ' selected' : '') + '>基础用户</option>' +
+            '<option value="manager"' + (effectiveRole === 'manager' ? ' selected' : '') + '>经理</option>' +
+            '<option value="admin"' + (effectiveRole === 'admin' ? ' selected' : '') + '>管理员</option>' +
+          '</select>';
+        } else if (resEmail === currentUserEmail) {
+          // 自己看自己的徽章（任何角色都能看到自己）
+          permCell = '<span class="role-badge ' + (roleBadgeClass[effectiveRole] || 'role-basic') + '">' + (roleLabels[effectiveRole] || effectiveRole) + '</span>';
+        } else if (canManage) {
+          // admin 看自己的徽章（不能修改自己）
+          permCell = '<span class="role-badge ' + (roleBadgeClass[effectiveRole] || 'role-basic') + '">' + (roleLabels[effectiveRole] || effectiveRole) + '</span>';
+        }
+        // 非 admin 看其他人：不显示权限信息
+      }
+
       html += '<tr data-id="' + r.id + '">' +
         '<td><div class="res-name-cell">' +
           '<div class="res-avatar" style="background:' + color + '">' + escapeHtml(initial) + '</div>' +
@@ -59,10 +99,11 @@ window.loadResources = async function loadResources() {
         '<td>' + escapeHtml(r.role || '-') + '</td>' +
         '<td>' + escapeHtml(r.email || '-') + '</td>' +
         '<td>' + (r.hours_per_day != null ? r.hours_per_day : 8) + 'h</td>' +
+        '<td>' + permCell + '</td>' +
         (canManage ? '<td><div class="res-actions">' +
           '<button class="btn-icon btn-res-edit" data-id="' + r.id + '" title="编辑">&#9998;</button>' +
           '<button class="btn-icon btn-res-del" data-id="' + r.id + '" title="删除">&#10005;</button>' +
-        '</div></td>' : '<td></td>') +
+        '</div></td>' : '') +
       '</tr>';
     });
   });
@@ -73,19 +114,35 @@ window.loadResources = async function loadResources() {
   }
   container.innerHTML = html;
 
+  /* 权限下拉事件 */
+  container.querySelectorAll('.res-role-select').forEach(function (sel) {
+    sel.addEventListener('change', async function (e) {
+      e.stopPropagation();
+      var userId = sel.dataset.userId;
+      var newRole = sel.value;
+      try {
+        await api('/api/auth/enterprises/members/' + userId + '/role', { method: 'PUT', body: { role: newRole } });
+        toast('权限已更新');
+      } catch (err) {
+        toast(err.message || '更新失败', 'error');
+        loadResources();
+      }
+    });
+  });
+
   /* Attach click events (only for admin/manage permission) */
   container.querySelectorAll('.btn-res-edit').forEach(function (btn) {
-    btn.addEventListener('click', function () { showResourceModal(parseInt(btn.dataset.id, 10)); });
+    btn.addEventListener('click', function (e) { e.stopPropagation(); showResourceModal(parseInt(btn.dataset.id, 10)); });
   });
   container.querySelectorAll('.btn-res-del').forEach(function (btn) {
-    btn.addEventListener('click', function () { deleteResource(parseInt(btn.dataset.id, 10)); });
+    btn.addEventListener('click', function (e) { e.stopPropagation(); deleteResource(parseInt(btn.dataset.id, 10)); });
   });
   /* Click on row to edit — only for admin */
   if (canManage) {
     container.querySelectorAll('tr[data-id]').forEach(function (row) {
       row.style.cursor = 'pointer';
       row.addEventListener('click', function (e) {
-        if (e.target.closest('.btn-icon')) return;
+        if (e.target.closest('.btn-icon') || e.target.closest('.res-role-select')) return;
         showResourceModal(parseInt(row.dataset.id, 10));
       });
     });

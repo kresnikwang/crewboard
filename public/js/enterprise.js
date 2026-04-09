@@ -87,7 +87,7 @@ window.loadEnterprise = async function loadEnterprise() {
     return;
   }
 
-  // Has enterprise — show info, requests (if admin/owner), members
+  // Has enterprise — show info, requests (if admin/owner), invite
   var ent = state.enterprise || {};
   var html =
     '<div class="page-header"><h2>企业管理</h2></div>' +
@@ -102,7 +102,7 @@ window.loadEnterprise = async function loadEnterprise() {
     html += '<div class="section-card" id="ent-requests-section"><h3>加入申请</h3><div id="ent-requests">加载中...</div></div>';
   }
 
-  html += '<div class="section-card"><h3>成员列表</h3><div id="ent-members">加载中...</div></div>';
+  // 成员列表已移至「人员管理」页面统一管理
 
   if (isOwnerOrAdmin()) {
     html += '<div class="section-card">' +
@@ -127,8 +127,8 @@ window.loadEnterprise = async function loadEnterprise() {
 
   container.innerHTML = html;
 
-  // Load members
-  loadEnterpriseMembers();
+  // 只加载成员数量（列表已移至人员管理）
+  loadEnterpriseMemberCount();
 
   // Load requests if admin/owner
   if (isOwnerOrAdmin()) {
@@ -161,85 +161,15 @@ window.loadEnterprise = async function loadEnterprise() {
   }
 };
 
-async function loadEnterpriseMembers() {
+// 只更新成员数量（列表已移至人员管理页面）
+async function loadEnterpriseMemberCount() {
   try {
     var members = await api('/api/auth/enterprises/members');
     var countEl = document.getElementById('ent-member-count');
     if (countEl) countEl.textContent = members.length + ' 人';
-
-    var isAdminOrOwner = isOwnerOrAdmin();
-    var roleLabels = { owner: '管理员', admin: '管理员', manager: '经理', member: '基础用户', basic: '基础用户' };
-    var roleDescriptions = {
-      admin:   '全权：可管理成员、项目、查看所有报表',
-      manager: '可创建排程，只能编辑自己创建的内容',
-      basic:   '只读：查看排程、工时和报表',
-    };
-
-    var html = '<div class="member-list">';
-    members.forEach(function (m) {
-      var effectiveRole = (m.role === 'owner' || m.role === 'admin') ? 'admin' : (m.role === 'manager' ? 'manager' : 'basic');
-      var initial = (m.name || m.email || '?').charAt(0).toUpperCase();
-
-      html += '<div class="member-card">' +
-        '<div class="member-card-header">' +
-          '<div class="member-info" style="display:flex;align-items:center;gap:10px">' +
-            '<div class="req-avatar">' + escHtml(initial) + '</div>' +
-            '<div>' +
-              '<div class="member-name">' + escHtml(m.name || '(未设置)') + '</div>' +
-              '<div class="member-contact">' +
-                (m.phone ? escHtml(m.phone) : '') +
-                (m.phone && m.email ? ' · ' : '') +
-                (m.email ? escHtml(m.email) : '') +
-              '</div>' +
-            '</div>' +
-          '</div>' +
-          '<div class="member-actions" style="display:flex;align-items:center;gap:8px">';
-
-      if (isAdminOrOwner && m.id !== state.user.id) {
-        html += '<select class="text-input member-role-select" data-member-id="' + m.id + '" style="width:auto;font-size:13px">' +
-          '<option value="basic"' + (effectiveRole === 'basic' ? ' selected' : '') + '>基础用户</option>' +
-          '<option value="manager"' + (effectiveRole === 'manager' ? ' selected' : '') + '>经理</option>' +
-          '<option value="admin"' + (effectiveRole === 'admin' ? ' selected' : '') + '>管理员</option>' +
-        '</select>';
-      } else {
-        html += '<span class="role-badge role-' + effectiveRole + '">' + (roleLabels[m.role] || m.role) + '</span>';
-      }
-
-      html += '</div></div>';
-
-      // Role description note
-      html += '<div class="member-role-desc">' + (roleDescriptions[effectiveRole] || '') + '</div>';
-
-      html += '</div>';
-    });
-    html += '</div>';
-
-    document.getElementById('ent-members').innerHTML = html;
-
-    // Bind role change handlers
-    if (isAdminOrOwner) {
-      document.querySelectorAll('.member-role-select').forEach(function (sel) {
-        sel.addEventListener('change', async function () {
-          var memberId = sel.dataset.memberId;
-          var newRole = sel.value;
-          try {
-            await api('/api/auth/enterprises/members/' + memberId + '/role', {
-              method: 'PUT',
-              body: { role: newRole },
-            });
-            toast('角色已更新');
-            loadEnterpriseMembers();
-          } catch (err) {
-            toast(err.message || '更新失败', 'error');
-            loadEnterpriseMembers();
-          }
-        });
-      });
-    }
-
-
-  } catch (err) {
-    document.getElementById('ent-members').innerHTML = '<p style="color:var(--text-secondary)">加载成员失败</p>';
+  } catch (e) {
+    var countEl = document.getElementById('ent-member-count');
+    if (countEl) countEl.textContent = '-';
   }
 }
 
