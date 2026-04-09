@@ -221,15 +221,17 @@ function migrate(db) {
     db.exec("ALTER TABLE users ADD COLUMN managed_project_ids TEXT DEFAULT ''");
   }
 
-  // === New three-role system migration ===
+  // === New three-role system migration (idempotent) ===
   // Migrate legacy owner/admin/member + perm_* to new basic/manager/admin roles
+  // Only runs on rows that still have old roles, so safe to run on every startup
   // owner → admin (full access)
   db.exec("UPDATE users SET role = 'admin' WHERE role = 'owner'");
-  // admin → admin (already mapped)
   // member with perm_book_others = 1 → manager
   db.exec("UPDATE users SET role = 'manager' WHERE role = 'member' AND perm_book_others = 1");
   // member without perm_book_others → basic
   db.exec("UPDATE users SET role = 'basic' WHERE role = 'member'");
+  // Ensure no NULL roles exist (fallback)
+  db.exec("UPDATE users SET role = 'basic' WHERE role IS NULL OR role = ''");
 
   // Add created_by to bookings, clients, projects for manager ownership check
   const bookingCols = db.prepare('PRAGMA table_info(bookings)').all();

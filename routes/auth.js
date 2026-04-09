@@ -36,7 +36,7 @@ module.exports = function(db) {
     }
     const hash = hashPassword(password);
     const result = db.prepare('INSERT INTO users (phone, email, password_hash, name, role, status) VALUES (?,?,?,?,?,?)')
-      .run(phone || null, email || null, hash, name, 'member', 'active');
+      .run(phone || null, email || null, hash, name, 'basic', 'active');
 
     // Auto-login
     const token = uuidv4();
@@ -45,7 +45,7 @@ module.exports = function(db) {
 
     // Check for pending invitations matching this email
     let enterprise_id = null;
-    let userRole = 'member';
+    let userRole = 'basic';
     let resourceId = null;
     if (email) {
       const invitation = db.prepare(`
@@ -64,7 +64,7 @@ module.exports = function(db) {
         resourceId = resResult.lastInsertRowid;
         // Update user to join enterprise
         db.prepare('UPDATE users SET enterprise_id = ?, resource_id = ?, role = ? WHERE id = ?')
-          .run(enterprise_id, resourceId, 'member', result.lastInsertRowid);
+          .run(enterprise_id, resourceId, 'basic', result.lastInsertRowid);
         // Mark invitation as accepted
         db.prepare('UPDATE invitations SET status = ? WHERE id = ?').run('accepted', invitation.id);
       }
@@ -131,7 +131,7 @@ module.exports = function(db) {
 
     const code = name.slice(0, 2).toUpperCase() + Math.random().toString(36).slice(2, 8).toUpperCase();
     const result = db.prepare('INSERT INTO enterprises (name, code, owner_id) VALUES (?,?,?)').run(name, code, req.user.id);
-    db.prepare('UPDATE users SET enterprise_id = ?, role = ? WHERE id = ?').run(result.lastInsertRowid, 'owner', req.user.id);
+    db.prepare('UPDATE users SET enterprise_id = ?, role = ? WHERE id = ?').run(result.lastInsertRowid, 'admin', req.user.id);
 
     // Create resource entry for the owner
     const resResult = db.prepare('INSERT INTO resources (name, email, role, team, enterprise_id) VALUES (?,?,?,?,?)')
@@ -163,7 +163,7 @@ module.exports = function(db) {
   // List join requests (for owner/admin)
   router.get('/enterprises/requests', (req, res) => {
     if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
-    if (req.user.role !== 'owner' && req.user.role !== 'admin') return res.status(403).json({ error: '无权限' });
+    if (req.user.role !== 'owner' && req.user.role !== 'admin') return res.status(403).json({ error: '无权限' }); // owner kept for legacy
 
     const requests = db.prepare(`
       SELECT jr.*, u.name as user_name, u.phone as user_phone, u.email as user_email
@@ -176,7 +176,7 @@ module.exports = function(db) {
   // Approve/reject join request
   router.put('/enterprises/requests/:id', (req, res) => {
     if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
-    if (req.user.role !== 'owner' && req.user.role !== 'admin') return res.status(403).json({ error: '无权限' });
+    if (req.user.role !== 'owner' && req.user.role !== 'admin') return res.status(403).json({ error: '无权限' }); // owner kept for legacy
 
     const { status } = req.body; // 'approved' or 'rejected'
     const request = db.prepare('SELECT * FROM join_requests WHERE id = ? AND enterprise_id = ?')
@@ -188,7 +188,7 @@ module.exports = function(db) {
 
     if (status === 'approved') {
       db.prepare('UPDATE users SET enterprise_id = ?, role = ? WHERE id = ?')
-        .run(req.user.enterprise_id, 'member', request.user_id);
+        .run(req.user.enterprise_id, 'basic', request.user_id);
 
       // Auto-create a resource entry for the new member
       const user = db.prepare('SELECT * FROM users WHERE id = ?').get(request.user_id);
@@ -215,7 +215,7 @@ module.exports = function(db) {
 
   // Update member role (new three-role system: basic | manager | admin)
   router.put('/enterprises/members/:id/role', (req, res) => {
-    if (req.user?.role !== 'admin') return res.status(403).json({ error: '仅管理员可操作' });
+    if (req.user?.role !== 'admin' && req.user?.role !== 'owner') return res.status(403).json({ error: '仅管理员可操作' });
     const { role } = req.body;
     if (!['basic', 'manager', 'admin'].includes(role)) return res.status(400).json({ error: '无效角色，可选：basic / manager / admin' });
     db.prepare('UPDATE users SET role = ? WHERE id = ? AND enterprise_id = ?')
@@ -227,7 +227,7 @@ module.exports = function(db) {
   // Prefer PUT /enterprises/members/:id/role instead
   router.put('/enterprises/members/:id/permissions', (req, res) => {
     if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
-    if (req.user.role !== 'admin') return res.status(403).json({ error: '仅管理员可操作' });
+    if (req.user.role !== 'admin' && req.user.role !== 'owner') return res.status(403).json({ error: '仅管理员可操作' });
 
     const target = db.prepare('SELECT * FROM users WHERE id = ? AND enterprise_id = ?')
       .get(req.params.id, req.user.enterprise_id);
