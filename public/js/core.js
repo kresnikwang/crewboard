@@ -291,7 +291,7 @@ window.loadPage = function loadPage(page) {
 
   // Toggle visible page
   document.querySelectorAll('.page').forEach(p => {
-    p.style.display = p.id === 'page-' + page ? 'block' : 'none';
+    p.style.display = p.id === 'page-' + page ? 'flex' : 'none';
   });
 
   // Call the page loader
