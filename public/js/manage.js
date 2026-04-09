@@ -143,6 +143,19 @@ window.loadResources = async function loadResources() {
       });
     });
   }
+
+  /* Bind add-resource button now that permissions are ready */
+  var btnAddRes = document.getElementById('btn-add-resource');
+  if (btnAddRes) {
+    if (!canManage) {
+      btnAddRes.style.display = 'none';
+    } else {
+      btnAddRes.style.display = '';
+      var newBtnRes = btnAddRes.cloneNode(true);
+      btnAddRes.parentNode.replaceChild(newBtnRes, btnAddRes);
+      newBtnRes.addEventListener('click', function () { showResourceModal(); });
+    }
+  }
 };
 
 window.showResourceModal = function showResourceModal(id) {
@@ -346,7 +359,30 @@ window.loadProjects = async function loadProjects() {
     return;
   }
   renderPCPage();
+  bindPCNewButton();
 };
+
+function bindPCNewButton() {
+  var permsBtn = window.state.permissions || {};
+  var canManageBtn = !!permsBtn.manage_resources;
+  var btnNew = document.getElementById('btn-add-new-pc');
+  if (!btnNew) return;
+  if (!canManageBtn) {
+    btnNew.style.display = 'none';
+    return;
+  }
+  btnNew.style.display = '';
+  // Remove old listener by cloning the node
+  var newBtn = btnNew.cloneNode(true);
+  btnNew.parentNode.replaceChild(newBtn, btnNew);
+  newBtn.addEventListener('click', function () {
+    if (pcActiveTab === 'clients') {
+      showClientModal();
+    } else {
+      showProjectModal();
+    }
+  });
+}
 
 function renderPCPage() {
   // Update tab counts
@@ -841,19 +877,6 @@ function renderArchivedPage(container) {
 
 // ===================== Event Listeners =====================
 document.addEventListener('DOMContentLoaded', function () {
-  var permsDOM = window.state.permissions || {};
-  var canManageDOM = !!permsDOM.manage_resources;
-
-  // Resource add button — only for admin
-  var btnAddResource = document.getElementById('btn-add-resource');
-  if (btnAddResource) {
-    if (!canManageDOM) {
-      btnAddResource.style.display = 'none';
-    } else {
-      btnAddResource.addEventListener('click', function () { showResourceModal(); });
-    }
-  }
-
   // Projects & Clients tabs
   document.querySelectorAll('.pc-tab').forEach(function (tab) {
     tab.addEventListener('click', function () {
@@ -864,6 +887,7 @@ document.addEventListener('DOMContentLoaded', function () {
       var searchInput = document.getElementById('pc-search');
       if (searchInput) searchInput.value = '';
       renderPCPage();
+      bindPCNewButton();
     });
   });
 
@@ -874,22 +898,6 @@ document.addEventListener('DOMContentLoaded', function () {
       pcSearchQuery = searchInput.value.trim();
       renderPCPage();
     });
-  }
-
-  // New button — creates project or client depending on active tab (admin only)
-  var btnNew = document.getElementById('btn-add-new-pc');
-  if (btnNew) {
-    if (!canManageDOM) {
-      btnNew.style.display = 'none';
-    } else {
-      btnNew.addEventListener('click', function () {
-        if (pcActiveTab === 'clients') {
-          showClientModal();
-        } else {
-          showProjectModal();
-        }
-      });
-    }
   }
 
   // Close modal — remove rg-modal class
