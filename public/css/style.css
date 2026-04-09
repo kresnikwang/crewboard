@@ -123,6 +123,14 @@ a { text-decoration: none; color: inherit; }
 .booking-block:hover .resize-handle { opacity: 1; }
 .booking-block.resizing { outline: 2px solid var(--primary); outline-offset: 1px; }
 .booking-block.resizing .resize-handle { opacity: 1; background: var(--primary); }
+.booking-block .resize-handle-left {
+  position: absolute; left: -4px; top: 0; bottom: 0; width: 14px; cursor: col-resize; opacity: 0;
+  transition: opacity .15s; background: linear-gradient(270deg, transparent 30%, rgba(79,70,229,0.85) 100%);
+  border-top-left-radius: 4px; border-bottom-left-radius: 4px;
+  z-index: 10;
+}
+.booking-block:hover .resize-handle-left { opacity: 1; }
+.booking-block.resizing .resize-handle-left { opacity: 1; background: var(--primary); }
 
 /* Move preview highlight — green */
 .booking-cell.move-preview,
@@ -1054,6 +1062,14 @@ a { text-decoration: none; color: inherit; }
 .m-booking:hover .resize-handle { opacity: 1; }
 .m-booking.resizing { outline: 2px solid var(--primary); outline-offset: 1px; }
 .m-booking.resizing .resize-handle { opacity: 1; background: var(--primary); }
+.m-booking .resize-handle-left {
+  position: absolute; left: -3px; top: 0; bottom: 0; width: 10px; cursor: col-resize; opacity: 0;
+  transition: opacity .15s; background: linear-gradient(270deg, transparent 20%, rgba(79,70,229,0.85) 100%);
+  border-top-left-radius: 2px; border-bottom-left-radius: 2px;
+  z-index: 10;
+}
+.m-booking:hover .resize-handle-left { opacity: 1; }
+.m-booking.resizing .resize-handle-left { opacity: 1; background: var(--primary); }
 
 /* Leave block in month view */
 .m-leave {

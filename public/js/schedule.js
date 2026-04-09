@@ -152,7 +152,7 @@
       });
     });
 
-    /* attach resize handlers to booking blocks */
+    /* attach RIGHT resize handlers to booking blocks */
     document.querySelectorAll('.booking-block .resize-handle, .m-booking .resize-handle').forEach(function (handle) {
       handle.addEventListener('mousedown', function (e) {
         e.stopPropagation();
@@ -173,11 +173,32 @@
       });
     });
 
+    /* attach LEFT resize handlers to booking blocks */
+    document.querySelectorAll('.booking-block .resize-handle-left, .m-booking .resize-handle-left').forEach(function (handle) {
+      handle.addEventListener('mousedown', function (e) {
+        e.stopPropagation();
+        e.preventDefault();
+        var block = e.target.closest('.booking-block, .m-booking');
+        if (!block) return;
+
+        var bookingId = parseInt(block.dataset.bookingId, 10);
+        var booking = _allBookings.find(function (b) { return b.id === bookingId; });
+        if (!booking) return;
+
+        if (!canBookForResource(booking.resource_id)) {
+          toast('您没有编辑此预订的权限', 'error');
+          return;
+        }
+
+        initResizeBookingLeft(block, booking, e);
+      });
+    });
+
     /* attach move (drag) handlers to booking block bodies */
     document.querySelectorAll('.booking-block, .m-booking').forEach(function (block) {
       block.addEventListener('mousedown', function (e) {
-        // Ignore if clicking on the resize handle
-        if (e.target.closest('.resize-handle')) return;
+        // Ignore if clicking on the resize handle (left or right)
+        if (e.target.closest('.resize-handle') || e.target.closest('.resize-handle-left')) return;
         // Only primary mouse button
         if (e.button !== 0) return;
 
@@ -317,6 +338,7 @@
           ' onclick="window.editBooking(' + b.id + ')"' +
           ' title="' + escAttr(b.project_name) + ' - ' + b.hours + 'h' +
             (b.notes ? '\n' + escAttr(b.notes) : '') + '">' +
+          '<div class="resize-handle-left"></div>' +
           '<span class="booking-hours">' + b.hours + 'h</span> ' +
           '<span class="booking-project">' + esc(truncate(b.project_name, 25)) + '</span>' +
           '<div class="resize-handle"></div>' +
@@ -513,6 +535,201 @@
         cleanup();
         document.removeEventListener('keydown', handleKeyDown);
       }
+    }
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup',   handleMouseUp);
+    document.addEventListener('keydown',   handleKeyDown);
+  }
+
+  /* --------------------------------------------------
+     Resize booking from LEFT side
+     左拖：向左延长（在更早的日期创建 booking）
+     右拖：向右缩短（删除最早的几天）
+     -------------------------------------------------- */
+  function initResizeBookingLeft(blockElement, booking, startEvent) {
+    var isResizing = true;
+
+    // 1. 收集当前资源所有日期格
+    var scheduleGrid = document.getElementById('schedule-grid');
+    var selector = '.booking-cell[data-resource="' + booking.resource_id +
+      '"], .m-day-cell[data-resource="' + booking.resource_id + '"]';
+    var allCells = Array.prototype.slice.call(scheduleGrid.querySelectorAll(selector));
+    var dateMap = {};
+    allCells.forEach(function (c) { dateMap[c.dataset.date] = c; });
+    var dates = Object.keys(dateMap).sort();
+
+    // 2. 找出该 booking 所属连续同项目段的最早日期（左侧锚点）
+    var sameGroup = _allBookings
+      .filter(function (b) {
+        return b.resource_id === booking.resource_id &&
+               b.project_id  === booking.project_id;
+      })
+      .sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+
+    // 找包含当前 booking 的连续段
+    var groupSegment = [];
+    var currentSeg = [];
+    for (var gi = 0; gi < sameGroup.length; gi++) {
+      var cur = sameGroup[gi];
+      if (currentSeg.length === 0) {
+        currentSeg.push(cur);
+      } else {
+        var prev = currentSeg[currentSeg.length - 1];
+        var prevD = new Date(prev.date);
+        var curD  = new Date(cur.date);
+        var diff  = Math.round((curD - prevD) / 86400000);
+        if (diff <= 3) { // 允许跨过周末
+          currentSeg.push(cur);
+        } else {
+          if (currentSeg.some(function (s) { return s.id === booking.id; })) {
+            groupSegment = currentSeg.slice();
+          }
+          currentSeg = [cur];
+        }
+      }
+    }
+    if (currentSeg.some(function (s) { return s.id === booking.id; })) {
+      groupSegment = currentSeg.slice();
+    }
+    if (groupSegment.length === 0) groupSegment = [booking];
+
+    // 段的最早日期为左侧锚点
+    var startDate = groupSegment[0].date;
+    var originalIndex = dates.indexOf(startDate);
+    if (originalIndex === -1) return;
+
+    // 3. 视觉状态
+    blockElement.classList.add('resizing');
+    var overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;cursor:col-resize;user-select:none;';
+    document.body.appendChild(overlay);
+
+    var previewCells = [];
+    function clearPreview() {
+      previewCells.forEach(function (c) { c.classList.remove('resize-preview', 'resize-preview-shrink'); });
+      previewCells = [];
+    }
+    // 左侧预览：左拖（延长）高亮新增的天；右拖（缩短）高亮将被删除的天
+    function applyPreview(hoverIndex) {
+      clearPreview();
+      if (hoverIndex === originalIndex) return;
+      var isShrink = hoverIndex > originalIndex; // 右拖 = 缩短
+      var lo = isShrink ? originalIndex : hoverIndex;
+      var hi = isShrink ? hoverIndex - 1 : originalIndex - 1;
+      for (var i = lo; i <= hi; i++) {
+        var c = dateMap[dates[i]];
+        if (c) {
+          c.classList.add('resize-preview');
+          if (isShrink) c.classList.add('resize-preview-shrink');
+          previewCells.push(c);
+        }
+      }
+    }
+
+    var currentHoverIndex = originalIndex;
+
+    // 4. mousemove
+    function handleMouseMove(e) {
+      if (!isResizing) return;
+      e.preventDefault();
+      overlay.style.pointerEvents = 'none';
+      var el = document.elementFromPoint(e.clientX, e.clientY);
+      overlay.style.pointerEvents = '';
+      if (!el) return;
+      var cell = el.closest('.booking-cell, .m-day-cell');
+      if (!cell) return;
+      if (parseInt(cell.dataset.resource, 10) !== booking.resource_id) return;
+      var hoverDate = cell.dataset.date;
+      var hoverIndex = dates.indexOf(hoverDate);
+      if (hoverIndex === -1) return;
+      if (hoverIndex !== currentHoverIndex) {
+        currentHoverIndex = hoverIndex;
+        applyPreview(hoverIndex);
+      }
+    }
+
+    // 5. mouseup
+    function handleMouseUp(e) {
+      if (!isResizing) return;
+      cleanup();
+      if (currentHoverIndex === originalIndex) return;
+
+      if (currentHoverIndex < originalIndex) {
+        // 左拖：延长（在 currentHoverIndex ~ originalIndex-1 创建 booking）
+        var promises = [];
+        for (var i = currentHoverIndex; i < originalIndex; i++) {
+          var d = dates[i];
+          var alreadyBooked = _allBookings.some(function (b) {
+            return b.resource_id === booking.resource_id &&
+                   b.project_id  === booking.project_id &&
+                   b.date === d;
+          });
+          if (!alreadyBooked) {
+            promises.push(api('/api/bookings', {
+              method: 'POST',
+              body: {
+                resource_id:  booking.resource_id,
+                project_id:   booking.project_id,
+                date:         d,
+                hours:        booking.hours,
+                notes:        booking.notes || '',
+                is_tentative: booking.is_tentative ? 1 : 0
+              }
+            }));
+          }
+        }
+        if (promises.length === 0) {
+          toast('所选范围已有相同预订', 'info');
+          return;
+        }
+        Promise.all(promises)
+          .then(function () {
+            toast('预订已延长 ' + promises.length + ' 天', 'success');
+            window.loadSchedule();
+          })
+          .catch(function (err) {
+            toast('延长失败：' + (err.message || ''), 'error');
+          });
+
+      } else {
+        // 右拖：缩短（删除 originalIndex ~ currentHoverIndex-1 的 booking）
+        var toDelete = _allBookings.filter(function (b) {
+          if (b.resource_id !== booking.resource_id) return false;
+          if (b.project_id  !== booking.project_id)  return false;
+          var idx = dates.indexOf(b.date);
+          return idx >= originalIndex && idx < currentHoverIndex;
+        });
+        if (toDelete.length === 0) {
+          toast('没有可缩短的预订', 'info');
+          return;
+        }
+        Promise.all(toDelete.map(function (b) {
+          return api('/api/bookings/' + b.id, { method: 'DELETE' });
+        }))
+          .then(function () {
+            toast('预订已缩短 ' + toDelete.length + ' 天', 'success');
+            window.loadSchedule();
+          })
+          .catch(function (err) {
+            toast('缩短失败：' + (err.message || ''), 'error');
+          });
+      }
+    }
+
+    // 6. 清理
+    function cleanup() {
+      isResizing = false;
+      clearPreview();
+      blockElement.classList.remove('resizing');
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup',   handleMouseUp);
+      document.removeEventListener('keydown',   handleKeyDown);
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    }
+
+    function handleKeyDown(e) {
+      if (e.key === 'Escape') cleanup();
     }
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -1015,6 +1232,7 @@
           ' data-date="' + b.date + '"' +
           ' style="background:' + bgColor + ';color:' + fgColor + ';border-left:2px solid ' + fgColor + '"' +
           ' title="' + escAttr(b.hours + 'h ' + b.project_name + (b.client_name ? ' | ' + b.client_name : '')) + '">' +
+          '<div class="resize-handle-left"></div>' +
           '<span class="m-booking-hours">' + b.hours + 'h</span> ' +
           esc(truncate(b.project_name, 25)) +
           '<div class="resize-handle"></div>' +
