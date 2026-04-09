@@ -9,35 +9,52 @@
 - **数据库**: SQLite (db/resource-guru.db)
 - **用户邮箱**: kris.wang@skandstudio.com
 
-## 部署规则（⚠️ 必须严格遵守）
+## 工作流程规则（⚠️ 必须严格遵守）
+
+### 规则0：默认只推送 GitHub，不部署
+- 每次代码修改完成后，**只推送到 GitHub main 分支**
+- **只有当用户明确说「部署到正式网站」时**，才执行服务器部署
+- 绝不主动部署，除非用户明确指示
 
 ### 规则1：部署前必须先备份服务器数据库
 每次部署前，在服务器上执行：
 ```bash
-cp /www/wwwroot/resource.skandstudio.com/db/resource-guru.db /tmp/resource-guru-backup-$(date +%Y%m%d_%H%M%S).db
+cp /www/wwwroot/resource.skandstudio.com/db/resource-guru.db \
+   /www/wwwroot/resource.skandstudio.com/db/resource-guru-backup-$(date +%Y%m%d_%H%M%S).db
 ```
+备份保存在同目录下，方便紧急恢复。
 
-### 规则2：绝不能用本地数据库覆盖线上数据库
-rsync 部署时必须排除数据库文件：
+### 规则2：绝不能覆盖线上数据库
+部署方式为 **git pull**（不是 rsync），数据库文件不在 git 追踪范围内，天然安全。
+但需确认 `.gitignore` 中包含 `db/*.db`，防止意外提交。
+
+### 规则3：部署后 npm install（如有新依赖）
+如果 package.json 有变动，需在服务器上执行：
 ```bash
-rsync --exclude="db/resource-guru.db" --exclude="db/resource-ghu.db" --exclude="db/*.db" --exclude="db/*.db-shm" --exclude="db/*.db-wal" --exclude="node_modules" --exclude=".git" --exclude=".well-known" --exclude=".workbuddy"
+npm install --production
 ```
 
-### 规则3：服务器上重新 npm install
-因为本地 node_modules 包含 macOS 编译的原生模块（如 better-sqlite3），部署后需在服务器上：
+## 标准部署流程（仅在用户说「部署到正式网站」时执行）
+1. SSH 连接服务器
+2. **备份数据库**：`cp db/resource-guru.db db/resource-guru-backup-$(date +%Y%m%d_%H%M%S).db`
+3. `git pull origin main`（通过 HTTPS token，因服务器 SSH key 未配置 GitHub）
+4. 如有依赖变动：`npm install --production`
+5. `pm2 restart crewboard`
+6. 验证：`pm2 show crewboard` + `curl http://localhost:3000/`
+
+## Git 拉取方式（服务器）
+服务器 SSH key 未配置 GitHub，需临时切换 HTTPS remote：
 ```bash
-rm -rf node_modules && npm install --production
+# 临时用 token 拉取
+git remote set-url origin https://<TOKEN>@github.com/kresnikwang/crewboard.git
+git pull origin main
+# 拉取后恢复 SSH remote
+git remote set-url origin git@github.com:kresnikwang/crewboard.git
 ```
-否则会导致 `invalid ELF header` 错误使服务无法启动。
-
-## 部署流程
-1. 备份服务器数据库
-2. rsync 同步代码（排除 db/*.db, node_modules 等）
-3. 服务器上 rm -rf node_modules && npm install --production
-4. pm2 restart crewboard
-5. 验证服务 online
+Token 从 `gh auth token` 获取。
 
 ## 技术备忘
-- macOS 的 scp 不支持 -e 排除参数，用 rsync 代替
+- 服务器 OS：CentOS/RHEL（kernel 4.18），Node.js v18，PM2 v6
+- 数据库文件：`db/resource-guru.db`（SQLite，WAL 模式）
 - pm2 有时会残留失效进程，需要 pm2 kill 后重新 start
-- 服务器没有配置 SQLite 数据库自动备份
+- 服务器没有配置 SQLite 数据库自动备份，每次部署时手动备份
