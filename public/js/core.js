@@ -278,7 +278,6 @@ const PAGE_LOADERS = {
   resources:  () => window.loadResources  && window.loadResources(),
   projects:   () => window.loadProjects   && window.loadProjects(),
   enterprise: () => window.loadEnterprise && window.loadEnterprise(),
-  settings:   () => window.loadSettings   && window.loadSettings(),
   account:    () => window.loadAccount    && window.loadAccount(),
 };
 

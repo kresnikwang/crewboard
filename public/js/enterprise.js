@@ -159,6 +159,77 @@ window.loadEnterprise = async function loadEnterprise() {
       });
     }
   }
+
+  // Webhook & Theme settings (owner/admin only)
+  if (isOwnerOrAdmin()) {
+    var currentTheme = ent.theme_color || '';
+
+    var settingsHtml =
+      '<div class="section-card">' +
+        '<h3>Webhook 通知配置</h3>' +
+        '<div class="form-group">' +
+          '<label>钉钉 Webhook URL</label>' +
+          '<input type="text" id="set-webhook-dingtalk" class="text-input" value="' + escHtml(ent.webhook_dingtalk || '') + '" placeholder="https://oapi.dingtalk.com/robot/send?access_token=...">' +
+        '</div>' +
+        '<div class="form-group">' +
+          '<label>企业微信 Webhook URL</label>' +
+          '<input type="text" id="set-webhook-wecom" class="text-input" value="' + escHtml(ent.webhook_wecom || '') + '" placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=...">' +
+        '</div>' +
+        '<div class="form-group">' +
+          '<label>飞书 Webhook URL</label>' +
+          '<input type="text" id="set-webhook-feishu" class="text-input" value="' + escHtml(ent.webhook_feishu || '') + '" placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/...">' +
+        '</div>' +
+      '</div>' +
+      '<div class="section-card">' +
+        '<h3>企业主题色</h3>' +
+        '<div class="theme-palette" id="theme-palette">';
+
+    THEME_OPTIONS.forEach(function (t) {
+      var active = t.id === currentTheme ? ' active' : '';
+      settingsHtml += '<div class="theme-option" data-theme-id="' + t.id + '">' +
+        '<div class="theme-swatch' + active + '" style="background:' + t.color + '">' +
+          '<span class="check-icon">\u2713</span>' +
+        '</div>' +
+        '<div class="theme-label">' + t.label + '</div>' +
+      '</div>';
+    });
+
+    settingsHtml += '</div></div>' +
+      '<button class="btn btn-primary" id="btn-save-settings">保存设置</button>';
+
+    container.insertAdjacentHTML('beforeend', settingsHtml);
+
+    // Theme swatch click handling
+    var selectedTheme = currentTheme;
+    document.querySelectorAll('#theme-palette .theme-option').forEach(function (opt) {
+      opt.addEventListener('click', function () {
+        selectedTheme = opt.dataset.themeId;
+        document.querySelectorAll('#theme-palette .theme-swatch').forEach(function (sw) {
+          sw.classList.remove('active');
+        });
+        opt.querySelector('.theme-swatch').classList.add('active');
+      });
+    });
+
+    // Save settings button
+    document.getElementById('btn-save-settings').addEventListener('click', async function () {
+      var payload = {
+        name: (state.enterprise && state.enterprise.name) || '',
+        webhook_dingtalk: document.getElementById('set-webhook-dingtalk').value.trim(),
+        webhook_wecom: document.getElementById('set-webhook-wecom').value.trim(),
+        webhook_feishu: document.getElementById('set-webhook-feishu').value.trim(),
+        theme_color: selectedTheme,
+      };
+      try {
+        await api('/api/auth/enterprises/settings', { method: 'PUT', body: payload });
+        state.enterprise = Object.assign(state.enterprise || {}, payload);
+        applyTheme(selectedTheme);
+        toast('设置已保存');
+      } catch (err) {
+        toast(err.message || '保存失败', 'error');
+      }
+    });
+  }
 };
 
 // 只更新成员数量（列表已移至人员管理页面）
@@ -291,7 +362,7 @@ async function loadInvitations() {
 }
 
 // ============================================================
-// SETTINGS PAGE
+// THEME OPTIONS (used in enterprise page)
 // ============================================================
 var THEME_OPTIONS = [
   { id: '',            label: '默认',    color: '#4F46E5' },
@@ -309,87 +380,7 @@ var THEME_OPTIONS = [
   { id: 'midnight',    label: '午夜',    color: '#4A4A8A' },
 ];
 
-window.loadSettings = async function loadSettings() {
-  var container = document.getElementById('page-settings');
-  if (!container) return;
-
-  if (!isOwnerOrAdmin()) {
-    container.innerHTML =
-      '<div class="page-header"><h2>设置</h2></div>' +
-      '<div class="section-card"><p style="color:var(--text-secondary)">仅管理员可访问设置页面</p></div>';
-    return;
-  }
-
-  var ent = state.enterprise || {};
-  var currentTheme = ent.theme_color || '';
-
-  var html =
-    '<div class="page-header"><h2>设置</h2></div>' +
-    '<div class="section-card">' +
-      '<h3>Webhook 通知配置</h3>' +
-      '<div class="form-group">' +
-        '<label>钉钉 Webhook URL</label>' +
-        '<input type="text" id="set-webhook-dingtalk" class="text-input" value="' + escHtml(ent.webhook_dingtalk || '') + '" placeholder="https://oapi.dingtalk.com/robot/send?access_token=...">' +
-      '</div>' +
-      '<div class="form-group">' +
-        '<label>企业微信 Webhook URL</label>' +
-        '<input type="text" id="set-webhook-wecom" class="text-input" value="' + escHtml(ent.webhook_wecom || '') + '" placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=...">' +
-      '</div>' +
-      '<div class="form-group">' +
-        '<label>飞书 Webhook URL</label>' +
-        '<input type="text" id="set-webhook-feishu" class="text-input" value="' + escHtml(ent.webhook_feishu || '') + '" placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/...">' +
-      '</div>' +
-    '</div>' +
-    '<div class="section-card">' +
-      '<h3>企业主题色</h3>' +
-      '<div class="theme-palette" id="theme-palette">';
-
-  THEME_OPTIONS.forEach(function (t) {
-    var active = t.id === currentTheme ? ' active' : '';
-    html += '<div class="theme-option" data-theme-id="' + t.id + '">' +
-      '<div class="theme-swatch' + active + '" style="background:' + t.color + '">' +
-        '<span class="check-icon">\u2713</span>' +
-      '</div>' +
-      '<div class="theme-label">' + t.label + '</div>' +
-    '</div>';
-  });
-
-  html += '</div></div>' +
-    '<button class="btn btn-primary" id="btn-save-settings">保存设置</button>';
-
-  container.innerHTML = html;
-
-  // Theme swatch click handling
-  var selectedTheme = currentTheme;
-  document.querySelectorAll('#theme-palette .theme-option').forEach(function (opt) {
-    opt.addEventListener('click', function () {
-      selectedTheme = opt.dataset.themeId;
-      document.querySelectorAll('#theme-palette .theme-swatch').forEach(function (sw) {
-        sw.classList.remove('active');
-      });
-      opt.querySelector('.theme-swatch').classList.add('active');
-    });
-  });
-
-  // Save button
-  document.getElementById('btn-save-settings').addEventListener('click', async function () {
-    var payload = {
-      name: (state.enterprise && state.enterprise.name) || '',
-      webhook_dingtalk: document.getElementById('set-webhook-dingtalk').value.trim(),
-      webhook_wecom: document.getElementById('set-webhook-wecom').value.trim(),
-      webhook_feishu: document.getElementById('set-webhook-feishu').value.trim(),
-      theme_color: selectedTheme,
-    };
-    try {
-      await api('/api/auth/enterprises/settings', { method: 'PUT', body: payload });
-      state.enterprise = Object.assign(state.enterprise || {}, payload);
-      applyTheme(selectedTheme);
-      toast('设置已保存');
-    } catch (err) {
-      toast(err.message || '保存失败', 'error');
-    }
-  });
-};
+// loadSettings removed — functionality merged into loadEnterprise
 
 // ============================================================
 // ACCOUNT PAGE
