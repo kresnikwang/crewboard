@@ -1068,10 +1068,11 @@ a { text-decoration: none; color: inherit; }
   margin-bottom: 1px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
   cursor: grab; position: relative;
   height: 16px; box-sizing: border-box;
+  color: var(--text);
 }
 .m-booking:hover { opacity: .8; }
 .m-booking.moving { opacity: 0.4; cursor: grabbing; }
-.m-booking-hours { font-weight: 600; }
+.m-booking-hours { font-weight: 600; color: var(--text); }
 
 /* Resize handle for month view booking blocks */
 .m-booking .resize-handle {

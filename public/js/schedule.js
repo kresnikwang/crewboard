@@ -336,7 +336,7 @@
         totalH += b.hours;
         var tentCls = b.is_tentative ? ' tentative' : '';
         var projColor = b.project_color || '#6366F1';
-        var bgColor = projColor + '18';
+        var bgColor = projColor + '30';
 
         html += '<div class="booking-block' + tentCls + '"' +
           ' style="background:' + bgColor + ';border-left:3px solid ' + projColor + '"' +
@@ -1233,12 +1233,12 @@
       var totalH = 0;
       dayBookings.forEach(function (b) {
         totalH += b.hours;
-        var bgColor = (b.project_color || '#6366F1') + '33';
-        var fgColor = b.project_color || '#6366F1';
+        var projColor = b.project_color || '#6366F1';
+        var bgColor = projColor + '30';
         html += '<div class="m-booking" data-booking-id="' + b.id + '"' +
           ' data-resource-id="' + b.resource_id + '"' +
           ' data-date="' + b.date + '"' +
-          ' style="background:' + bgColor + ';color:' + fgColor + ';border-left:2px solid ' + fgColor + '"' +
+          ' style="background:' + bgColor + ';border-left:2px solid ' + projColor + '"' +
           ' title="' + escAttr(b.hours + 'h ' + b.project_name + (b.client_name ? ' | ' + b.client_name : '')) + '">' +
           '<div class="resize-handle-left"></div>' +
           '<span class="m-booking-hours">' + b.hours + 'h</span> ' +
