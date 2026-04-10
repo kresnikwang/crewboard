@@ -294,6 +294,49 @@
   }
 
   /* --------------------------------------------------
+     Detect continuous booking spans for a resource.
+     Returns a map: bookingId -> { cls: 'span-s'|'span-m'|'span-e', showText: bool }
+     A span is consecutive days with same (project_id, hours, is_tentative).
+     -------------------------------------------------- */
+  function detectSpans(resourceId, days, bMap) {
+    var info = {};
+    var dateFmts = days.map(fmt);
+
+    // Build sorted booking lists per day (consistent order across days)
+    var dayLists = dateFmts.map(function (dateStr) {
+      var key = resourceId + '_' + dateStr;
+      return (bMap[key] || []).slice().sort(function (a, b) {
+        return a.project_id - b.project_id || a.hours - b.hours || a.id - b.id;
+      });
+    });
+
+    for (var di = 0; di < dateFmts.length; di++) {
+      dayLists[di].forEach(function (b) {
+        var prevList = di > 0 ? dayLists[di - 1] : [];
+        var nextList = di < dateFmts.length - 1 ? dayLists[di + 1] : [];
+
+        var matchFn = function (other) {
+          return other.project_id === b.project_id &&
+                 other.hours === b.hours &&
+                 other.is_tentative === b.is_tentative;
+        };
+        var hasPrev = prevList.some(matchFn);
+        var hasNext = nextList.some(matchFn);
+
+        if (hasPrev && hasNext) {
+          info[b.id] = { cls: 'span-m', showText: false };
+        } else if (hasPrev && !hasNext) {
+          info[b.id] = { cls: 'span-e', showText: false };
+        } else if (!hasPrev && hasNext) {
+          info[b.id] = { cls: 'span-s', showText: true };
+        }
+        // else: solo booking, no span class needed
+      });
+    }
+    return info;
+  }
+
+  /* --------------------------------------------------
      Single resource row
      -------------------------------------------------- */
   function buildResourceRow(r, days, bMap, lMap) {
@@ -307,10 +350,15 @@
         '</div>' +
       '</div></td>';
 
+    // Detect spans for continuous bar rendering
+    var spanInfo = detectSpans(r.id, days, bMap);
+
     days.forEach(function (d) {
       var dateStr = fmt(d);
       var key = r.id + '_' + dateStr;
-      var dayBookings = bMap[key] || [];
+      var dayBookings = (bMap[key] || []).slice().sort(function (a, b) {
+        return a.project_id - b.project_id || a.hours - b.hours || a.id - b.id;
+      });
       var dayLeave    = lMap[key];
 
       var cellCls = 'booking-cell';
@@ -338,19 +386,33 @@
         var projColor = b.project_color || '#6366F1';
         var bgColor = projColor + '30';
 
-        html += '<div class="booking-block' + tentCls + '"' +
-          ' style="background:' + bgColor + ';border-left:3px solid ' + projColor + '"' +
+        var si = spanInfo[b.id];
+        var spanCls = si ? ' ' + si.cls : '';
+        var showText = si ? si.showText : true;
+        // Only span-start (or solo) gets the left colored border
+        var hasBorderLeft = !si || si.cls === 'span-s';
+        var borderStyle = hasBorderLeft ? 'border-left:3px solid ' + projColor + ';' : '';
+
+        html += '<div class="booking-block' + tentCls + spanCls + '"' +
+          ' style="background:' + bgColor + ';' + borderStyle + '"' +
           ' data-booking-id="' + b.id + '"' +
           ' data-resource-id="' + b.resource_id + '"' +
           ' data-date="' + b.date + '"' +
           ' onclick="window.editBooking(' + b.id + ')"' +
           ' title="' + escAttr(b.project_name) + ' - ' + b.hours + 'h' +
-            (b.notes ? '\n' + escAttr(b.notes) : '') + '">' +
-          '<div class="resize-handle-left"></div>' +
-          '<span class="booking-hours">' + b.hours + 'h</span> ' +
-          '<span class="booking-project">' + esc(truncate(b.project_name, 25)) + '</span>' +
-          '<div class="resize-handle"></div>' +
-        '</div>';
+            (b.notes ? '\n' + escAttr(b.notes) : '') + '">';
+
+        if (hasBorderLeft) {
+          html += '<div class="resize-handle-left"></div>';
+        }
+        if (showText) {
+          html += '<span class="booking-hours">' + b.hours + 'h</span> ' +
+            '<span class="booking-project">' + esc(truncate(b.project_name, 25)) + '</span>';
+        }
+        if (!si || si.cls === 'span-e') {
+          html += '<div class="resize-handle"></div>';
+        }
+        html += '</div>';
       });
 
       if (totalH > 0) {
