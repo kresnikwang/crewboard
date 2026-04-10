@@ -1077,8 +1077,8 @@ a { text-decoration: none; color: inherit; }
 
 /* Day cells in month view */
 .m-day-cell {
-  padding: 1px; vertical-align: top; height: 54px; position: relative; cursor: pointer;
-  width: 36px; min-width: 36px;
+  padding: 1px 0; vertical-align: top; height: 54px; position: relative; cursor: pointer;
+  width: 36px; min-width: 36px; overflow: visible;
 }
 .m-day-cell:hover { background: var(--primary-light); }
 .m-day-cell.m-weekend { background: #F3F4F6; }
@@ -1096,6 +1096,27 @@ a { text-decoration: none; color: inherit; }
 .m-booking:hover { opacity: .8; }
 .m-booking.moving { opacity: 0.4; cursor: grabbing; }
 .m-booking-hours { font-weight: 600; color: #374151; }
+
+/* === Month view continuous bar (span) styles === */
+.m-booking.span-s {
+  border-top-right-radius: 0; border-bottom-right-radius: 0;
+  margin-right: -1px;
+}
+.m-booking.span-m {
+  border-radius: 0;
+  margin-left: -1px; margin-right: -1px;
+  padding-left: 2px;
+}
+.m-booking.span-e {
+  border-top-left-radius: 0; border-bottom-left-radius: 0;
+  margin-left: -1px;
+  padding-left: 2px;
+}
+.m-booking.span-m:hover, .m-booking.span-e:hover {
+  outline: 1px dashed var(--primary);
+  outline-offset: -1px;
+  opacity: 1;
+}
 
 /* Resize handle for month view booking blocks */
 .m-booking .resize-handle {

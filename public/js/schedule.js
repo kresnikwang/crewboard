@@ -1269,10 +1269,15 @@
       '<div class="m-res-role">' + esc(r.role || '') + '</div></div>' +
     '</div></td>';
 
+    // Detect spans for continuous bar rendering
+    var spanInfo = detectSpans(r.id, days, bMap);
+
     days.forEach(function (d) {
       var dateStr = fmt(d);
       var key = r.id + '_' + dateStr;
-      var dayBookings = bMap[key] || [];
+      var dayBookings = (bMap[key] || []).slice().sort(function (a, b) {
+        return a.project_id - b.project_id || a.hours - b.hours || a.id - b.id;
+      });
       var dayLeave = lMap[key];
       var weekend = isWeekend(d);
 
@@ -1297,16 +1302,30 @@
         totalH += b.hours;
         var projColor = b.project_color || '#6366F1';
         var bgColor = projColor + '30';
-        html += '<div class="m-booking" data-booking-id="' + b.id + '"' +
+
+        var si = spanInfo[b.id];
+        var spanCls = si ? ' ' + si.cls : '';
+        var showText = si ? si.showText : true;
+        var hasBorderLeft = !si || si.cls === 'span-s';
+        var borderStyle = hasBorderLeft ? 'border-left:2px solid ' + projColor + ';' : '';
+
+        html += '<div class="m-booking' + spanCls + '" data-booking-id="' + b.id + '"' +
           ' data-resource-id="' + b.resource_id + '"' +
           ' data-date="' + b.date + '"' +
-          ' style="background:' + bgColor + ';border-left:2px solid ' + projColor + '"' +
-          ' title="' + escAttr(b.hours + 'h ' + b.project_name + (b.client_name ? ' | ' + b.client_name : '')) + '">' +
-          '<div class="resize-handle-left"></div>' +
-          '<span class="m-booking-hours">' + b.hours + 'h</span> ' +
-          esc(truncate(b.project_name, 25)) +
-          '<div class="resize-handle"></div>' +
-          '</div>';
+          ' style="background:' + bgColor + ';' + borderStyle + '"' +
+          ' title="' + escAttr(b.hours + 'h ' + b.project_name + (b.client_name ? ' | ' + b.client_name : '')) + '">';
+
+        if (hasBorderLeft) {
+          html += '<div class="resize-handle-left"></div>';
+        }
+        if (showText) {
+          html += '<span class="m-booking-hours">' + b.hours + 'h</span> ' +
+            esc(truncate(b.project_name, 25));
+        }
+        if (!si || si.cls === 'span-e') {
+          html += '<div class="resize-handle"></div>';
+        }
+        html += '</div>';
       });
 
       /* Utilization bar */
