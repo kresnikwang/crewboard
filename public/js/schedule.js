@@ -50,9 +50,17 @@
     var rangeEl = document.getElementById('schedule-range');
     if (rangeEl) {
       var s = days[0], e = days[days.length - 1];
-      rangeEl.textContent =
-        s.getFullYear() + '年' + (s.getMonth() + 1) + '月' + s.getDate() + '日 - ' +
-        (e.getMonth() + 1) + '月' + e.getDate() + '日';
+      var sMonth = s.getMonth() + 1, eMonth = e.getMonth() + 1;
+      var sYear = s.getFullYear(), eYear = e.getFullYear();
+      var rangeText;
+      if (sYear !== eYear) {
+        rangeText = sYear + '年' + sMonth + '月' + s.getDate() + '日 - ' + eYear + '年' + eMonth + '月' + e.getDate() + '日';
+      } else if (sMonth !== eMonth) {
+        rangeText = sMonth + '月' + s.getDate() + '日 - ' + eMonth + '月' + e.getDate() + '日';
+      } else {
+        rangeText = sMonth + '月' + s.getDate() + '日 - ' + e.getDate() + '日';
+      }
+      rangeEl.textContent = rangeText;
     }
 
     /* Update today button label */
@@ -327,11 +335,11 @@
       dayBookings.forEach(function (b) {
         totalH += b.hours;
         var tentCls = b.is_tentative ? ' tentative' : '';
-        var bgColor = (b.project_color || '#6366F1') + '22';
-        var fgColor = b.project_color || '#6366F1';
+        var projColor = b.project_color || '#6366F1';
+        var bgColor = projColor + '18';
 
         html += '<div class="booking-block' + tentCls + '"' +
-          ' style="background:' + bgColor + ';color:' + fgColor + ';border-left:3px solid ' + fgColor + '"' +
+          ' style="background:' + bgColor + ';border-left:3px solid ' + projColor + '"' +
           ' data-booking-id="' + b.id + '"' +
           ' data-resource-id="' + b.resource_id + '"' +
           ' data-date="' + b.date + '"' +
@@ -1400,8 +1408,12 @@
   function buildModalTabs(bookingId) {
     if (bookingId) return ''; /* no tabs when editing */
     return '<div class="bk-tabs">' +
-      '<button class="bk-tab active" data-tab="booking">预订</button>' +
-      '<button class="bk-tab" data-tab="timeoff">休假</button>' +
+      '<button class="bk-tab active" data-tab="booking">' +
+        '<svg width="14" height="14" viewBox="0 0 20 20" fill="none" style="vertical-align:-2px;margin-right:4px"><rect x="2" y="3" width="16" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M2 7h16M6 1v4M14 1v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' +
+        '预订</button>' +
+      '<button class="bk-tab" data-tab="timeoff">' +
+        '<svg width="14" height="14" viewBox="0 0 20 20" fill="none" style="vertical-align:-2px;margin-right:4px"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M7 7l6 6M13 7l-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' +
+        '休假</button>' +
     '</div>';
   }
 

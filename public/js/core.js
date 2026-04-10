@@ -111,16 +111,35 @@ window.fmtDate = fmtDate;
 window.isToday = isToday;
 window.isWeekend = isWeekend;
 
-// --------------- Toast Notification ---------------
-window.toast = function toast(msg, type = 'success') {
-  const el = document.createElement('div');
-  el.className = 'toast toast-' + type;
-  el.textContent = msg;
-  document.body.appendChild(el);
-  setTimeout(() => {
-    el.remove();
-  }, 2500);
-};
+// --------------- Toast Notification (queued & stacked) ---------------
+(function () {
+  var container = null;
+  function getContainer() {
+    if (!container) {
+      container = document.createElement('div');
+      container.className = 'toast-container';
+      document.body.appendChild(container);
+    }
+    return container;
+  }
+  window.toast = function toast(msg, type) {
+    type = type || 'success';
+    var el = document.createElement('div');
+    el.className = 'toast toast-' + type + ' toast-enter';
+    el.textContent = msg;
+    var c = getContainer();
+    c.appendChild(el);
+    // Trigger enter animation
+    requestAnimationFrame(function () {
+      el.classList.remove('toast-enter');
+    });
+    // Auto-remove after 2.5s
+    setTimeout(function () {
+      el.classList.add('toast-exit');
+      setTimeout(function () { el.remove(); }, 300);
+    }, 2500);
+  };
+})();
 
 // --------------- Modal ---------------
 window.showModal = function showModal(title, bodyHtml, footerHtml) {
@@ -249,6 +268,33 @@ function initLogoutHandler() {
     window.state.enterprise = null;
     document.getElementById('main-app').style.display = 'none';
     document.getElementById('auth-page').style.display = 'flex';
+  });
+}
+
+function initSidebarUserMenu() {
+  var userInfo = document.getElementById('user-info');
+  var dropdown = document.getElementById('sidebar-dropdown');
+  var accountBtn = document.getElementById('btn-account');
+  if (!userInfo || !dropdown) return;
+
+  userInfo.addEventListener('click', function (e) {
+    e.stopPropagation();
+    dropdown.classList.toggle('open');
+  });
+
+  if (accountBtn) {
+    accountBtn.addEventListener('click', function () {
+      dropdown.classList.remove('open');
+      window.loadPage('account');
+    });
+  }
+
+  // Close dropdown on outside click
+  document.addEventListener('click', function () {
+    dropdown.classList.remove('open');
+  });
+  dropdown.addEventListener('click', function (e) {
+    e.stopPropagation();
   });
 }
 
@@ -467,14 +513,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initLogoutHandler();
   initFirstLoginHandler();
   initNavigation();
-
-  // User-info click -> account page
-  var userInfoEl = document.getElementById('user-info');
-  if (userInfoEl) {
-    userInfoEl.addEventListener('click', function () {
-      window.loadPage('account');
-    });
-  }
+  initSidebarUserMenu();
 
   // Modal close button
   const modalClose = document.getElementById('modal-close');
