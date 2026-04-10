@@ -117,16 +117,19 @@ a { text-decoration: none; color: inherit; }
 .booking-block.span-s {
   border-top-right-radius: 0; border-bottom-right-radius: 0;
   margin-right: -1px;
+  overflow: visible; z-index: 2;
 }
 .booking-block.span-m {
   border-radius: 0;
   margin-left: -1px; margin-right: -1px;
   padding-left: 4px;
+  z-index: 1;
 }
 .booking-block.span-e {
   border-top-left-radius: 0; border-bottom-left-radius: 0;
   margin-left: -1px;
   padding-left: 4px;
+  z-index: 1;
 }
 /* Hover highlight for mid/end segments */
 .booking-block.span-m:hover, .booking-block.span-e:hover {
@@ -1101,16 +1104,19 @@ a { text-decoration: none; color: inherit; }
 .m-booking.span-s {
   border-top-right-radius: 0; border-bottom-right-radius: 0;
   margin-right: -1px;
+  overflow: visible; z-index: 2;
 }
 .m-booking.span-m {
   border-radius: 0;
   margin-left: -1px; margin-right: -1px;
   padding-left: 2px;
+  z-index: 1;
 }
 .m-booking.span-e {
   border-top-left-radius: 0; border-bottom-left-radius: 0;
   margin-left: -1px;
   padding-left: 2px;
+  z-index: 1;
 }
 .m-booking.span-m:hover, .m-booking.span-e:hover {
   outline: 1px dashed var(--primary);
