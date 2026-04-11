@@ -190,8 +190,9 @@ window.loadEnterprise = async function loadEnterprise() {
       '</div>';
     });
 
-    settingsHtml += '</div></div>' +
-      '<button class="btn btn-primary" id="btn-save-settings">保存设置</button>';
+    settingsHtml += '</div>' +
+      '<button class="btn btn-primary" id="btn-save-settings" style="margin-top:16px">保存</button>' +
+    '</div>';
 
     container.insertAdjacentHTML('beforeend', settingsHtml);
 
@@ -421,6 +422,11 @@ window.loadAccount = async function loadAccount() {
         '<input type="password" id="acc-confirm-pw" class="text-input">' +
       '</div>' +
       '<button class="btn btn-primary" id="btn-change-pw">修改密码</button>' +
+    '</div>' +
+    '<div class="section-card">' +
+      '<h3>退出登录</h3>' +
+      '<p style="font-size:13px;color:var(--text-secondary);margin-bottom:14px;">退出当前账号，返回登录页面。</p>' +
+      '<button class="btn btn-danger" id="btn-logout-account">退出登录</button>' +
     '</div>';
 
   container.innerHTML = html;
@@ -484,6 +490,16 @@ window.loadAccount = async function loadAccount() {
     } catch (err) {
       toast(err.message || '密码修改失败', 'error');
     }
+  });
+
+  // Logout button on account page
+  document.getElementById('btn-logout-account').addEventListener('click', async function () {
+    try {
+      await api('/api/auth/logout', { method: 'POST' });
+    } catch (_) {}
+    clearToken();
+    window.state.user = null;
+    window.location.href = '/';
   });
 };
 
