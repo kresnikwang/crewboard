@@ -9,6 +9,7 @@
 
   var state = window.state;
   var api   = window.api;
+  var cachedApi = window.cachedApi;
 
   /* ---- module-level cache for current week's bookings (used by copy feature) ---- */
   var _currentBookings = [];
@@ -24,7 +25,7 @@
     /* ---- resource selector ---- */
     var resources = state.resources && state.resources.length
       ? state.resources
-      : await api('/api/resources');
+      : await cachedApi('/api/resources');
     state.resources = resources;
 
     if (!state.tsResourceId && resources.length) {

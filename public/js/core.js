@@ -49,6 +49,168 @@ window.api = async function api(path, opts = {}) {
   return res.json();
 };
 
+// --------------- SWR-style API Cache ---------------
+// Stale-While-Revalidate: return cached data instantly, then refresh in background.
+// Usage: const data = await cachedApi('/api/foo?bar=1', { maxAge: 30000 });
+// Call  apiCache.invalidate('/api/foo') or apiCache.invalidateAll() to bust cache.
+(function () {
+  var _cache = {};   // key → { data, timestamp }
+  var _inflight = {}; // key → Promise (dedup concurrent requests)
+  var DEFAULT_MAX_AGE = 60000; // 1 minute
+
+  /**
+   * cachedApi(url, options)
+   *   options.maxAge  — ms before data is considered stale (default 60s)
+   *   options.swr     — if true (default), return stale data immediately and
+   *                     revalidate in background; if false, always await fresh data
+   *   options.onRevalidate — callback(freshData) when background refresh completes
+   */
+  window.cachedApi = async function cachedApi(url, options) {
+    options = options || {};
+    var maxAge = options.maxAge != null ? options.maxAge : DEFAULT_MAX_AGE;
+    var swr = options.swr !== false;
+    var entry = _cache[url];
+    var now = Date.now();
+
+    // Fresh cache hit — return immediately
+    if (entry && (now - entry.timestamp) < maxAge) {
+      return entry.data;
+    }
+
+    // Stale cache hit — return stale, revalidate in background
+    if (swr && entry) {
+      _revalidate(url, options.onRevalidate);
+      return entry.data;
+    }
+
+    // No cache — must fetch
+    return _fetchAndCache(url, options.onRevalidate);
+  };
+
+  function _fetchAndCache(url, onRevalidate) {
+    // Dedup: if already fetching this URL, return same promise
+    if (_inflight[url]) return _inflight[url];
+
+    _inflight[url] = api(url).then(function (data) {
+      _cache[url] = { data: data, timestamp: Date.now() };
+      delete _inflight[url];
+      return data;
+    }).catch(function (err) {
+      delete _inflight[url];
+      throw err;
+    });
+    return _inflight[url];
+  }
+
+  function _revalidate(url, onRevalidate) {
+    if (_inflight[url]) return; // already revalidating
+    _inflight[url] = api(url).then(function (data) {
+      _cache[url] = { data: data, timestamp: Date.now() };
+      delete _inflight[url];
+      if (typeof onRevalidate === 'function') onRevalidate(data);
+    }).catch(function () {
+      delete _inflight[url];
+    });
+  }
+
+  window.apiCache = {
+    /** Invalidate a specific URL (exact match) */
+    invalidate: function (url) { delete _cache[url]; },
+    /** Invalidate all URLs matching a prefix */
+    invalidatePrefix: function (prefix) {
+      Object.keys(_cache).forEach(function (k) {
+        if (k.indexOf(prefix) === 0) delete _cache[k];
+      });
+    },
+    /** Invalidate everything */
+    invalidateAll: function () { _cache = {}; },
+    /** Manually set cache for a URL (useful after mutation) */
+    set: function (url, data) {
+      _cache[url] = { data: data, timestamp: Date.now() };
+    },
+    /** Check if URL is cached and fresh */
+    has: function (url, maxAge) {
+      var entry = _cache[url];
+      if (!entry) return false;
+      return (Date.now() - entry.timestamp) < (maxAge || DEFAULT_MAX_AGE);
+    }
+  };
+})();
+
+// --------------- SSE (Server-Sent Events) Client ---------------
+// Connects to /api/sse for real-time push updates.
+// On receiving an event, invalidates relevant cache and re-renders active page.
+(function () {
+  var _es = null;
+  var _retryTimer = null;
+  var _retryDelay = 1000;
+  var MAX_RETRY = 30000;
+
+  function connect() {
+    var token = getToken();
+    if (!token) return;
+    if (_es) { _es.close(); _es = null; }
+
+    _es = new EventSource('/api/sse?token=' + encodeURIComponent(token));
+
+    _es.onopen = function () {
+      _retryDelay = 1000; // reset on successful connect
+    };
+
+    _es.addEventListener('schedule-change', function (e) {
+      // Invalidate schedule-related caches
+      apiCache.invalidatePrefix('/api/schedule-data');
+      apiCache.invalidatePrefix('/api/bookings');
+      apiCache.invalidatePrefix('/api/resources');
+
+      // Re-render if user is on schedule or timesheets page
+      var page = window.state.currentPage;
+      if (page === 'schedule' && typeof window.loadSchedule === 'function') {
+        window.loadSchedule();
+      } else if (page === 'timesheets' && typeof window.loadTimesheets === 'function') {
+        window.loadTimesheets();
+      } else if (page === 'reports' && typeof window.loadReports === 'function') {
+        window.loadReports();
+      }
+    });
+
+    _es.addEventListener('resource-change', function () {
+      apiCache.invalidatePrefix('/api/resources');
+      apiCache.invalidatePrefix('/api/schedule-data');
+      if (window.state.currentPage === 'resources' && typeof window.loadResources === 'function') {
+        window.loadResources();
+      }
+    });
+
+    _es.addEventListener('project-change', function () {
+      apiCache.invalidatePrefix('/api/projects');
+      apiCache.invalidatePrefix('/api/schedule-data');
+      if (window.state.currentPage === 'projects' && typeof window.loadProjects === 'function') {
+        window.loadProjects();
+      }
+    });
+
+    _es.onerror = function () {
+      _es.close();
+      _es = null;
+      // Exponential backoff reconnect
+      if (_retryTimer) clearTimeout(_retryTimer);
+      _retryTimer = setTimeout(function () {
+        _retryDelay = Math.min(_retryDelay * 2, MAX_RETRY);
+        connect();
+      }, _retryDelay);
+    };
+  }
+
+  function disconnect() {
+    if (_retryTimer) { clearTimeout(_retryTimer); _retryTimer = null; }
+    if (_es) { _es.close(); _es = null; }
+  }
+
+  window.sseConnect = connect;
+  window.sseDisconnect = disconnect;
+})();
+
 // --------------- Date Helpers ---------------
 function getMonday(d) {
   const date = new Date(d);
@@ -263,6 +425,8 @@ function initLogoutHandler() {
     } catch (_) {
       // ignore errors on logout
     }
+    if (typeof window.sseDisconnect === 'function') window.sseDisconnect();
+    apiCache.invalidateAll();
     clearToken();
     window.state.user = null;
     window.state.enterprise = null;
@@ -418,6 +582,9 @@ async function enterApp() {
   } else {
     window.loadPage('schedule');
   }
+
+  // Connect SSE for real-time updates
+  if (typeof window.sseConnect === 'function') window.sseConnect();
 }
 
 // Hide nav items the user can't access

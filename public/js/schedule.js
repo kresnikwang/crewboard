@@ -8,6 +8,16 @@
 
   var state = window.state;
   var api   = window.api;
+  var cachedApi = window.cachedApi;
+
+  /** Invalidate schedule caches and reload. Call after any booking/leave mutation. */
+  function reloadAfterMutation() {
+    if (window.apiCache) {
+      window.apiCache.invalidatePrefix('/api/schedule-data');
+      window.apiCache.invalidatePrefix('/api/bookings');
+    }
+    window.loadSchedule();
+  }
 
   /* ---- cached bookings & leave used by edit lookup ---- */
   var _allBookings = [];
@@ -67,8 +77,21 @@
     var todayBtn = document.getElementById('schedule-today');
     if (todayBtn) todayBtn.textContent = isMonth ? '本月' : '本周';
 
-    /* Single aggregated request instead of 4 parallel calls */
-    var schedData = await api('/api/schedule-data?start=' + startStr + '&end=' + endStr);
+    /* Single aggregated request with SWR caching.
+       Returns cached data instantly on view/page switches;
+       revalidates in background and re-renders if data changed. */
+    var _scheduleUrl = '/api/schedule-data?start=' + startStr + '&end=' + endStr;
+    var schedData = await cachedApi(_scheduleUrl, {
+      maxAge: 30000,
+      onRevalidate: function (freshData) {
+        // Background refresh complete — only re-render if data actually changed
+        var oldSig = _allBookings.length + '|' + _allLeave.length;
+        var newSig = freshData.bookings.length + '|' + freshData.leave.length;
+        if (oldSig !== newSig) {
+          window.loadSchedule();
+        }
+      }
+    });
 
     var resources = schedData.resources;
     var bookings  = schedData.bookings;
@@ -563,7 +586,7 @@
         Promise.all(promises)
           .then(function () {
             toast('预订已延长 ' + promises.length + ' 天', 'success');
-            window.loadSchedule();
+            reloadAfterMutation();
           })
           .catch(function (err) {
             toast('延长失败：' + (err.message || ''), 'error');
@@ -587,7 +610,7 @@
         }))
           .then(function () {
             toast('预订已缩短 ' + toDelete.length + ' 天', 'success');
-            window.loadSchedule();
+            reloadAfterMutation();
           })
           .catch(function (err) {
             toast('缩短失败：' + (err.message || ''), 'error');
@@ -767,7 +790,7 @@
         Promise.all(promises)
           .then(function () {
             toast('预订已延长 ' + promises.length + ' 天', 'success');
-            window.loadSchedule();
+            reloadAfterMutation();
           })
           .catch(function (err) {
             toast('延长失败：' + (err.message || ''), 'error');
@@ -790,7 +813,7 @@
         }))
           .then(function () {
             toast('预订已缩短 ' + toDelete.length + ' 天', 'success');
-            window.loadSchedule();
+            reloadAfterMutation();
           })
           .catch(function (err) {
             toast('缩短失败：' + (err.message || ''), 'error');
@@ -988,11 +1011,11 @@
         .then(function () {
           var dir = currentDelta > 0 ? '向后' : '向前';
           toast('预订已' + dir + '移 ' + Math.abs(currentDelta) + ' 天', 'success');
-          window.loadSchedule();
+          reloadAfterMutation();
         })
         .catch(function (err) {
           toast('移动失败：' + (err.message || ''), 'error');
-          window.loadSchedule();
+          reloadAfterMutation();
         });
     }
 
@@ -2020,7 +2043,7 @@
       document.getElementById('modal').classList.remove('bk-modal');
       closeModal();
       toast(id ? '预订已更新' : '预订已创建（' + resourceIds.length + '人）', 'success');
-      window.loadSchedule();
+      reloadAfterMutation();
     } catch (err) {
       toast(err.message || '保存失败', 'error');
     }
@@ -2061,7 +2084,7 @@
       document.getElementById('modal').classList.remove('bk-modal');
       closeModal();
       toast('休假已添加（' + resourceIds.length + '人）', 'success');
-      window.loadSchedule();
+      reloadAfterMutation();
     } catch (err) {
       toast(err.message || '添加休假失败', 'error');
     }
@@ -2086,7 +2109,7 @@
       document.getElementById('modal').classList.remove('bk-modal');
       closeModal();
       toast('预订已删除', 'success');
-      window.loadSchedule();
+      reloadAfterMutation();
     } catch (err) {
       toast(err.message || '删除失败', 'error');
     }
@@ -2117,7 +2140,7 @@
       await api('/api/leave/' + id, { method: 'DELETE' });
       closeModal();
       toast('休假已删除', 'success');
-      window.loadSchedule();
+      reloadAfterMutation();
     } catch (err) {
       toast(err.message || '删除失败', 'error');
     }

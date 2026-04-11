@@ -4,6 +4,37 @@ const { holidays, getHoliday, isWorkingDay } = require('../db/holidays');
 const { notifyAll } = require('./webhook');
 const router = express.Router();
 
+// --------------- SSE Connection Pool ---------------
+// Map<enterpriseId, Set<{res, userId}>>
+const _sseClients = new Map();
+
+function sseAddClient(enterpriseId, userId, res) {
+  if (!_sseClients.has(enterpriseId)) _sseClients.set(enterpriseId, new Set());
+  const client = { res, userId };
+  _sseClients.get(enterpriseId).add(client);
+  res.on('close', () => {
+    const pool = _sseClients.get(enterpriseId);
+    if (pool) { pool.delete(client); if (pool.size === 0) _sseClients.delete(enterpriseId); }
+  });
+}
+
+/**
+ * Broadcast an SSE event to all connected clients in an enterprise.
+ * @param {number} enterpriseId
+ * @param {string} event - event name (e.g. 'schedule-change')
+ * @param {object} data  - JSON payload
+ * @param {number} [excludeUserId] - skip this user (the one who made the change)
+ */
+function sseBroadcast(enterpriseId, event, data, excludeUserId) {
+  const pool = _sseClients.get(enterpriseId);
+  if (!pool || pool.size === 0) return;
+  const payload = 'event: ' + event + '\ndata: ' + JSON.stringify(data) + '\n\n';
+  pool.forEach(client => {
+    if (excludeUserId && client.userId === excludeUserId) return;
+    try { client.res.write(payload); } catch (_) { /* dead connection */ }
+  });
+}
+
 module.exports = function(db) {
 
   // === CURRENT USER PERMISSIONS (effective) ===
@@ -75,6 +106,7 @@ module.exports = function(db) {
     const stmt = db.prepare('INSERT INTO resources (name, email, role, team, color, hours_per_day, enterprise_id) VALUES (?, ?, ?, ?, ?, ?, ?)');
     const result = stmt.run(name, email || null, role || '', team || '', color || '#4F46E5', hours_per_day || 8, entId);
     res.json({ id: result.lastInsertRowid });
+    sseBroadcast(req.user?.enterprise_id, 'resource-change', { action: 'create' }, req.user?.id);
   });
 
   router.put('/resources/:id', (req, res) => {
@@ -83,12 +115,14 @@ module.exports = function(db) {
     db.prepare('UPDATE resources SET name=?, email=?, role=?, team=?, color=?, hours_per_day=? WHERE id=?')
       .run(name, email, role, team, color, hours_per_day, req.params.id);
     res.json({ ok: true });
+    sseBroadcast(req.user?.enterprise_id, 'resource-change', { action: 'update' }, req.user?.id);
   });
 
   router.delete('/resources/:id', (req, res) => {
     if (req.user?.role !== 'admin') return res.status(403).json({ error: '仅管理员可删除人员' });
     db.prepare('UPDATE resources SET is_active = 0 WHERE id = ?').run(req.params.id);
     res.json({ ok: true });
+    sseBroadcast(req.user?.enterprise_id, 'resource-change', { action: 'delete' }, req.user?.id);
   });
 
   // === CLIENTS ===
@@ -164,6 +198,7 @@ module.exports = function(db) {
     const result = db.prepare('INSERT INTO projects (name, client_id, color, code, start_date, end_date, budget_hours, hourly_rate, billable, details, enterprise_id, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
       .run(name, client_id || null, color || '#8B5CF6', code || '', start_date || null, end_date || null, budget_hours || 0, hourly_rate || 0, billable != null ? (billable ? 1 : 0) : 1, details || '', entId, req.user.id);
     res.json({ id: result.lastInsertRowid });
+    sseBroadcast(req.user?.enterprise_id, 'project-change', { action: 'create' }, req.user?.id);
   });
 
   router.put('/projects/:id', (req, res) => {
@@ -177,24 +212,28 @@ module.exports = function(db) {
     db.prepare('UPDATE projects SET name=?, client_id=?, color=?, code=?, start_date=?, end_date=?, budget_hours=?, hourly_rate=?, billable=?, details=? WHERE id=?')
       .run(name, client_id, color, code || '', start_date, end_date, budget_hours, hourly_rate, billable != null ? (billable ? 1 : 0) : 1, details || '', req.params.id);
     res.json({ ok: true });
+    sseBroadcast(req.user?.enterprise_id, 'project-change', { action: 'update' }, req.user?.id);
   });
 
   router.patch('/projects/:id/archive', (req, res) => {
     if (req.user?.role !== 'admin') return res.status(403).json({ error: '仅管理员可归档项目' });
     db.prepare('UPDATE projects SET is_archived = 1 WHERE id = ?').run(req.params.id);
     res.json({ ok: true });
+    sseBroadcast(req.user?.enterprise_id, 'project-change', { action: 'archive' }, req.user?.id);
   });
 
   router.patch('/projects/:id/unarchive', (req, res) => {
     if (req.user?.role !== 'admin') return res.status(403).json({ error: '仅管理员可取消归档项目' });
     db.prepare('UPDATE projects SET is_archived = 0 WHERE id = ?').run(req.params.id);
     res.json({ ok: true });
+    sseBroadcast(req.user?.enterprise_id, 'project-change', { action: 'unarchive' }, req.user?.id);
   });
 
   router.delete('/projects/:id', (req, res) => {
     if (req.user?.role !== 'admin') return res.status(403).json({ error: '仅管理员可删除项目' });
     db.prepare('UPDATE projects SET is_active = 0 WHERE id = ?').run(req.params.id);
     res.json({ ok: true });
+    sseBroadcast(req.user?.enterprise_id, 'project-change', { action: 'delete' }, req.user?.id);
   });
 
   // === SCHEDULE DATA AGGREGATION (performance optimization) ===
@@ -323,6 +362,7 @@ module.exports = function(db) {
       notifyAll(db, enterpriseId, `新排程: ${r.name} 在 ${rangeStr} 被安排到「${p.name}」${bookHours}h/天`);
     }
     res.json({ ids, id: ids[0] });
+    sseBroadcast(req.user?.enterprise_id, 'schedule-change', { action: 'create', ids }, req.user?.id);
   });
 
   router.put('/bookings/:id', (req, res) => {
@@ -343,6 +383,7 @@ module.exports = function(db) {
       notifyAll(db, enterpriseId, `排程变更: ${r.name} 在 ${date}「${p.name}」已更新为${hours}小时`);
     }
     res.json({ ok: true });
+    sseBroadcast(req.user?.enterprise_id, 'schedule-change', { action: 'update', id: +req.params.id }, req.user?.id);
   });
 
   router.delete('/bookings/:id', (req, res) => {
@@ -359,6 +400,7 @@ module.exports = function(db) {
       notifyAll(db, enterpriseId, `排程取消: ${booking.rname} 在 ${booking.date}「${booking.pname}」的安排已取消`);
     }
     res.json({ ok: true });
+    sseBroadcast(req.user?.enterprise_id, 'schedule-change', { action: 'delete', id: +req.params.id }, req.user?.id);
   });
 
   // === TIMESHEETS ===
@@ -578,6 +620,7 @@ module.exports = function(db) {
     const result = db.prepare('INSERT INTO leave_entries (resource_id, date, type, notes) VALUES (?,?,?,?)')
       .run(resource_id, date, type || 'vacation', notes || '');
     res.json({ id: result.lastInsertRowid });
+    sseBroadcast(req.user?.enterprise_id, 'schedule-change', { action: 'leave-create' }, req.user?.id);
   });
 
   // Batch leave creation for date ranges
@@ -609,11 +652,13 @@ module.exports = function(db) {
 
     const count = batchInsert();
     res.json({ ok: true, count });
+    sseBroadcast(req.user?.enterprise_id, 'schedule-change', { action: 'leave-batch' }, req.user?.id);
   });
 
   router.delete('/leave/:id', (req, res) => {
     db.prepare('DELETE FROM leave_entries WHERE id = ?').run(req.params.id);
     res.json({ ok: true });
+    sseBroadcast(req.user?.enterprise_id, 'schedule-change', { action: 'leave-delete' }, req.user?.id);
   });
 
   // === EXCEL EXPORT ===
@@ -744,6 +789,31 @@ module.exports = function(db) {
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename=projects_${start}_${end}.xlsx`);
     await wb.xlsx.write(res);
+  });
+
+  // ===== SSE Endpoint =====
+  router.get('/sse', (req, res) => {
+    const user = req.user;
+    if (!user || !user.enterprise_id) {
+      return res.status(401).json({ error: '未授权' });
+    }
+
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no',  // Disable nginx buffering for SSE
+    });
+    res.write(':ok\n\n'); // initial comment to flush headers
+
+    sseAddClient(user.enterprise_id, user.id, res);
+
+    // Heartbeat every 30s to keep connection alive through proxies
+    const hb = setInterval(() => {
+      try { res.write(':heartbeat\n\n'); } catch (_) { clearInterval(hb); }
+    }, 30000);
+
+    req.on('close', () => clearInterval(hb));
   });
 
   return router;
