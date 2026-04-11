@@ -324,9 +324,9 @@
         var hasNext = nextList.some(matchFn);
 
         if (hasPrev && hasNext) {
-          info[b.id] = { cls: 'span-m', showText: false };
+          info[b.id] = { cls: 'span-m', showText: true };
         } else if (hasPrev && !hasNext) {
-          info[b.id] = { cls: 'span-e', showText: false };
+          info[b.id] = { cls: 'span-e', showText: true };
         } else if (!hasPrev && hasNext) {
           info[b.id] = { cls: 'span-s', showText: true };
         }
