@@ -83,6 +83,7 @@ a { text-decoration: none; color: inherit; }
 }
 .schedule-table th:first-child { text-align: left; padding-left: 16px; width: 180px; min-width: 180px; position: sticky; left: 0; z-index: 11; }
 .schedule-table th.today { color: var(--primary); }
+.schedule-table tbody tr { content-visibility: auto; contain-intrinsic-size: auto 60px; }
 .schedule-table td { border-bottom: 1px solid var(--border); padding: 0; vertical-align: top; height: 60px; position: relative; }
 .schedule-table td:first-child {
   position: sticky; left: 0; z-index: 5; background: var(--surface); padding: 8px 12px 8px 16px;
@@ -1011,6 +1012,7 @@ a { text-decoration: none; color: inherit; }
 .month-schedule { display: flex; flex-direction: column; height: 100%; }
 .month-scroll { flex: 1; overflow: auto; position: relative; }
 .month-table { border-collapse: collapse; table-layout: fixed; }
+.month-table tbody tr { content-visibility: auto; contain-intrinsic-size: auto 32px; }
 .month-table th, .month-table td { border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); }
 
 /* Sticky resource name column */

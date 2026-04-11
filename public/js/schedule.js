@@ -490,31 +490,36 @@
 
     var currentHoverIndex = originalIndex;
 
-    // ── 4. mousemove：用 elementFromPoint 追踪悬停格 ───────────────
+    // ── 4. mousemove：用 elementFromPoint 追踪悬停格（rAF 节流）───
+    var _rafRight = null;
     function handleMouseMove(e) {
       if (!isResizing) return;
       e.preventDefault();
+      if (_rafRight) return;
+      _rafRight = requestAnimationFrame(function () {
+        _rafRight = null;
 
-      // 暂时隐藏遮罩以穿透取到下方元素
-      overlay.style.pointerEvents = 'none';
-      var el = document.elementFromPoint(e.clientX, e.clientY);
-      overlay.style.pointerEvents = '';
+        // 暂时隐藏遮罩以穿透取到下方元素
+        overlay.style.pointerEvents = 'none';
+        var el = document.elementFromPoint(e.clientX, e.clientY);
+        overlay.style.pointerEvents = '';
 
-      if (!el) return;
-      var cell = el.closest('.booking-cell, .m-day-cell');
-      if (!cell) return;
+        if (!el) return;
+        var cell = el.closest('.booking-cell, .m-day-cell');
+        if (!cell) return;
 
-      // 必须是同一资源
-      if (parseInt(cell.dataset.resource, 10) !== booking.resource_id) return;
+        // 必须是同一资源
+        if (parseInt(cell.dataset.resource, 10) !== booking.resource_id) return;
 
-      var hoverDate = cell.dataset.date;
-      var hoverIndex = dates.indexOf(hoverDate);
-      if (hoverIndex === -1) return;
+        var hoverDate = cell.dataset.date;
+        var hoverIndex = dates.indexOf(hoverDate);
+        if (hoverIndex === -1) return;
 
-      if (hoverIndex !== currentHoverIndex) {
-        currentHoverIndex = hoverIndex;
-        applyPreview(hoverIndex);
-      }
+        if (hoverIndex !== currentHoverIndex) {
+          currentHoverIndex = hoverIndex;
+          applyPreview(hoverIndex);
+        }
+      });
     }
 
     // ── 5. mouseup：执行实际操作 ───────────────────────────────────
@@ -593,6 +598,7 @@
     // ── 6. 清理函数 ────────────────────────────────────────────────
     function cleanup() {
       isResizing = false;
+      if (_rafRight) { cancelAnimationFrame(_rafRight); _rafRight = null; }
       clearPreview();
       blockElement.classList.remove('resizing');
       document.removeEventListener('mousemove', handleMouseMove);
@@ -699,24 +705,29 @@
 
     var currentHoverIndex = originalIndex;
 
-    // 4. mousemove
+    // 4. mousemove（rAF 节流）
+    var _rafLeft = null;
     function handleMouseMove(e) {
       if (!isResizing) return;
       e.preventDefault();
-      overlay.style.pointerEvents = 'none';
-      var el = document.elementFromPoint(e.clientX, e.clientY);
-      overlay.style.pointerEvents = '';
-      if (!el) return;
-      var cell = el.closest('.booking-cell, .m-day-cell');
-      if (!cell) return;
-      if (parseInt(cell.dataset.resource, 10) !== booking.resource_id) return;
-      var hoverDate = cell.dataset.date;
-      var hoverIndex = dates.indexOf(hoverDate);
-      if (hoverIndex === -1) return;
-      if (hoverIndex !== currentHoverIndex) {
-        currentHoverIndex = hoverIndex;
-        applyPreview(hoverIndex);
-      }
+      if (_rafLeft) return;
+      _rafLeft = requestAnimationFrame(function () {
+        _rafLeft = null;
+        overlay.style.pointerEvents = 'none';
+        var el = document.elementFromPoint(e.clientX, e.clientY);
+        overlay.style.pointerEvents = '';
+        if (!el) return;
+        var cell = el.closest('.booking-cell, .m-day-cell');
+        if (!cell) return;
+        if (parseInt(cell.dataset.resource, 10) !== booking.resource_id) return;
+        var hoverDate = cell.dataset.date;
+        var hoverIndex = dates.indexOf(hoverDate);
+        if (hoverIndex === -1) return;
+        if (hoverIndex !== currentHoverIndex) {
+          currentHoverIndex = hoverIndex;
+          applyPreview(hoverIndex);
+        }
+      });
     }
 
     // 5. mouseup
@@ -790,6 +801,7 @@
     // 6. 清理
     function cleanup() {
       isResizing = false;
+      if (_rafLeft) { cancelAnimationFrame(_rafLeft); _rafLeft = null; }
       clearPreview();
       blockElement.classList.remove('resizing');
       document.removeEventListener('mousemove', handleMouseMove);
@@ -903,29 +915,34 @@
 
     var currentDelta = 0;
 
-    // 4. mousemove: track hover cell via elementFromPoint
+    // 4. mousemove: track hover cell via elementFromPoint（rAF 节流）
+    var _rafMove = null;
     function handleMouseMove(e) {
       if (!isMoving) return;
       e.preventDefault();
+      if (_rafMove) return;
+      _rafMove = requestAnimationFrame(function () {
+        _rafMove = null;
 
-      overlay.style.pointerEvents = 'none';
-      var el = document.elementFromPoint(e.clientX, e.clientY);
-      overlay.style.pointerEvents = '';
+        overlay.style.pointerEvents = 'none';
+        var el = document.elementFromPoint(e.clientX, e.clientY);
+        overlay.style.pointerEvents = '';
 
-      if (!el) return;
-      var cell = el.closest('.booking-cell, .m-day-cell');
-      if (!cell) return;
-      if (parseInt(cell.dataset.resource, 10) !== booking.resource_id) return;
+        if (!el) return;
+        var cell = el.closest('.booking-cell, .m-day-cell');
+        if (!cell) return;
+        if (parseInt(cell.dataset.resource, 10) !== booking.resource_id) return;
 
-      var hoverDate  = cell.dataset.date;
-      var hoverIndex = dates.indexOf(hoverDate);
-      if (hoverIndex === -1) return;
+        var hoverDate  = cell.dataset.date;
+        var hoverIndex = dates.indexOf(hoverDate);
+        if (hoverIndex === -1) return;
 
-      var delta = hoverIndex - anchorIndex;
-      if (delta !== currentDelta) {
-        currentDelta = delta;
-        applyPreview(delta);
-      }
+        var delta = hoverIndex - anchorIndex;
+        if (delta !== currentDelta) {
+          currentDelta = delta;
+          applyPreview(delta);
+        }
+      });
     }
 
     // 5. mouseup: execute move
@@ -982,6 +999,7 @@
     // 6. Cleanup
     function cleanup() {
       isMoving = false;
+      if (_rafMove) { cancelAnimationFrame(_rafMove); _rafMove = null; }
       clearPreview();
       scheduleGrid.querySelectorAll('.moving').forEach(function (el) {
         el.classList.remove('moving');
@@ -1053,59 +1071,64 @@
       return dateMap;
     }
 
+    var _rafDrag = null;
     function handleMouseMove(e) {
       if (!isDragging) return;
+      if (_rafDrag) return;
+      _rafDrag = requestAnimationFrame(function () {
+        _rafDrag = null;
 
-      var cell = document.elementFromPoint(e.clientX, e.clientY);
-      if (!cell) return;
-      cell = cell.closest('.booking-cell, .m-day-cell');
-      if (!cell || cell === endCell) return;
+        var cell = document.elementFromPoint(e.clientX, e.clientY);
+        if (!cell) return;
+        cell = cell.closest('.booking-cell, .m-day-cell');
+        if (!cell || cell === endCell) return;
 
-      // Must be same resource
-      var startRid = parseInt(startCell.dataset.resource, 10);
-      var endRid   = parseInt(cell.dataset.resource, 10);
-      if (startRid !== endRid) return;
+        // Must be same resource
+        var startRid = parseInt(startCell.dataset.resource, 10);
+        var endRid   = parseInt(cell.dataset.resource, 10);
+        if (startRid !== endRid) return;
 
-      didDrag = true;
+        didDrag = true;
 
-      // Clear previous selection highlights
-      selectedCells.forEach(function (c) {
-        c.classList.remove('drag-selecting', 'drag-start', 'drag-end');
-      });
+        // Clear previous selection highlights
+        selectedCells.forEach(function (c) {
+          c.classList.remove('drag-selecting', 'drag-start', 'drag-end');
+        });
 
-      var startDate = startCell.dataset.date;
-      var endDate   = cell.dataset.date;
+        var startDate = startCell.dataset.date;
+        var endDate   = cell.dataset.date;
 
-      // Build date→cell map using the correct selector for this view
-      var dateMap = getCellsForResource(startRid);
-      var dates = Object.keys(dateMap).sort();
-      var startIndex = dates.indexOf(startDate);
-      var endIndex   = dates.indexOf(endDate);
+        // Build date→cell map using the correct selector for this view
+        var dateMap = getCellsForResource(startRid);
+        var dates = Object.keys(dateMap).sort();
+        var startIndex = dates.indexOf(startDate);
+        var endIndex   = dates.indexOf(endDate);
 
-      if (startIndex === -1 || endIndex === -1) {
-        // Fallback: just highlight start and current cell
-        startCell.classList.add('drag-selecting', 'drag-start');
-        cell.classList.add('drag-selecting', 'drag-end');
-        selectedCells = [startCell, cell];
-        endCell = cell;
-        return;
-      }
-
-      if (startIndex > endIndex) {
-        var tmp = startIndex; startIndex = endIndex; endIndex = tmp;
-      }
-
-      selectedCells = [];
-      for (var i = startIndex; i <= endIndex; i++) {
-        var c = dateMap[dates[i]];
-        if (c) {
-          c.classList.add('drag-selecting');
-          selectedCells.push(c);
-          if (i === startIndex) c.classList.add('drag-start');
-          if (i === endIndex)   c.classList.add('drag-end');
+        if (startIndex === -1 || endIndex === -1) {
+          // Fallback: just highlight start and current cell
+          startCell.classList.add('drag-selecting', 'drag-start');
+          cell.classList.add('drag-selecting', 'drag-end');
+          selectedCells = [startCell, cell];
+          endCell = cell;
+          return;
         }
-      }
-      endCell = cell;
+
+        if (startIndex > endIndex) {
+          var tmp = startIndex; startIndex = endIndex; endIndex = tmp;
+        }
+
+        selectedCells = [];
+        for (var i = startIndex; i <= endIndex; i++) {
+          var c = dateMap[dates[i]];
+          if (c) {
+            c.classList.add('drag-selecting');
+            selectedCells.push(c);
+            if (i === startIndex) c.classList.add('drag-start');
+            if (i === endIndex)   c.classList.add('drag-end');
+          }
+        }
+        endCell = cell;
+      });
     }
 
     // Expose a way to clear highlights from outside (e.g. when modal is closed)
@@ -1119,6 +1142,7 @@
 
     function handleMouseUp(e) {
       if (!isDragging) return;
+      if (_rafDrag) { cancelAnimationFrame(_rafDrag); _rafDrag = null; }
 
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
