@@ -295,7 +295,7 @@
 
   /* --------------------------------------------------
      Detect continuous booking spans for a resource.
-     Returns a map: bookingId -> { cls, showText, days }
+     Returns a map: bookingId -> { cls: 'span-s'|'span-m'|'span-e', showText: bool }
      A span is consecutive days with same (project_id, hours, is_tentative).
      -------------------------------------------------- */
   function detectSpans(resourceId, days, bMap) {
@@ -324,17 +324,11 @@
         var hasNext = nextList.some(matchFn);
 
         if (hasPrev && hasNext) {
-          info[b.id] = { cls: 'span-m', showText: false, days: 1 };
+          info[b.id] = { cls: 'span-m', showText: false };
         } else if (hasPrev && !hasNext) {
-          info[b.id] = { cls: 'span-e', showText: false, days: 1 };
+          info[b.id] = { cls: 'span-e', showText: false };
         } else if (!hasPrev && hasNext) {
-          // Count how many consecutive days this span covers
-          var spanDays = 1;
-          for (var ndi = di + 1; ndi < dateFmts.length; ndi++) {
-            if (dayLists[ndi].some(matchFn)) spanDays++;
-            else break;
-          }
-          info[b.id] = { cls: 'span-s', showText: true, days: spanDays };
+          info[b.id] = { cls: 'span-s', showText: true };
         }
         // else: solo booking, no span class needed
       });
