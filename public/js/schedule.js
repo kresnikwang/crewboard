@@ -295,7 +295,7 @@
 
   /* --------------------------------------------------
      Detect continuous booking spans for a resource.
-     Returns a map: bookingId -> { cls: 'span-s'|'span-m'|'span-e', showText: bool }
+     Returns a map: bookingId -> { cls, showText, days }
      A span is consecutive days with same (project_id, hours, is_tentative).
      -------------------------------------------------- */
   function detectSpans(resourceId, days, bMap) {
@@ -324,11 +324,17 @@
         var hasNext = nextList.some(matchFn);
 
         if (hasPrev && hasNext) {
-          info[b.id] = { cls: 'span-m', showText: false };
+          info[b.id] = { cls: 'span-m', showText: false, days: 1 };
         } else if (hasPrev && !hasNext) {
-          info[b.id] = { cls: 'span-e', showText: false };
+          info[b.id] = { cls: 'span-e', showText: false, days: 1 };
         } else if (!hasPrev && hasNext) {
-          info[b.id] = { cls: 'span-s', showText: true };
+          // Count how many consecutive days this span covers
+          var spanDays = 1;
+          for (var ndi = di + 1; ndi < dateFmts.length; ndi++) {
+            if (dayLists[ndi].some(matchFn)) spanDays++;
+            else break;
+          }
+          info[b.id] = { cls: 'span-s', showText: true, days: spanDays };
         }
         // else: solo booking, no span class needed
       });
@@ -392,9 +398,12 @@
         // Only span-start (or solo) gets the left colored border
         var hasBorderLeft = !si || si.cls === 'span-s';
         var borderStyle = hasBorderLeft ? 'border-left:3px solid ' + projColor + ';' : '';
+        // For span-start, set width to span across all days in the group
+        var spanWidth = (si && si.cls === 'span-s' && si.days > 1)
+          ? 'width:calc(' + si.days + '00% + ' + (si.days - 1) + 'px);' : '';
 
         html += '<div class="booking-block' + tentCls + spanCls + '"' +
-          ' style="background:' + bgColor + ';' + borderStyle + '"' +
+          ' style="background:' + bgColor + ';' + borderStyle + spanWidth + '"' +
           ' data-booking-id="' + b.id + '"' +
           ' data-resource-id="' + b.resource_id + '"' +
           ' data-date="' + b.date + '"' +
@@ -1308,11 +1317,13 @@
         var showText = si ? si.showText : true;
         var hasBorderLeft = !si || si.cls === 'span-s';
         var borderStyle = hasBorderLeft ? 'border-left:2px solid ' + projColor + ';' : '';
+        var spanWidth = (si && si.cls === 'span-s' && si.days > 1)
+          ? 'width:calc(' + si.days + '00% + ' + (si.days - 1) + 'px);' : '';
 
         html += '<div class="m-booking' + spanCls + '" data-booking-id="' + b.id + '"' +
           ' data-resource-id="' + b.resource_id + '"' +
           ' data-date="' + b.date + '"' +
-          ' style="background:' + bgColor + ';' + borderStyle + '"' +
+          ' style="background:' + bgColor + ';' + borderStyle + spanWidth + '"' +
           ' title="' + escAttr(b.hours + 'h ' + b.project_name + (b.client_name ? ' | ' + b.client_name : '')) + '">';
 
         if (hasBorderLeft) {
