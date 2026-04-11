@@ -398,12 +398,9 @@
         // Only span-start (or solo) gets the left colored border
         var hasBorderLeft = !si || si.cls === 'span-s';
         var borderStyle = hasBorderLeft ? 'border-left:3px solid ' + projColor + ';' : '';
-        // For span-start, set width to span across all days in the group
-        var spanWidth = (si && si.cls === 'span-s' && si.days > 1)
-          ? 'width:calc(' + si.days + '00% + ' + (si.days - 1) + 'px);' : '';
 
         html += '<div class="booking-block' + tentCls + spanCls + '"' +
-          ' style="background:' + bgColor + ';' + borderStyle + spanWidth + '"' +
+          ' style="background:' + bgColor + ';' + borderStyle + '"' +
           ' data-booking-id="' + b.id + '"' +
           ' data-resource-id="' + b.resource_id + '"' +
           ' data-date="' + b.date + '"' +
@@ -1317,13 +1314,11 @@
         var showText = si ? si.showText : true;
         var hasBorderLeft = !si || si.cls === 'span-s';
         var borderStyle = hasBorderLeft ? 'border-left:2px solid ' + projColor + ';' : '';
-        var spanWidth = (si && si.cls === 'span-s' && si.days > 1)
-          ? 'width:calc(' + si.days + '00% + ' + (si.days - 1) + 'px);' : '';
 
         html += '<div class="m-booking' + spanCls + '" data-booking-id="' + b.id + '"' +
           ' data-resource-id="' + b.resource_id + '"' +
           ' data-date="' + b.date + '"' +
-          ' style="background:' + bgColor + ';' + borderStyle + spanWidth + '"' +
+          ' style="background:' + bgColor + ';' + borderStyle + '"' +
           ' title="' + escAttr(b.hours + 'h ' + b.project_name + (b.client_name ? ' | ' + b.client_name : '')) + '">';
 
         if (hasBorderLeft) {
