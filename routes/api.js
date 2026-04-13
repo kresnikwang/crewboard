@@ -48,13 +48,15 @@ module.exports = function(db) {
     res.json({
       role,
       can_book: isAdmin || isManager,           // can create/edit bookings
-      can_manage: isAdmin,                       // can manage resources/clients/projects (full CRUD)
+      can_manage: isAdmin,                       // can manage resources (full CRUD)
+      can_manage_projects: isAdmin || isManager, // can manage projects/clients
       can_view_reports: isAdmin || isManager,    // can view reports
       can_admin: isAdmin,                        // can manage users and enterprise settings
       resource_id: u.resource_id,
       // Legacy aliases for backward compat with old vanilla frontend
       book_others: isAdmin || isManager,
       manage_resources: isAdmin,
+      manage_projects: isAdmin || isManager,
       view_reports: isAdmin || isManager,
     });
   });

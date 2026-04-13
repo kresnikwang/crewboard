@@ -590,14 +590,18 @@ async function enterApp() {
 // Hide nav items the user can't access
 function updateNavVisibility() {
   var perms = window.state.permissions;
-  // Resources & Projects pages require manage_resources
+  // Resources (人员管理) — admin only
   var resNav = document.querySelector('.nav-item[data-page="resources"]');
-  var projNav = document.querySelector('.nav-item[data-page="projects"]');
   if (resNav) resNav.style.display = perms.manage_resources ? '' : 'none';
-  if (projNav) projNav.style.display = perms.manage_resources ? '' : 'none';
-  // Reports page requires view_reports
+  // Projects (项目管理) — admin + manager
+  var projNav = document.querySelector('.nav-item[data-page="projects"]');
+  if (projNav) projNav.style.display = perms.manage_projects ? '' : 'none';
+  // Reports — admin + manager
   var repNav = document.querySelector('.nav-item[data-page="reports"]');
   if (repNav) repNav.style.display = perms.view_reports ? '' : 'none';
+  // Enterprise (企业管理) — admin only
+  var entNav = document.querySelector('.nav-item[data-page="enterprise"]');
+  if (entNav) entNav.style.display = perms.can_admin ? '' : 'none';
 }
 
 window.enterApp = enterApp;
