@@ -364,7 +364,7 @@ window.loadProjects = async function loadProjects() {
 
 function bindPCNewButton() {
   var permsBtn = window.state.permissions || {};
-  var canManageBtn = !!permsBtn.manage_resources;
+  var canManageBtn = !!permsBtn.manage_projects;
   var btnNew = document.getElementById('btn-add-new-pc');
   if (!btnNew) return;
   if (!canManageBtn) {
@@ -413,7 +413,7 @@ function renderPCPage() {
 
 function renderProjectsTable(container) {
   var permsPC = window.state.permissions || {};
-  var canManagePC = !!permsPC.manage_resources;
+  var canManagePC = !!permsPC.manage_projects;
   var query = pcSearchQuery.toLowerCase();
   var filtered = state.projects.filter(function (p) {
     if (!query) return true;
@@ -482,7 +482,7 @@ function renderProjectsTable(container) {
 
 function renderClientsTable(container) {
   var permsClient = window.state.permissions || {};
-  var canManageClient = !!permsClient.manage_resources;
+  var canManageClient = !!permsClient.manage_projects;
   var query = pcSearchQuery.toLowerCase();
   var filtered = state.clients.filter(function (c) {
     if (!query) return true;
