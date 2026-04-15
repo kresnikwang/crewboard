@@ -2,6 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const { sendMail, passwordResetEmail, invitationEmail, APP_URL } = require('../utils/email');
 const uuidv4 = () => crypto.randomUUID();
 const router = express.Router();
 
@@ -450,7 +451,7 @@ module.exports = function(db) {
   // === INVITATIONS ===
 
   // Send invitation
-  router.post('/enterprises/invite', (req, res) => {
+  router.post('/enterprises/invite', async (req, res) => {
     if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
     if (req.user.role !== 'owner' && req.user.role !== 'admin') return res.status(403).json({ error: '仅管理员可操作' });
 
@@ -473,11 +474,17 @@ module.exports = function(db) {
 
     const enterprise = db.prepare('SELECT name, code FROM enterprises WHERE id = ?').get(req.user.enterprise_id);
 
+    // Send invitation email
+    const inviteLink = APP_URL + '/#register?invite=' + token + '&email=' + encodeURIComponent(email);
+    const html = invitationEmail(req.user.name, enterprise.name, inviteLink);
+    const emailResult = await sendMail(email, '邀请加入「' + enterprise.name + '」- 神马排班 CrewBoard', html);
+
     res.json({
       ok: true,
       token,
       invite_code: enterprise.code,
-      enterprise_name: enterprise.name
+      enterprise_name: enterprise.name,
+      email_sent: emailResult.ok
     });
   });
 
@@ -503,6 +510,77 @@ module.exports = function(db) {
 
     db.prepare('DELETE FROM invitations WHERE id = ? AND enterprise_id = ?')
       .run(req.params.id, req.user.enterprise_id);
+    res.json({ ok: true });
+  });
+
+  // === FORGOT PASSWORD ===
+
+  // Step 1: Request password reset (no auth required)
+  router.post('/forgot-password', async (req, res) => {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: '请输入邮箱地址' });
+
+    const user = db.prepare('SELECT id, name, email FROM users WHERE email = ?').get(email);
+    if (!user) {
+      // Don't reveal whether email exists — return success either way
+      return res.json({ ok: true, message: '如果该邮箱已注册，重置链接已发送' });
+    }
+
+    // Invalidate previous tokens for this user
+    db.prepare('UPDATE password_reset_tokens SET used = 1 WHERE user_id = ? AND used = 0').run(user.id);
+
+    // Generate new token (30 min expiry)
+    const token = uuidv4();
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+    db.prepare('INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES (?,?,?)')
+      .run(user.id, token, expiresAt);
+
+    // Send email
+    const resetLink = APP_URL + '/#reset-password?token=' + token;
+    const html = passwordResetEmail(user.name, resetLink);
+    const result = await sendMail(user.email, '重置密码 - 神马排班 CrewBoard', html);
+
+    if (!result.ok) {
+      console.error('[ForgotPassword] Email send failed:', result.error);
+    }
+
+    res.json({ ok: true, message: '如果该邮箱已注册，重置链接已发送' });
+  });
+
+  // Step 2: Verify reset token
+  router.get('/reset-password/:token', (req, res) => {
+    const row = db.prepare(
+      'SELECT * FROM password_reset_tokens WHERE token = ? AND used = 0 AND expires_at > datetime(?)'
+    ).get(req.params.token, new Date().toISOString());
+
+    if (!row) return res.status(400).json({ error: '链接无效或已过期，请重新申请' });
+
+    const user = db.prepare('SELECT name, email FROM users WHERE id = ?').get(row.user_id);
+    res.json({ ok: true, email: user?.email || '' });
+  });
+
+  // Step 3: Set new password with token
+  router.post('/reset-password', (req, res) => {
+    const { token, new_password } = req.body;
+    if (!token || !new_password) return res.status(400).json({ error: '缺少参数' });
+    if (new_password.length < 6) return res.status(400).json({ error: '密码至少6位' });
+
+    const row = db.prepare(
+      'SELECT * FROM password_reset_tokens WHERE token = ? AND used = 0 AND expires_at > datetime(?)'
+    ).get(token, new Date().toISOString());
+
+    if (!row) return res.status(400).json({ error: '链接无效或已过期，请重新申请' });
+
+    // Update password
+    const newHash = hashPassword(new_password);
+    db.prepare('UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?').run(newHash, row.user_id);
+
+    // Mark token as used
+    db.prepare('UPDATE password_reset_tokens SET used = 1 WHERE id = ?').run(row.id);
+
+    // Clear all sessions for this user (force re-login)
+    db.prepare('DELETE FROM sessions WHERE user_id = ?').run(row.user_id);
+
     res.json({ ok: true });
   });
 

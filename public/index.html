@@ -77,6 +77,9 @@
               </div>
             </div>
             <button class="btn btn-primary btn-block" id="btn-login">登录</button>
+            <div style="text-align:center;margin-top:8px;">
+              <a href="#" id="link-forgot-password" style="font-size:13px;color:var(--text-secondary);text-decoration:none;">忘记密码？</a>
+            </div>
             <div class="auth-hint">
               <svg width="14" height="14" viewBox="0 0 20 20" fill="none" style="vertical-align:-2px;margin-right:4px"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 9v5M10 6.5v.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
               演示账号: admin@company.com / admin123
@@ -159,6 +162,59 @@
             <button class="btn btn-primary btn-block" id="btn-first-password">确认设置密码</button>
           </div>
           <div class="auth-error" id="auth-error-first-login"></div>
+        </div>
+
+        <!-- FORGOT PASSWORD PAGE -->
+        <div class="auth-view" id="view-forgot-password">
+          <div class="auth-card-header">
+            <h1>忘记密码</h1>
+            <p>输入您的注册邮箱，我们将发送密码重置链接</p>
+          </div>
+          <div class="auth-form">
+            <div class="form-group">
+              <label>邮箱地址</label>
+              <div class="input-with-icon">
+                <svg class="input-icon" width="18" height="18" viewBox="0 0 20 20" fill="none"><rect x="2" y="4" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M2 6l8 5 8-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <input type="email" id="forgot-email" class="text-input" placeholder="请输入注册时使用的邮箱">
+              </div>
+            </div>
+            <button class="btn btn-primary btn-block" id="btn-forgot-password">发送重置链接</button>
+          </div>
+          <div class="auth-error" id="auth-error-forgot"></div>
+          <div class="auth-success" id="auth-success-forgot" style="display:none;color:#10B981;text-align:center;font-size:14px;margin-top:16px;"></div>
+          <div class="auth-switch">
+            <a href="#" id="link-forgot-to-login">返回登录</a>
+          </div>
+        </div>
+
+        <!-- RESET PASSWORD PAGE (from email link) -->
+        <div class="auth-view" id="view-reset-password">
+          <div class="auth-card-header">
+            <h1>重置密码</h1>
+            <p>请设置您的新密码</p>
+          </div>
+          <div id="reset-email-hint" style="text-align:center;font-size:13px;color:var(--text-secondary);margin-bottom:16px;"></div>
+          <div class="auth-form">
+            <div class="form-group">
+              <label>新密码</label>
+              <div class="input-with-icon">
+                <svg class="input-icon" width="18" height="18" viewBox="0 0 20 20" fill="none"><rect x="4" y="9" width="12" height="9" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M7 9V6a3 3 0 016 0v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                <input type="password" id="reset-new-password" class="text-input" placeholder="请设置新密码（至少6位）">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>确认新密码</label>
+              <div class="input-with-icon">
+                <svg class="input-icon" width="18" height="18" viewBox="0 0 20 20" fill="none"><rect x="4" y="9" width="12" height="9" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M7 9V6a3 3 0 016 0v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                <input type="password" id="reset-confirm-password" class="text-input" placeholder="再次输入新密码">
+              </div>
+            </div>
+            <button class="btn btn-primary btn-block" id="btn-reset-password">确认重置密码</button>
+          </div>
+          <div class="auth-error" id="auth-error-reset"></div>
+          <div class="auth-switch">
+            <a href="#" id="link-reset-to-login">返回登录</a>
+          </div>
         </div>
 
         <div class="auth-footer">

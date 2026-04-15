@@ -246,6 +246,22 @@ function migrate(db) {
   if (!projCols3.find(c => c.name === 'created_by')) {
     db.exec('ALTER TABLE projects ADD COLUMN created_by INTEGER DEFAULT NULL');
   }
+
+  // Create password_reset_tokens table for forgot-password flow
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      token TEXT UNIQUE NOT NULL,
+      expires_at TEXT NOT NULL,
+      used INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  try {
+    db.exec('CREATE INDEX IF NOT EXISTS idx_prt_token ON password_reset_tokens(token)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_prt_user ON password_reset_tokens(user_id)');
+  } catch (_) {}
 }
 
 function seedDemoData(db) {

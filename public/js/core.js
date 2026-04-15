@@ -327,13 +327,23 @@ function showAuthView(view) {
   document.getElementById('view-register').classList.toggle('active', view === 'register');
   var firstLogin = document.getElementById('view-first-login');
   if (firstLogin) firstLogin.classList.toggle('active', view === 'first-login');
+  var forgotPw = document.getElementById('view-forgot-password');
+  if (forgotPw) forgotPw.classList.toggle('active', view === 'forgot-password');
+  var resetPw = document.getElementById('view-reset-password');
+  if (resetPw) resetPw.classList.toggle('active', view === 'reset-password');
   // Clear errors on switch
   var errLogin = document.getElementById('auth-error-login');
   var errReg = document.getElementById('auth-error-register');
   var errFirst = document.getElementById('auth-error-first-login');
+  var errForgot = document.getElementById('auth-error-forgot');
+  var errReset = document.getElementById('auth-error-reset');
+  var successForgot = document.getElementById('auth-success-forgot');
   if (errLogin) errLogin.textContent = '';
   if (errReg) errReg.textContent = '';
   if (errFirst) errFirst.textContent = '';
+  if (errForgot) errForgot.textContent = '';
+  if (errReset) errReset.textContent = '';
+  if (successForgot) { successForgot.textContent = ''; successForgot.style.display = 'none'; }
 }
 
 function initAuthSwitchLinks() {
@@ -351,11 +361,41 @@ function initAuthSwitchLinks() {
       showAuthView('login');
     });
   }
+  // Forgot password links
+  var forgotLink = document.getElementById('link-forgot-password');
+  if (forgotLink) {
+    forgotLink.addEventListener('click', function (e) {
+      e.preventDefault();
+      showAuthView('forgot-password');
+    });
+  }
+  var forgotToLogin = document.getElementById('link-forgot-to-login');
+  if (forgotToLogin) {
+    forgotToLogin.addEventListener('click', function (e) {
+      e.preventDefault();
+      showAuthView('login');
+    });
+  }
+  var resetToLogin = document.getElementById('link-reset-to-login');
+  if (resetToLogin) {
+    resetToLogin.addEventListener('click', function (e) {
+      e.preventDefault();
+      window.location.hash = '';
+      showAuthView('login');
+    });
+  }
 }
 
 // --------------- Login / Register Handlers ---------------
 function showAuthError(msg, view) {
-  var id = view === 'register' ? 'auth-error-register' : 'auth-error-login';
+  var idMap = {
+    login: 'auth-error-login',
+    register: 'auth-error-register',
+    'first-login': 'auth-error-first-login',
+    forgot: 'auth-error-forgot',
+    reset: 'auth-error-reset'
+  };
+  var id = idMap[view] || 'auth-error-login';
   var el = document.getElementById(id);
   if (el) el.textContent = msg;
 }
@@ -677,12 +717,141 @@ function initFirstLoginHandler() {
 }
 
 // --------------- Init ---------------
+// --------------- Forgot Password Handler ---------------
+function initForgotPasswordHandler() {
+  var btn = document.getElementById('btn-forgot-password');
+  if (!btn) return;
+  btn.addEventListener('click', async function () {
+    var errEl = document.getElementById('auth-error-forgot');
+    var successEl = document.getElementById('auth-success-forgot');
+    if (errEl) errEl.textContent = '';
+    if (successEl) { successEl.textContent = ''; successEl.style.display = 'none'; }
+
+    var email = document.getElementById('forgot-email').value.trim();
+    if (!email) {
+      if (errEl) errEl.textContent = '请输入邮箱地址';
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = '发送中...';
+    try {
+      var data = await api('/api/auth/forgot-password', {
+        method: 'POST',
+        body: { email: email }
+      });
+      if (successEl) {
+        successEl.textContent = '重置链接已发送到您的邮箱，请查收（30分钟内有效）';
+        successEl.style.display = 'block';
+      }
+      btn.textContent = '已发送';
+    } catch (err) {
+      if (errEl) errEl.textContent = err.message || '发送失败，请稍后重试';
+      btn.disabled = false;
+      btn.textContent = '发送重置链接';
+    }
+  });
+}
+
+// --------------- Reset Password Handler ---------------
+function initResetPasswordHandler() {
+  var btn = document.getElementById('btn-reset-password');
+  if (!btn) return;
+  btn.addEventListener('click', async function () {
+    var errEl = document.getElementById('auth-error-reset');
+    if (errEl) errEl.textContent = '';
+
+    var newPw = document.getElementById('reset-new-password').value;
+    var confirmPw = document.getElementById('reset-confirm-password').value;
+    if (!newPw || newPw.length < 6) {
+      if (errEl) errEl.textContent = '密码至少6位';
+      return;
+    }
+    if (newPw !== confirmPw) {
+      if (errEl) errEl.textContent = '两次输入的密码不一致';
+      return;
+    }
+
+    // Get token from URL hash
+    var hash = window.location.hash;
+    var match = hash.match(/token=([^&]+)/);
+    var token = match ? match[1] : '';
+    if (!token) {
+      if (errEl) errEl.textContent = '无效的重置链接';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = '重置中...';
+    try {
+      await api('/api/auth/reset-password', {
+        method: 'POST',
+        body: { token: token, new_password: newPw }
+      });
+      // Show success and redirect to login
+      if (errEl) { errEl.style.color = '#10B981'; errEl.textContent = '密码重置成功，正在跳转登录...'; }
+      window.location.hash = '';
+      setTimeout(function () {
+        if (errEl) { errEl.style.color = ''; errEl.textContent = ''; }
+        showAuthView('login');
+      }, 2000);
+    } catch (err) {
+      if (errEl) errEl.textContent = err.message || '重置失败';
+      btn.disabled = false;
+      btn.textContent = '确认重置密码';
+    }
+  });
+}
+
+// --------------- Hash Route Handler ---------------
+function handleHashRoute() {
+  var hash = window.location.hash;
+  // Handle #reset-password?token=xxx
+  if (hash.indexOf('#reset-password') === 0) {
+    var match = hash.match(/token=([^&]+)/);
+    if (match) {
+      var token = match[1];
+      // Show auth page and reset view
+      document.getElementById('auth-page').style.display = 'flex';
+      document.getElementById('main-app').style.display = 'none';
+      showAuthView('reset-password');
+      // Verify token
+      api('/api/auth/reset-password/' + token).then(function (data) {
+        var hint = document.getElementById('reset-email-hint');
+        if (hint && data.email) {
+          hint.textContent = '重置账号：' + data.email;
+        }
+      }).catch(function (err) {
+        var errEl = document.getElementById('auth-error-reset');
+        if (errEl) errEl.textContent = err.message || '链接无效或已过期';
+        var btn = document.getElementById('btn-reset-password');
+        if (btn) btn.disabled = true;
+      });
+      return true;
+    }
+  }
+  // Handle #register?invite=xxx&email=xxx
+  if (hash.indexOf('#register') === 0) {
+    var emailMatch = hash.match(/email=([^&]+)/);
+    document.getElementById('auth-page').style.display = 'flex';
+    document.getElementById('main-app').style.display = 'none';
+    showAuthView('register');
+    if (emailMatch) {
+      var emailField = document.getElementById('reg-email');
+      if (emailField) emailField.value = decodeURIComponent(emailMatch[1]);
+    }
+    return true;
+  }
+  return false;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   initAuthSwitchLinks();
   initLoginHandler();
   initRegisterHandler();
   initLogoutHandler();
   initFirstLoginHandler();
+  initForgotPasswordHandler();
+  initResetPasswordHandler();
   initNavigation();
   initSidebarUserMenu();
 
@@ -700,6 +869,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Attempt session restore
-  restoreSession();
+  // Check hash route first (e.g. #reset-password?token=xxx)
+  if (!handleHashRoute()) {
+    // Attempt session restore only if no special hash route
+    restoreSession();
+  }
 });
