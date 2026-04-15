@@ -657,6 +657,21 @@ module.exports = function(db) {
     sseBroadcast(req.user?.enterprise_id, 'schedule-change', { action: 'leave-batch' }, req.user?.id);
   });
 
+  router.put('/leave/:id', (req, res) => {
+    const { type, notes, date } = req.body;
+    const existing = db.prepare('SELECT * FROM leave_entries WHERE id = ?').get(req.params.id);
+    if (!existing) return res.status(404).json({ error: '休假记录不存在' });
+
+    const newType = type || existing.type;
+    const newNotes = notes !== undefined ? notes : existing.notes;
+    const newDate = date || existing.date;
+
+    db.prepare('UPDATE leave_entries SET type = ?, notes = ?, date = ? WHERE id = ?')
+      .run(newType, newNotes, newDate, req.params.id);
+    res.json({ ok: true });
+    sseBroadcast(req.user?.enterprise_id, 'schedule-change', { action: 'leave-update' }, req.user?.id);
+  });
+
   router.delete('/leave/:id', (req, res) => {
     db.prepare('DELETE FROM leave_entries WHERE id = ?').run(req.params.id);
     res.json({ ok: true });

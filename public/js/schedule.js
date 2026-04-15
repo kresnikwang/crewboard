@@ -171,14 +171,14 @@
       });
     });
 
-    /* attach click on leave blocks for deletion */
+    /* attach click on leave blocks for editing */
     document.querySelectorAll('.leave-block[data-leave-id], .m-leave[data-leave-id]').forEach(function (el) {
       el.addEventListener('click', function (e) {
         e.stopPropagation();
         var leaveId = parseInt(el.dataset.leaveId, 10);
         var leaveEntry = _allLeave.find(function (l) { return l.id === leaveId; });
         if (leaveEntry) {
-          showDeleteLeaveConfirm(leaveEntry);
+          showEditLeaveModal(leaveEntry);
         }
       });
     });
@@ -2116,28 +2116,106 @@
   };
 
   /* --------------------------------------------------
-     8. Delete leave confirm
+     8. Edit leave modal
      -------------------------------------------------- */
-  function showDeleteLeaveConfirm(leaveEntry) {
+  function showEditLeaveModal(leaveEntry) {
     if (!canBookForResource(leaveEntry.resource_id)) {
       toast('您没有管理此人休假的权限', 'error');
       return;
     }
-    var label = getLeaveLabel(leaveEntry.type);
-    var body = '<p style="font-size:14px;margin-bottom:8px">' +
-      '确定要删除 <strong>' + esc(leaveEntry.resource_name || '') + '</strong> 在 ' +
-      leaveEntry.date + ' 的' + label + '记录吗？</p>';
-    if (leaveEntry.notes) {
-      body += '<p style="font-size:13px;color:var(--text-secondary)">备注: ' + esc(leaveEntry.notes) + '</p>';
-    }
-    var footer = '<button class="btn btn-outline" onclick="closeModal()">取消</button>' +
-      '<button class="btn btn-danger" onclick="window._deleteLeave(' + leaveEntry.id + ')">删除</button>';
-    showModal('删除休假', body, footer);
+
+    var leaveTypes = [
+      { key: 'vacation', label: '年假', cls: '' },
+      { key: 'sick', label: '病假', cls: 'sick' },
+      { key: 'personal', label: '事假', cls: 'personal' },
+      { key: 'holiday', label: '法定假期', cls: 'holiday' },
+      { key: 'other', label: '其他', cls: 'other' }
+    ];
+
+    var typeBtns = leaveTypes.map(function (t) {
+      var activeCls = (leaveEntry.type === t.key) ? ' active' : '';
+      return '<button class="bk-leave-type ' + t.cls + activeCls + '" data-type="' + t.key + '">' + t.label + '</button>';
+    }).join('');
+
+    var body =
+      '<div class="bk-field">' +
+        '<svg class="bk-field-icon" viewBox="0 0 20 20" fill="none"><path d="M10 2a8 8 0 100 16 8 8 0 000-16z" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="14" r="0.5" fill="currentColor"/></svg>' +
+        '<div class="bk-field-body">' +
+          '<div class="bk-field-label">人员</div>' +
+          '<div style="font-size:14px;font-weight:500">' + esc(leaveEntry.resource_name || '') + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="bk-field">' +
+        '<svg class="bk-field-icon" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' +
+        '<div class="bk-field-body">' +
+          '<div class="bk-field-label">日期</div>' +
+          '<input type="date" id="edit-leave-date" class="text-input" value="' + leaveEntry.date + '">' +
+        '</div>' +
+      '</div>' +
+      '<div class="bk-separator"></div>' +
+      '<div class="bk-field">' +
+        '<svg class="bk-field-icon" viewBox="0 0 20 20" fill="none"><rect x="2" y="3" width="16" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M2 7h16" stroke="currentColor" stroke-width="1.5"/><path d="M7 11l2 2 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+        '<div class="bk-field-body">' +
+          '<div class="bk-field-label">休假类型</div>' +
+          '<div class="bk-leave-types" id="edit-leave-types">' + typeBtns + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="bk-separator"></div>' +
+      '<div class="bk-field">' +
+        '<svg class="bk-field-icon" viewBox="0 0 20 20" fill="none"><path d="M4 4h12M4 8h12M4 12h8M4 16h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' +
+        '<div class="bk-field-body">' +
+          '<div class="bk-field-label">备注</div>' +
+          '<textarea id="edit-leave-notes" class="text-input" rows="2" placeholder="可选备注..." style="resize:vertical">' + esc(leaveEntry.notes || '') + '</textarea>' +
+        '</div>' +
+      '</div>';
+
+    var footer =
+      '<button class="btn btn-danger bk-footer-left" onclick="window._deleteLeave(' + leaveEntry.id + ')">删除休假</button>' +
+      '<button class="btn btn-outline" onclick="closeModal()">取消</button>' +
+      '<button class="btn btn-primary" onclick="window._saveLeave(' + leaveEntry.id + ')">保存更改</button>';
+
+    showModal('编辑休假', body, footer);
+    document.getElementById('modal').classList.add('bk-modal');
+
+    /* Init leave type toggle within the edit modal */
+    document.querySelectorAll('#edit-leave-types .bk-leave-type').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        document.querySelectorAll('#edit-leave-types .bk-leave-type').forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+      });
+    });
   }
 
+  window._saveLeave = async function (id) {
+    var activeType = document.querySelector('#edit-leave-types .bk-leave-type.active');
+    var leaveType = activeType ? activeType.dataset.type : 'vacation';
+    var notes = document.getElementById('edit-leave-notes').value;
+    var date = document.getElementById('edit-leave-date').value;
+
+    if (!date) {
+      toast('请选择日期', 'error');
+      return;
+    }
+
+    try {
+      await api('/api/leave/' + id, {
+        method: 'PUT',
+        body: { type: leaveType, notes: notes, date: date }
+      });
+      document.getElementById('modal').classList.remove('bk-modal');
+      closeModal();
+      toast('休假已更新', 'success');
+      reloadAfterMutation();
+    } catch (err) {
+      toast(err.message || '更新失败', 'error');
+    }
+  };
+
   window._deleteLeave = async function (id) {
+    if (!confirm('确定要删除这条休假记录吗？')) return;
     try {
       await api('/api/leave/' + id, { method: 'DELETE' });
+      document.getElementById('modal').classList.remove('bk-modal');
       closeModal();
       toast('休假已删除', 'success');
       reloadAfterMutation();
