@@ -430,7 +430,7 @@
         }
         if (showText) {
           html += '<span class="booking-hours">' + b.hours + 'h</span> ' +
-            '<span class="booking-project">' + esc(truncate(b.project_name, 25)) + '</span>';
+            '<span class="booking-project" title="' + escAttr(b.project_name + (b.client_name ? ' (' + b.client_name + ')' : '')) + '">' + esc(truncate(b.project_name, 25)) + '</span>';
         }
         if (!si || si.cls === 'span-e') {
           html += '<div class="resize-handle"></div>';
@@ -1367,7 +1367,7 @@
         }
         if (showText) {
           html += '<span class="m-booking-hours">' + b.hours + 'h</span> ' +
-            esc(truncate(b.project_name, 25));
+            '<span class="booking-project" title="' + escAttr(b.project_name + (b.client_name ? ' (' + b.client_name + ')' : '')) + '">' + esc(truncate(b.project_name, 25)) + '</span>';
         }
         if (!si || si.cls === 'span-e') {
           html += '<div class="resize-handle"></div>';
