@@ -254,11 +254,13 @@ module.exports = function(db) {
     /* Bookings with joined names */
     const bookings = db.prepare(`
       SELECT b.*, r.name as resource_name, r.color as resource_color, r.team,
-             p.name as project_name, COALESCE(c.color, p.color) as project_color, c.name as client_name
+             p.name as project_name, COALESCE(c.color, p.color) as project_color, c.name as client_name,
+             u.name as created_by_name
       FROM bookings b
       JOIN resources r ON b.resource_id = r.id
       JOIN projects p ON b.project_id = p.id
       LEFT JOIN clients c ON p.client_id = c.id
+      LEFT JOIN users u ON b.created_by = u.id
       WHERE r.enterprise_id = ? AND b.date >= ? AND b.date <= ?
       ORDER BY r.name, b.date
     `).all(entId, start, end);
@@ -310,11 +312,13 @@ module.exports = function(db) {
     const { start, end, resource_id } = req.query;
     let sql = `
       SELECT b.*, r.name as resource_name, r.color as resource_color, r.team,
-             p.name as project_name, COALESCE(c.color, p.color) as project_color, c.name as client_name
+             p.name as project_name, COALESCE(c.color, p.color) as project_color, c.name as client_name,
+             u.name as created_by_name
       FROM bookings b
       JOIN resources r ON b.resource_id = r.id
       JOIN projects p ON b.project_id = p.id
       LEFT JOIN clients c ON p.client_id = c.id
+      LEFT JOIN users u ON b.created_by = u.id
       WHERE 1=1
     `;
     const params = [];

@@ -1490,6 +1490,7 @@
         buildTentativeField(tentChecked) +
         '<div class="bk-separator"></div>' +
         buildNotesField(notesVal) +
+        (booking ? buildCreatedByField(booking.created_by_name, booking.created_at) : '') +
       '</div>' +
       /* ---- TIME OFF TAB ---- */
       '<div class="bk-tab-content" id="bk-tab-timeoff">' +
@@ -1780,6 +1781,25 @@
         '<textarea id="' + id + '" class="text-input" rows="2" placeholder="可选备注..." style="resize:vertical">' + esc(val) + '</textarea>' +
       '</div>' +
     '</div>';
+  }
+
+  /* ---- Created by field (read-only, shown in edit mode) ---- */
+  function buildCreatedByField(creatorName, createdAt) {
+    if (!creatorName && !createdAt) return '';
+    var info = '';
+    if (creatorName) info += esc(creatorName);
+    if (createdAt) {
+      var d = createdAt.replace('T', ' ').substring(0, 16);
+      info += (info ? '，' : '') + d;
+    }
+    return '<div class="bk-separator"></div>' +
+      '<div class="bk-field">' +
+        '<svg class="bk-field-icon" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="7" r="3.5" stroke="currentColor" stroke-width="1.5"/><path d="M3 17.5c0-3.5 3.1-5.5 7-5.5s7 2 7 5.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' +
+        '<div class="bk-field-body">' +
+          '<div class="bk-field-label">预定人</div>' +
+          '<div style="font-size:13px;color:var(--text-secondary)">' + info + '</div>' +
+        '</div>' +
+      '</div>';
   }
 
   /* ---- Init tab switching ---- */
