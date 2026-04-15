@@ -2,6 +2,7 @@ const express = require('express');
 const ExcelJS = require('exceljs');
 const { holidays, getHoliday, isWorkingDay } = require('../db/holidays');
 const { notifyAll } = require('./webhook');
+const { notifyBookingCreated, notifyBookingUpdated, notifyBookingDeleted, getDepartmentUsers } = require('../utils/wecom');
 const router = express.Router();
 
 // --------------- SSE Connection Pool ---------------
@@ -366,6 +367,8 @@ module.exports = function(db) {
     if (enterpriseId && r && p) {
       const rangeStr = startDate === endDate ? startDate : `${startDate} ~ ${endDate}`;
       notifyAll(db, enterpriseId, `新排程: ${r.name} 在 ${rangeStr} 被安排到「${p.name}」${bookHours}h/天`);
+      // WeCom individual notification
+      notifyBookingCreated(db, resource_id, p.name, startDate, endDate, bookHours, req.user?.name);
     }
     res.json({ ids, id: ids[0] });
     sseBroadcast(req.user?.enterprise_id, 'schedule-change', { action: 'create', ids }, req.user?.id);
@@ -387,6 +390,7 @@ module.exports = function(db) {
     const enterpriseId = req.user?.enterprise_id;
     if (enterpriseId && r && p) {
       notifyAll(db, enterpriseId, `排程变更: ${r.name} 在 ${date}「${p.name}」已更新为${hours}小时`);
+      notifyBookingUpdated(db, resource_id, p.name, date, hours, req.user?.name);
     }
     res.json({ ok: true });
     sseBroadcast(req.user?.enterprise_id, 'schedule-change', { action: 'update', id: +req.params.id }, req.user?.id);
@@ -404,6 +408,7 @@ module.exports = function(db) {
     const enterpriseId = req.user?.enterprise_id;
     if (enterpriseId && booking) {
       notifyAll(db, enterpriseId, `排程取消: ${booking.rname} 在 ${booking.date}「${booking.pname}」的安排已取消`);
+      notifyBookingDeleted(db, booking.resource_id, booking.pname, booking.date, req.user?.name);
     }
     res.json({ ok: true });
     sseBroadcast(req.user?.enterprise_id, 'schedule-change', { action: 'delete', id: +req.params.id }, req.user?.id);
@@ -680,6 +685,56 @@ module.exports = function(db) {
     db.prepare('DELETE FROM leave_entries WHERE id = ?').run(req.params.id);
     res.json({ ok: true });
     sseBroadcast(req.user?.enterprise_id, 'schedule-change', { action: 'leave-delete' }, req.user?.id);
+  });
+
+  // === WECOM SYNC ===
+
+  // Fetch WeCom department users and auto-match by name
+  router.post('/wecom/sync', async (req, res) => {
+    if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
+    if (req.user.role !== 'admin') return res.status(403).json({ error: '仅管理员可操作' });
+
+    const wecomUsers = await getDepartmentUsers(1); // root department
+    if (wecomUsers.length === 0) {
+      return res.status(500).json({ error: '无法获取企业微信通讯录，请检查配置' });
+    }
+
+    const resources = db.prepare('SELECT id, name, email FROM resources WHERE enterprise_id = ? AND is_active = 1').all(req.user.enterprise_id);
+    const matched = [];
+    const unmatched = [];
+
+    const update = db.prepare('UPDATE resources SET wecom_userid = ? WHERE id = ?');
+    const tx = db.transaction(() => {
+      resources.forEach(r => {
+        // Match by exact name
+        const found = wecomUsers.find(wu => wu.name === r.name);
+        if (found) {
+          update.run(found.userid, r.id);
+          matched.push({ resource: r.name, wecom_userid: found.userid });
+        } else {
+          unmatched.push({ resource: r.name, id: r.id });
+        }
+      });
+    });
+    tx();
+
+    res.json({
+      ok: true,
+      matched,
+      unmatched,
+      wecom_users: wecomUsers.map(u => ({ userid: u.userid, name: u.name }))
+    });
+  });
+
+  // Manually set wecom_userid for a resource
+  router.put('/resources/:id/wecom', (req, res) => {
+    if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
+    if (req.user.role !== 'admin') return res.status(403).json({ error: '仅管理员可操作' });
+
+    const { wecom_userid } = req.body;
+    db.prepare('UPDATE resources SET wecom_userid = ? WHERE id = ? AND enterprise_id = ?')
+      .run(wecom_userid || '', req.params.id, req.user.enterprise_id);
+    res.json({ ok: true });
   });
 
   // === EXCEL EXPORT ===

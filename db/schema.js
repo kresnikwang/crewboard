@@ -262,6 +262,12 @@ function migrate(db) {
     db.exec('CREATE INDEX IF NOT EXISTS idx_prt_token ON password_reset_tokens(token)');
     db.exec('CREATE INDEX IF NOT EXISTS idx_prt_user ON password_reset_tokens(user_id)');
   } catch (_) {}
+
+  // Add wecom_userid column to resources table for WeChat Work notifications
+  const resCols = db.prepare('PRAGMA table_info(resources)').all();
+  if (!resCols.find(c => c.name === 'wecom_userid')) {
+    db.exec("ALTER TABLE resources ADD COLUMN wecom_userid TEXT DEFAULT ''");
+  }
 }
 
 function seedDemoData(db) {
