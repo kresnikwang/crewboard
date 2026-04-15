@@ -137,38 +137,27 @@ function notifyBookingCreated(db, resourceId, projectName, startDate, endDate, h
   const rangeStr = startDate === endDate ? startDate : `${startDate} ~ ${endDate}`;
   const days = startDate === endDate ? 1 : Math.ceil((new Date(endDate) - new Date(startDate)) / 86400000) + 1;
 
-  const desc = `<div class="gray">${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</div>` +
-    `<div class="normal">项目：${projectName}</div>` +
-    `<div class="normal">时间：${rangeStr}（${days}天）</div>` +
-    `<div class="normal">工时：${hours}h/天</div>` +
-    `<div class="normal">安排人：${bookerName || '未知'}</div>`;
+  const content = `📋 排班通知\n请查收您的工作安排更新：\n  项目：${projectName}\n  时间：${rangeStr}（${days}天）\n  工时：${hours}h/天\n  安排人：${bookerName || '未知'}`;
 
-  sendCardMessage(resource.wecom_userid, '📋 新排班通知', desc).catch(() => {});
+  sendTextMessage(resource.wecom_userid, content).catch(() => {});
 }
 
 function notifyBookingUpdated(db, resourceId, projectName, date, hours, bookerName) {
   const resource = db.prepare('SELECT wecom_userid, name FROM resources WHERE id = ?').get(resourceId);
   if (!resource || !resource.wecom_userid) return;
 
-  const desc = `<div class="gray">${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</div>` +
-    `<div class="normal">项目：${projectName}</div>` +
-    `<div class="normal">日期：${date}</div>` +
-    `<div class="normal">工时：${hours}h</div>` +
-    `<div class="normal">操作人：${bookerName || '未知'}</div>`;
+  const content = `✏️ 排班变更通知\n您的工作安排已更新：\n  项目：${projectName}\n  日期：${date}\n  工时：${hours}h\n  操作人：${bookerName || '未知'}`;
 
-  sendCardMessage(resource.wecom_userid, '✏️ 排班变更通知', desc).catch(() => {});
+  sendTextMessage(resource.wecom_userid, content).catch(() => {});
 }
 
 function notifyBookingDeleted(db, resourceId, projectName, date, bookerName) {
   const resource = db.prepare('SELECT wecom_userid, name FROM resources WHERE id = ?').get(resourceId);
   if (!resource || !resource.wecom_userid) return;
 
-  const desc = `<div class="gray">${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</div>` +
-    `<div class="normal">项目：${projectName}</div>` +
-    `<div class="normal">日期：${date}</div>` +
-    `<div class="normal">操作人：${bookerName || '未知'}</div>`;
+  const content = `🗑️ 排班取消通知\n您的以下工作安排已取消：\n  项目：${projectName}\n  日期：${date}\n  操作人：${bookerName || '未知'}`;
 
-  sendCardMessage(resource.wecom_userid, '🗑️ 排班取消通知', desc).catch(() => {});
+  sendTextMessage(resource.wecom_userid, content).catch(() => {});
 }
 
 module.exports = {
