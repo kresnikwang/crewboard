@@ -19,7 +19,7 @@ window.loadResources = async function loadResources() {
   try {
     state.resources = await api('/api/resources'); // 已包含 JOIN 后的账号字段
   } catch (err) {
-    toast('加载人员失败: ' + err.message, 'error');
+    toast(t('manage.load_failed') + ': ' + err.message, 'error');
     return;
   }
 
@@ -28,7 +28,7 @@ window.loadResources = async function loadResources() {
 
   var teams = {};
   state.resources.forEach(function (r) {
-    var team = r.team || '未分组';
+    var team = r.team || t('manage.ungrouped');
     if (!teams[team]) teams[team] = [];
     teams[team].push(r);
   });
@@ -37,19 +37,19 @@ window.loadResources = async function loadResources() {
   var canManage = !!perms.manage_resources;  // admin
   var currentUserId = state.user && state.user.id;
 
-  var roleLabels = { admin: '管理员', manager: '经理', basic: '基础用户', owner: '管理员', member: '基础用户' };
+  var roleLabels = { admin: t('manage.admin'), manager: t('manage.manager'), basic: t('manage.basic_user'), owner: t('manage.admin'), member: t('manage.basic_user') };
   var roleBadgeClass = { admin: 'role-admin', manager: 'role-manager', basic: 'role-basic', owner: 'role-admin', member: 'role-basic' };
 
   // 列数：人员 / 职位 / 邮箱 / 手机 / 工时/天 / 系统权限 / 账号状态 [/ 操作]
   var colCount = canManage ? 8 : 7;
   var html = '<table class="res-table"><thead><tr>' +
-    '<th style="width:28%">人员</th>' +
-    '<th>职位</th>' +
-    '<th>邮箱</th>' +
-    '<th style="width:100px">手机</th>' +
-    '<th style="width:72px">工时/天</th>' +
-    '<th style="width:90px">系统权限</th>' +
-    '<th style="width:80px">账号状态</th>' +
+    '<th style="width:28%">' + t('schedule.resource') + '</th>' +
+    '<th>' + t('manage.position') + '</th>' +
+    '<th>' + t('common.email') + '</th>' +
+    '<th style="width:100px">' + t('common.phone') + '</th>' +
+    '<th style="width:72px">' + t('manage.hours_day') + '</th>' +
+    '<th style="width:90px">' + t('manage.permissions') + '</th>' +
+    '<th style="width:80px">' + t('manage.account_status') + '</th>' +
     (canManage ? '<th style="width:60px"></th>' : '') +
   '</tr></thead><tbody>';
 
@@ -70,9 +70,9 @@ window.loadResources = async function loadResources() {
       if (hasAccount && effectiveRole) {
         if (canManage && r.user_id !== currentUserId) {
           permCell = '<select class="text-input res-role-select" data-user-id="' + r.user_id + '" style="width:84px;font-size:12px;padding:3px 6px">' +
-            '<option value="basic"'  + (effectiveRole === 'basic'   ? ' selected' : '') + '>基础用户</option>' +
-            '<option value="manager"'+ (effectiveRole === 'manager' ? ' selected' : '') + '>经理</option>' +
-            '<option value="admin"'  + (effectiveRole === 'admin'   ? ' selected' : '') + '>管理员</option>' +
+            '<option value="basic"'  + (effectiveRole === 'basic'   ? ' selected' : '') + '>' + t('manage.basic_user') + '</option>' +
+            '<option value="manager"'+ (effectiveRole === 'manager' ? ' selected' : '') + '>' + t('manage.manager') + '</option>' +
+            '<option value="admin"'  + (effectiveRole === 'admin'   ? ' selected' : '') + '>' + t('manage.admin') + '</option>' +
           '</select>';
         } else {
           permCell = '<span class="role-badge ' + (roleBadgeClass[effectiveRole] || 'role-basic') + '">' + (roleLabels[effectiveRole] || effectiveRole) + '</span>';
@@ -81,8 +81,8 @@ window.loadResources = async function loadResources() {
 
       // 账号状态列
       var accountCell = hasAccount
-        ? '<span class="account-linked" title="已注册系统账号">&#10003; 已关联</span>'
-        : '<span class="account-unlinked" title="尚未注册系统账号">— 未注册</span>';
+        ? '<span class="account-linked" title="' + t('manage.linked') + '">&#10003; ' + t('manage.linked') + '</span>'
+        : '<span class="account-unlinked" title="' + t('manage.unregistered') + '">— ' + t('manage.unregistered') + '</span>';
 
       html += '<tr data-id="' + r.id + '">' +
         '<td><div class="res-name-cell">' +
@@ -97,8 +97,8 @@ window.loadResources = async function loadResources() {
         '<td>' + permCell + '</td>' +
         '<td>' + accountCell + '</td>' +
         (canManage ? '<td><div class="res-actions">' +
-          '<button class="btn-icon btn-res-edit" data-id="' + r.id + '" title="编辑">&#9998;</button>' +
-          '<button class="btn-icon btn-res-del" data-id="' + r.id + '" title="删除">&#10005;</button>' +
+          '<button class="btn-icon btn-res-edit" data-id="' + r.id + '" title="' + t('common.edit') + '">&#9998;</button>' +
+          '<button class="btn-icon btn-res-del" data-id="' + r.id + '" title="' + t('common.delete') + '">&#10005;</button>' +
         '</div></td>' : '') +
       '</tr>';
     });
@@ -106,7 +106,7 @@ window.loadResources = async function loadResources() {
 
   html += '</tbody></table>';
   if (state.resources.length === 0) {
-    html = '<div class="empty-hint">暂无人员，点击上方按钮添加</div>';
+    html = '<div class="empty-hint">' + t('manage.no_resources') + '</div>';
   }
   container.innerHTML = html;
 
@@ -118,9 +118,9 @@ window.loadResources = async function loadResources() {
       var newRole = sel.value;
       try {
         await api('/api/auth/enterprises/members/' + userId + '/role', { method: 'PUT', body: { role: newRole } });
-        toast('权限已更新');
+        toast(t('manage.permission_updated'));
       } catch (err) {
-        toast(err.message || '更新失败', 'error');
+        toast(err.message || t('common.save_failed'), 'error');
         loadResources();
       }
     });
@@ -161,22 +161,22 @@ window.loadResources = async function loadResources() {
 window.showResourceModal = function showResourceModal(id) {
   var resource = null;
   if (id) resource = state.resources.find(function (r) { return r.id === id; });
-  var title = resource ? '编辑人员' : '添加人员';
+  var title = resource ? t('manage.edit_resource_title') : t('manage.add_resource_title');
 
   var body = '<div class="rg-form" style="padding:0 24px">' +
     /* Name */
     '<div class="rg-field">' +
       '<div class="rg-field-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="7" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M3 18c0-3.3 2.7-6 7-6s7 2.7 7 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>' +
       '<div class="rg-field-body">' +
-        '<label class="rg-label">姓名 <span style="color:#EF4444">*</span></label>' +
-        '<input class="rg-input" type="text" id="res-name" value="' + escapeAttr(resource ? resource.name : '') + '" placeholder="输入姓名">' +
+        '<label class="rg-label">' + t('common.name') + ' <span style="color:#EF4444">*</span></label>' +
+        '<input class="rg-input" type="text" id="res-name" value="' + escapeAttr(resource ? resource.name : '') + '" placeholder="' + t('manage.input_name') + '">' +
       '</div>' +
     '</div>' +
     /* Color */
     '<div class="rg-field">' +
       '<div class="rg-field-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="10" r="3" fill="currentColor" opacity=".3"/></svg></div>' +
       '<div class="rg-field-body">' +
-        '<label class="rg-label">标识颜色</label>' +
+        '<label class="rg-label">' + t('manage.color_label') + '</label>' +
         buildColorDropdownHtml(resource && resource.color ? resource.color : '#4F46E5', 'rg-color-value') +
       '</div>' +
     '</div>' +
@@ -184,15 +184,15 @@ window.showResourceModal = function showResourceModal(id) {
     '<div class="rg-field">' +
       '<div class="rg-field-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="4" width="16" height="13" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M7 4V2h6v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>' +
       '<div class="rg-field-body">' +
-        '<label class="rg-label">角色 / 职位</label>' +
-        '<input class="rg-input" type="text" id="res-role" value="' + escapeAttr(resource ? resource.role : '') + '" placeholder="如：前端开发">' +
+        '<label class="rg-label">' + t('manage.position_label') + '</label>' +
+        '<input class="rg-input" type="text" id="res-role" value="' + escapeAttr(resource ? resource.role : '') + '" placeholder="' + t('manage.position_placeholder') + '">' +
       '</div>' +
     '</div>' +
     /* Email */
     '<div class="rg-field">' +
       '<div class="rg-field-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="4" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M2 6l8 5 8-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>' +
       '<div class="rg-field-body">' +
-        '<label class="rg-label">邮箱</label>' +
+        '<label class="rg-label">' + t('common.email') + '</label>' +
         '<input class="rg-input" type="email" id="res-email" value="' + escapeAttr(resource ? resource.email : '') + '" placeholder="name@company.com">' +
       '</div>' +
     '</div>' +
@@ -200,15 +200,15 @@ window.showResourceModal = function showResourceModal(id) {
     '<div class="rg-field">' +
       '<div class="rg-field-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="7" cy="7" r="2.5" stroke="currentColor" stroke-width="1.5"/><circle cx="13" cy="7" r="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M1 17c0-2.5 2-4.5 5-4.5h1M14 12.5c3 0 5 2 5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>' +
       '<div class="rg-field-body">' +
-        '<label class="rg-label">组别</label>' +
-        '<input class="rg-input" type="text" id="res-team" value="' + escapeAttr(resource ? resource.team : '') + '" placeholder="如：开发组">' +
+        '<label class="rg-label">' + t('manage.team_label') + '</label>' +
+        '<input class="rg-input" type="text" id="res-team" value="' + escapeAttr(resource ? resource.team : '') + '" placeholder="' + t('manage.team_placeholder') + '">' +
       '</div>' +
     '</div>' +
     /* Hours per day */
     '<div class="rg-field">' +
       '<div class="rg-field-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>' +
       '<div class="rg-field-body">' +
-        '<label class="rg-label">工时/天</label>' +
+        '<label class="rg-label">' + t('manage.hours_day') + '</label>' +
         '<input class="rg-input" type="number" id="res-hours" min="0" max="24" step="0.5" value="' + (resource && resource.hours_per_day != null ? resource.hours_per_day : 8) + '" style="width:100px">' +
       '</div>' +
     '</div>' +
@@ -216,10 +216,10 @@ window.showResourceModal = function showResourceModal(id) {
 
   var footer = '';
   if (id) {
-    footer += '<button class="btn btn-danger bk-footer-left" id="btn-del-resource">删除人员</button>';
+    footer += '<button class="btn btn-danger bk-footer-left" id="btn-del-resource">' + t('manage.delete_resource') + '</button>';
   }
-  footer += '<button class="btn btn-outline" onclick="closeModal()">取消</button>';
-  footer += '<button class="btn btn-primary" id="btn-save-resource">保存</button>';
+  footer += '<button class="btn btn-outline" onclick="closeModal()">' + t('common.cancel') + '</button>';
+  footer += '<button class="btn btn-primary" id="btn-save-resource">' + t('common.save') + '</button>';
 
   showModal(title, body, footer);
   document.getElementById('modal').classList.add('rg-modal');
@@ -237,7 +237,7 @@ window.showResourceModal = function showResourceModal(id) {
 
 window.saveResource = async function saveResource(id) {
   var name = document.getElementById('res-name').value.trim();
-  if (!name) { toast('请输入姓名', 'error'); return; }
+  if (!name) { toast(t('manage.enter_name'), 'error'); return; }
   var colorEl = document.getElementById('rg-color-value');
   var payload = {
     name: name,
@@ -248,60 +248,60 @@ window.saveResource = async function saveResource(id) {
     hours_per_day: parseFloat(document.getElementById('res-hours').value) || 8,
   };
   try {
-    if (id) { await api('/api/resources/' + id, { method: 'PUT', body: payload }); toast('人员已更新'); }
-    else { await api('/api/resources', { method: 'POST', body: payload }); toast('人员已添加'); }
+    if (id) { await api('/api/resources/' + id, { method: 'PUT', body: payload }); toast(t('manage.resource_updated')); }
+    else { await api('/api/resources', { method: 'POST', body: payload }); toast(t('manage.resource_added')); }
     document.getElementById('modal').classList.remove('rg-modal');
     closeModal(); loadResources();
-  } catch (err) { toast('保存失败: ' + err.message, 'error'); }
+  } catch (err) { toast(t('common.save_failed') + ': ' + err.message, 'error'); }
 };
 
 window.deleteResource = async function deleteResource(id) {
-  if (!confirm('确定要删除该人员吗？')) return;
+  if (!confirm(t('manage.confirm_delete_resource'))) return;
   try {
     await api('/api/resources/' + id, { method: 'DELETE' });
-    toast('人员已删除');
+    toast(t('manage.resource_deleted'));
     document.getElementById('modal').classList.remove('rg-modal');
     closeModal();
     loadResources();
-  } catch (err) { toast('删除失败: ' + err.message, 'error'); }
+  } catch (err) { toast(t('common.delete_failed') + ': ' + err.message, 'error'); }
 };
-
-// ===================== Projects & Clients =====================
 
 var pcActiveTab = 'projects';
 var pcSearchQuery = '';
 
-// Color palette for dropdowns
-var COLOR_PALETTE = [
-  /* Row 1 — 鲜明主色 */
-  { value: '#EF4444', label: '红色' },
-  { value: '#F97316', label: '橙色' },
-  { value: '#F59E0B', label: '琥珀' },
-  { value: '#84CC16', label: '黄绿' },
-  { value: '#22C55E', label: '翠绿' },
-  { value: '#06B6D4', label: '青色' },
-  /* Row 2 — 蓝紫粉 */
-  { value: '#3B82F6', label: '蓝色' },
-  { value: '#6366F1', label: '蓝紫' },
-  { value: '#8B5CF6', label: '紫色' },
-  { value: '#EC4899', label: '粉色' },
-  { value: '#78716C', label: '灰色' },
-  { value: '#1E293B', label: '墨黑' },
-  /* Row 3 — 深色系 */
-  { value: '#991B1B', label: '深红' },
-  { value: '#9A3412', label: '棕色' },
-  { value: '#92400E', label: '深棕' },
-  { value: '#166534', label: '深绿' },
-  { value: '#115E59', label: '深青' },
-  { value: '#1E40AF', label: '深蓝' },
-  /* Row 4 — 浅色/柔和色系 */
-  { value: '#FB7185', label: '浅红' },
-  { value: '#FDBA74', label: '杏色' },
-  { value: '#FDE047', label: '柠檬黄' },
-  { value: '#86EFAC', label: '薄荷绿' },
-  { value: '#7DD3FC', label: '天蓝' },
-  { value: '#C084FC', label: '淡紫' },
-];
+// Color palette for dropdowns - function to support i18n
+function getColorPalette() {
+  return [
+    /* Row 1 */
+    { value: '#EF4444', label: t('color.red') },
+    { value: '#F97316', label: t('color.orange') },
+    { value: '#F59E0B', label: t('color.amber') },
+    { value: '#84CC16', label: t('color.yellow_green') },
+    { value: '#22C55E', label: t('color.emerald') },
+    { value: '#06B6D4', label: t('color.cyan') },
+    /* Row 2 */
+    { value: '#3B82F6', label: t('color.blue') },
+    { value: '#6366F1', label: t('color.blue_purple') },
+    { value: '#8B5CF6', label: t('color.purple') },
+    { value: '#EC4899', label: t('color.pink') },
+    { value: '#78716C', label: t('color.gray') },
+    { value: '#1E293B', label: t('color.ink_black') },
+    /* Row 3 */
+    { value: '#991B1B', label: t('color.deep_red') },
+    { value: '#9A3412', label: t('color.brown') },
+    { value: '#92400E', label: t('color.dark_brown') },
+    { value: '#166534', label: t('color.dark_green') },
+    { value: '#115E59', label: t('color.dark_cyan') },
+    { value: '#1E40AF', label: t('color.dark_blue') },
+    /* Row 4 */
+    { value: '#FB7185', label: t('color.light_red') },
+    { value: '#FDBA74', label: t('color.apricot') },
+    { value: '#FDE047', label: t('color.lemon') },
+    { value: '#86EFAC', label: t('color.mint') },
+    { value: '#7DD3FC', label: t('color.sky_blue') },
+    { value: '#C084FC', label: t('color.light_purple') },
+  ];
+}
 
 function buildColorDropdownHtml(selectedColor, inputId) {
   var html = '<div class="rg-color-picker" id="' + inputId + '-picker">';
@@ -311,7 +311,7 @@ function buildColorDropdownHtml(selectedColor, inputId) {
   html += '</button>';
   html += '<input type="hidden" id="' + inputId + '" value="' + (selectedColor || '#8B5CF6') + '">';
   html += '<div class="rg-color-dropdown" id="' + inputId + '-dropdown">';
-  COLOR_PALETTE.forEach(function (c) {
+  getColorPalette().forEach(function (c) {
     var active = c.value === (selectedColor || '#8B5CF6') ? ' active' : '';
     html += '<span class="rg-color-option' + active + '" data-color="' + c.value + '" style="background:' + c.value + '" title="' + c.label + '"></span>';
   });
@@ -355,7 +355,7 @@ window.loadProjects = async function loadProjects() {
     state.archivedProjects = results[2];
     state.archivedClients = results[3];
   } catch (err) {
-    toast('加载失败: ' + err.message, 'error');
+    toast(t('manage.load_failed') + ': ' + err.message, 'error');
     return;
   }
   renderPCPage();
@@ -389,10 +389,10 @@ function renderPCPage() {
   var tabProjects = document.getElementById('tab-projects');
   var tabClients = document.getElementById('tab-clients');
   var tabArchived = document.getElementById('tab-archived');
-  if (tabProjects) tabProjects.textContent = '项目 (' + state.projects.length + ')';
-  if (tabClients) tabClients.textContent = '客户 (' + state.clients.length + ')';
+  if (tabProjects) tabProjects.textContent = t('manage.projects_tab') + ' (' + state.projects.length + ')';
+  if (tabClients) tabClients.textContent = t('manage.clients_tab') + ' (' + state.clients.length + ')';
   var archivedTotal = (state.archivedProjects ? state.archivedProjects.length : 0) + (state.archivedClients ? state.archivedClients.length : 0);
-  if (tabArchived) tabArchived.textContent = '存档' + (archivedTotal ? ' (' + archivedTotal + ')' : '');
+  if (tabArchived) tabArchived.textContent = t('manage.archive_tab') + (archivedTotal ? ' (' + archivedTotal + ')' : '');
 
   // Hide "新建" button on archived tab
   var btnNew = document.getElementById('btn-add-new-pc');
@@ -423,7 +423,7 @@ function renderProjectsTable(container) {
   });
 
   if (filtered.length === 0) {
-    container.innerHTML = '<div class="empty-hint">' + (query ? '没有匹配的项目' : '暂无项目，点击"新建"添加') + '</div>';
+    container.innerHTML = '<div class="empty-hint">' + (query ? t('manage.no_match_projects') : t('manage.no_projects')) + '</div>';
     return;
   }
 
@@ -431,11 +431,11 @@ function renderProjectsTable(container) {
   table.className = 'pc-table';
   table.innerHTML =
     '<thead><tr>' +
-      '<th class="col-name">项目名称</th>' +
-      '<th class="col-client">客户</th>' +
-      '<th class="col-code">项目编号</th>' +
-      '<th class="col-dates">周期</th>' +
-      '<th class="col-billable">计费</th>' +
+      '<th class="col-name">' + t('manage.project_name') + '</th>' +
+      '<th class="col-client">' + t('common.client') + '</th>' +
+      '<th class="col-code">' + t('manage.project_code') + '</th>' +
+      '<th class="col-dates">' + t('manage.period') + '</th>' +
+      '<th class="col-billable">' + t('manage.billing') + '</th>' +
       '<th class="col-actions"></th>' +
     '</tr></thead>';
 
@@ -459,8 +459,8 @@ function renderProjectsTable(container) {
       '<td class="col-dates">' + escapeHtml(dateRange) + '</td>' +
       '<td class="col-billable">' + (p.billable ? 'Yes' : 'No') + '</td>' +
       (canManagePC ? '<td class="col-actions">' +
-        '<button class="btn-icon btn-edit" title="编辑">&#9998;</button>' +
-        '<button class="btn-icon btn-archive" title="存档">&#128451;</button>' +
+        '<button class="btn-icon btn-edit" title="' + t('common.edit') + '">&#9998;</button>' +
+        '<button class="btn-icon btn-archive" title="' + t('common.archive') + '">&#128451;</button>' +
       '</td>' : '<td></td>');
     if (canManagePC) {
       tr.querySelector('.btn-edit').addEventListener('click', function (e) {
@@ -490,7 +490,7 @@ function renderClientsTable(container) {
   });
 
   if (filtered.length === 0) {
-    container.innerHTML = '<div class="empty-hint">' + (query ? '没有匹配的客户' : '暂无客户，点击"新建"添加') + '</div>';
+    container.innerHTML = '<div class="empty-hint">' + (query ? t('manage.no_match_clients') : t('manage.no_clients')) + '</div>';
     return;
   }
 
@@ -498,9 +498,9 @@ function renderClientsTable(container) {
   table.className = 'pc-table';
   table.innerHTML =
     '<thead><tr>' +
-      '<th class="col-name">客户名称</th>' +
-      '<th class="col-projects">关联项目</th>' +
-      '<th class="col-details">备注</th>' +
+      '<th class="col-name">' + t('manage.client_name') + '</th>' +
+      '<th class="col-projects">' + t('manage.linked_projects') + '</th>' +
+      '<th class="col-details">' + t('common.notes') + '</th>' +
       '<th class="col-actions"></th>' +
     '</tr></thead>';
 
@@ -516,11 +516,11 @@ function renderClientsTable(container) {
           '<span class="pc-name-text">' + escapeHtml(c.name) + '</span>' +
         '</div>' +
       '</td>' +
-      '<td class="col-projects">' + projectCount + ' 个项目</td>' +
+      '<td class="col-projects">' + projectCount + '</td>' +
       '<td class="col-details">' + escapeHtml(c.details || '') + '</td>' +
       (canManageClient ? '<td class="col-actions">' +
-        '<button class="btn-icon btn-edit" title="编辑">&#9998;</button>' +
-        '<button class="btn-icon btn-archive" title="存档">&#128451;</button>' +
+        '<button class="btn-icon btn-edit" title="' + t('common.edit') + '">&#9998;</button>' +
+        '<button class="btn-icon btn-archive" title="' + t('common.archive') + '">&#128451;</button>' +
       '</td>' : '<td></td>');
     if (canManageClient) {
       tr.querySelector('.btn-edit').addEventListener('click', function (e) {
@@ -544,7 +544,7 @@ window.showClientModal = function showClientModal(id) {
   var client = null;
   if (id) client = state.clients.find(function (c) { return c.id === id; });
   var isEdit = !!client;
-  var title = isEdit ? '编辑客户' : '新建客户';
+  var title = isEdit ? t('manage.edit_client') : t('manage.new_client');
 
   var colorVal = client && client.color ? client.color : '#6366F1';
 
@@ -552,7 +552,7 @@ window.showClientModal = function showClientModal(id) {
     '<div class="rg-form">' +
       '<div class="rg-field">' +
         '<div class="rg-field-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="4" width="16" height="13" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M7 4V2h6v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>' +
-        '<div class="rg-field-body"><input type="text" id="client-name" class="rg-input rg-input-lg" placeholder="客户名称" value="' + escapeAttr(client ? client.name : '') + '"></div>' +
+        '<div class="rg-field-body"><input type="text" id="client-name" class="rg-input rg-input-lg" placeholder="' + t('manage.client_name') + '" value="' + escapeAttr(client ? client.name : '') + '"></div>' +
       '</div>' +
       '<div class="rg-field">' +
         '<div class="rg-field-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 17c0-3 3-5 7-5s7 2 7 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="7" r="3" stroke="currentColor" stroke-width="1.5"/></svg></div>' +
@@ -560,19 +560,19 @@ window.showClientModal = function showClientModal(id) {
       '</div>' +
       '<div class="rg-field">' +
         '<div class="rg-field-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 5h12M4 10h12M4 15h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>' +
-        '<div class="rg-field-body"><textarea id="client-details" class="rg-textarea" placeholder="备注" rows="3">' + escapeHtml(client ? client.details || '' : '') + '</textarea></div>' +
+        '<div class="rg-field-body"><textarea id="client-details" class="rg-textarea" placeholder="' + t('common.notes') + '" rows="3">' + escapeHtml(client ? client.details || '' : '') + '</textarea></div>' +
       '</div>' +
     '</div>';
 
   var footer = '';
   if (isEdit) {
     footer = '<div class="bk-footer-left">' +
-      '<button class="btn btn-warning btn-sm" id="btn-archive-client-modal">存档客户</button>' +
-      '<button class="btn btn-danger btn-sm" id="btn-delete-client-modal" style="margin-left:8px">删除客户</button>' +
+      '<button class="btn btn-warning btn-sm" id="btn-archive-client-modal">' + t('manage.archive_client') + '</button>' +
+      '<button class="btn btn-danger btn-sm" id="btn-delete-client-modal" style="margin-left:8px">' + t('manage.delete_client') + '</button>' +
     '</div>';
   }
-  footer += '<button class="btn btn-outline" id="btn-cancel-client">取消</button>';
-  footer += '<button class="btn btn-primary" id="btn-save-client">' + (isEdit ? '保存修改' : '创建客户') + '</button>';
+  footer += '<button class="btn btn-outline" id="btn-cancel-client">' + t('common.cancel') + '</button>';
+  footer += '<button class="btn btn-primary" id="btn-save-client">' + (isEdit ? t('common.save') : t('manage.create_client')) + '</button>';
 
   showModal(title, body, footer);
   document.getElementById('modal').classList.add('rg-modal');
@@ -595,26 +595,26 @@ window.showClientModal = function showClientModal(id) {
 
 window.saveClient = async function saveClient(id) {
   var name = document.getElementById('client-name').value.trim();
-  if (!name) { toast('请输入客户名称', 'error'); return; }
+  if (!name) { toast(t('manage.enter_client_name'), 'error'); return; }
   var payload = {
     name: name,
     color: document.getElementById('client-color').value,
     details: document.getElementById('client-details').value.trim(),
   };
   try {
-    if (id) { await api('/api/clients/' + id, { method: 'PUT', body: payload }); toast('客户已更新'); }
-    else { await api('/api/clients', { method: 'POST', body: payload }); toast('客户创建成功'); }
+    if (id) { await api('/api/clients/' + id, { method: 'PUT', body: payload }); toast(t('manage.client_updated')); }
+    else { await api('/api/clients', { method: 'POST', body: payload }); toast(t('manage.client_created')); }
     closeModal(); loadProjects();
-  } catch (err) { toast('保存失败: ' + err.message, 'error'); }
+  } catch (err) { toast(t('common.save_failed') + ': ' + err.message, 'error'); }
 };
 
 window.deleteClient = async function deleteClient(id) {
   var projectCount = state.projects.filter(function (p) { return p.client_id === id; }).length;
-  var msg = '确定要删除该客户吗？';
-  if (projectCount > 0) msg += '\n该客户下有 ' + projectCount + ' 个关联项目。';
+  var msg = t('manage.confirm_delete_client');
+  if (projectCount > 0) msg += '\n' + projectCount + ' ' + t('manage.linked_projects') + '.';
   if (!confirm(msg)) return;
-  try { await api('/api/clients/' + id, { method: 'DELETE' }); toast('客户已删除'); loadProjects(); }
-  catch (err) { toast('删除失败: ' + err.message, 'error'); }
+  try { await api('/api/clients/' + id, { method: 'DELETE' }); toast(t('manage.client_deleted')); loadProjects(); }
+  catch (err) { toast(t('common.delete_failed') + ': ' + err.message, 'error'); }
 };
 
 // --------------- Project Modal (ResourceGuru style) ---------------
@@ -626,11 +626,11 @@ window.showProjectModal = async function showProjectModal(id) {
   var project = null;
   if (id) project = state.projects.find(function (p) { return p.id === id; });
   var isEdit = !!project;
-  var title = isEdit ? '编辑项目' : '新建项目';
+  var title = isEdit ? t('manage.edit_project') : t('manage.new_project');
 
   var billableChecked = project ? !!project.billable : true;
 
-  var clientOptions = '<option value="">选择客户</option>';
+  var clientOptions = '<option value="">' + t('manage.select_client') + '</option>';
   state.clients.forEach(function (c) {
     var sel = project && project.client_id === c.id ? ' selected' : '';
     clientOptions += '<option value="' + c.id + '"' + sel + '>' + escapeHtml(c.name) + '</option>';
@@ -641,12 +641,12 @@ window.showProjectModal = async function showProjectModal(id) {
       /* Name */
       '<div class="rg-field">' +
         '<div class="rg-field-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M2 5a2 2 0 012-2h4l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V5z" stroke="currentColor" stroke-width="1.5"/></svg></div>' +
-        '<div class="rg-field-body"><input type="text" id="proj-name" class="rg-input rg-input-lg" placeholder="项目名称" value="' + escapeAttr(project ? project.name : '') + '"></div>' +
+        '<div class="rg-field-body"><input type="text" id="proj-name" class="rg-input rg-input-lg" placeholder="' + t('manage.project_name') + '" value="' + escapeAttr(project ? project.name : '') + '"></div>' +
       '</div>' +
       /* Project Code */
       '<div class="rg-field">' +
         '<div class="rg-field-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><text x="4" y="15" font-size="14" font-weight="bold" fill="currentColor" opacity=".7">#</text></svg></div>' +
-        '<div class="rg-field-body"><input type="text" id="proj-code" class="rg-input" placeholder="项目编号" value="' + escapeAttr(project ? project.code || '' : '') + '"></div>' +
+        '<div class="rg-field-body"><input type="text" id="proj-code" class="rg-input" placeholder="' + t('manage.project_code') + '" value="' + escapeAttr(project ? project.code || '' : '') + '"></div>' +
       '</div>' +
       /* Client */
       '<div class="rg-field">' +
@@ -666,25 +666,25 @@ window.showProjectModal = async function showProjectModal(id) {
       '<div class="rg-field">' +
         '<div class="rg-field-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><text x="5" y="15" font-size="15" font-weight="bold" fill="currentColor" opacity=".7">¥</text></svg></div>' +
         '<div class="rg-field-body">' +
-          '<label class="bk-toggle"><input type="checkbox" id="proj-billable"' + (billableChecked ? ' checked' : '') + '><span class="bk-toggle-track"></span><span class="bk-toggle-label">计费项目 (Billable)</span></label>' +
+          '<label class="bk-toggle"><input type="checkbox" id="proj-billable"' + (billableChecked ? ' checked' : '') + '><span class="bk-toggle-track"></span><span class="bk-toggle-label">' + t('manage.billable') + '</span></label>' +
         '</div>' +
       '</div>' +
       /* Details */
       '<div class="rg-field">' +
         '<div class="rg-field-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 5h12M4 10h12M4 15h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>' +
-        '<div class="rg-field-body"><textarea id="proj-details" class="rg-textarea" placeholder="项目备注" rows="3">' + escapeHtml(project ? project.details || '' : '') + '</textarea></div>' +
+        '<div class="rg-field-body"><textarea id="proj-details" class="rg-textarea" placeholder="' + t('manage.project_notes') + '" rows="3">' + escapeHtml(project ? project.details || '' : '') + '</textarea></div>' +
       '</div>' +
     '</div>';
 
   var footer = '';
   if (isEdit) {
     footer = '<div class="bk-footer-left">' +
-      '<button class="btn btn-warning btn-sm" id="btn-archive-proj-modal">存档项目</button>' +
-      '<button class="btn btn-danger btn-sm" id="btn-delete-proj-modal" style="margin-left:8px">删除项目</button>' +
+      '<button class="btn btn-warning btn-sm" id="btn-archive-proj-modal">' + t('manage.archive_project') + '</button>' +
+      '<button class="btn btn-danger btn-sm" id="btn-delete-proj-modal" style="margin-left:8px">' + t('manage.delete_project') + '</button>' +
     '</div>';
   }
-  footer += '<button class="btn btn-outline" id="btn-cancel-project">取消</button>';
-  footer += '<button class="btn btn-primary" id="btn-save-project">' + (isEdit ? '保存修改' : '创建项目') + '</button>';
+  footer += '<button class="btn btn-outline" id="btn-cancel-project">' + t('common.cancel') + '</button>';
+  footer += '<button class="btn btn-primary" id="btn-save-project">' + (isEdit ? t('common.save') : t('manage.create_project')) + '</button>';
 
   showModal(title, body, footer);
   document.getElementById('modal').classList.add('rg-modal');
@@ -705,7 +705,7 @@ window.showProjectModal = async function showProjectModal(id) {
 
 window.saveProject = async function saveProject(id) {
   var name = document.getElementById('proj-name').value.trim();
-  if (!name) { toast('请输入项目名称', 'error'); return; }
+  if (!name) { toast(t('manage.enter_project_name'), 'error'); return; }
 
   var clientId = document.getElementById('proj-client').value;
   /* Derive color from selected client */
@@ -728,45 +728,45 @@ window.saveProject = async function saveProject(id) {
   };
 
   try {
-    if (id) { await api('/api/projects/' + id, { method: 'PUT', body: payload }); toast('项目已更新'); }
-    else { await api('/api/projects', { method: 'POST', body: payload }); toast('项目创建成功'); }
+    if (id) { await api('/api/projects/' + id, { method: 'PUT', body: payload }); toast(t('manage.project_updated')); }
+    else { await api('/api/projects', { method: 'POST', body: payload }); toast(t('manage.project_created')); }
     closeModal(); loadProjects();
-  } catch (err) { toast('保存失败: ' + err.message, 'error'); }
+  } catch (err) { toast(t('common.save_failed') + ': ' + err.message, 'error'); }
 };
 
 window.deleteProject = async function deleteProject(id) {
-  if (!confirm('确定要永久删除该项目吗？删除后将无法恢复。')) return;
-  try { await api('/api/projects/' + id, { method: 'DELETE' }); toast('项目已删除'); loadProjects(); }
-  catch (err) { toast('删除失败: ' + err.message, 'error'); }
+  if (!confirm(t('manage.confirm_delete_project'))) return;
+  try { await api('/api/projects/' + id, { method: 'DELETE' }); toast(t('manage.project_deleted')); loadProjects(); }
+  catch (err) { toast(t('common.delete_failed') + ': ' + err.message, 'error'); }
 };
 
 // --------------- Archive / Unarchive ---------------
 window.archiveProject = async function archiveProject(id) {
   var p = state.projects.find(function (p) { return p.id === id; });
-  if (!confirm('确定要存档项目"' + (p ? p.name : '') + '"吗？\n存档后将不在项目列表中显示，可在"存档"页面恢复。')) return;
-  try { await api('/api/projects/' + id + '/archive', { method: 'PATCH' }); toast('项目已存档'); loadProjects(); }
-  catch (err) { toast('存档失败: ' + err.message, 'error'); }
+  if (!confirm(t('manage.archive_project') + ' "' + (p ? p.name : '') + '"?')) return;
+  try { await api('/api/projects/' + id + '/archive', { method: 'PATCH' }); toast(t('manage.project_archived')); loadProjects(); }
+  catch (err) { toast(t('manage.archive_failed') + ': ' + err.message, 'error'); }
 };
 
 window.unarchiveProject = async function unarchiveProject(id) {
-  try { await api('/api/projects/' + id + '/unarchive', { method: 'PATCH' }); toast('项目已恢复'); loadProjects(); }
-  catch (err) { toast('恢复失败: ' + err.message, 'error'); }
+  try { await api('/api/projects/' + id + '/unarchive', { method: 'PATCH' }); toast(t('manage.project_restored')); loadProjects(); }
+  catch (err) { toast(t('manage.restore_failed') + ': ' + err.message, 'error'); }
 };
 
 window.archiveClient = async function archiveClient(id) {
   var c = state.clients.find(function (c) { return c.id === id; });
   var projectCount = state.projects.filter(function (p) { return p.client_id === id; }).length;
-  var msg = '确定要存档客户"' + (c ? c.name : '') + '"吗？';
-  if (projectCount > 0) msg += '\n该客户下的 ' + projectCount + ' 个关联项目也将一并存档。';
-  msg += '\n可在"存档"页面恢复。';
+  var msg = t('manage.archive_client') + ' "' + (c ? c.name : '') + '"?';
+  if (projectCount > 0) msg += '\n' + projectCount + ' linked projects will also be archived.';
+  msg += '\n' + t('common.restore') + '?';
   if (!confirm(msg)) return;
-  try { await api('/api/clients/' + id + '/archive', { method: 'PATCH' }); toast('客户已存档'); loadProjects(); }
-  catch (err) { toast('存档失败: ' + err.message, 'error'); }
+  try { await api('/api/clients/' + id + '/archive', { method: 'PATCH' }); toast(t('manage.client_archived')); loadProjects(); }
+  catch (err) { toast(t('manage.archive_failed') + ': ' + err.message, 'error'); }
 };
 
 window.unarchiveClient = async function unarchiveClient(id) {
-  try { await api('/api/clients/' + id + '/unarchive', { method: 'PATCH' }); toast('客户已恢复'); loadProjects(); }
-  catch (err) { toast('恢复失败: ' + err.message, 'error'); }
+  try { await api('/api/clients/' + id + '/unarchive', { method: 'PATCH' }); toast(t('manage.client_restored')); loadProjects(); }
+  catch (err) { toast(t('manage.restore_failed') + ': ' + err.message, 'error'); }
 };
 
 // --------------- Archived Page ---------------
@@ -784,7 +784,7 @@ function renderArchivedPage(container) {
   });
 
   if (!archivedProjects.length && !archivedClients.length) {
-    container.innerHTML = '<div class="empty-hint">' + (query ? '没有匹配的存档项' : '暂无存档项目或客户') + '</div>';
+    container.innerHTML = '<div class="empty-hint">' + (query ? t('manage.no_match_archived') : t('manage.no_archived')) + '</div>';
     return;
   }
 
@@ -793,10 +793,10 @@ function renderArchivedPage(container) {
   // Archived clients section
   if (archivedClients.length) {
     html += '<div class="archive-section">' +
-      '<h3 class="archive-section-title">存档客户 (' + archivedClients.length + ')</h3>' +
+      '<h3 class="archive-section-title">' + t('manage.archive_client') + ' (' + archivedClients.length + ')</h3>' +
       '<table class="pc-table"><thead><tr>' +
-        '<th class="col-name">客户名称</th>' +
-        '<th class="col-details">备注</th>' +
+        '<th class="col-name">' + t('manage.client_name') + '</th>' +
+        '<th class="col-details">' + t('common.notes') + '</th>' +
         '<th class="col-actions"></th>' +
       '</tr></thead><tbody>';
     archivedClients.forEach(function (c) {
@@ -804,12 +804,12 @@ function renderArchivedPage(container) {
         '<td class="col-name">' +
           '<span class="pc-color-bar" style="background:' + (c.color || '#6366F1') + ';opacity:.5"></span>' +
           '<span class="pc-name-text">' + escapeHtml(c.name) + '</span>' +
-          '<span class="archive-badge">已存档</span>' +
+          '<span class="archive-badge">' + t('common.archive') + '</span>' +
         '</td>' +
         '<td class="col-details">' + escapeHtml(c.details || '') + '</td>' +
         '<td class="col-actions">' +
-          '<button class="btn btn-sm btn-outline btn-restore" data-type="client" data-id="' + c.id + '">恢复</button>' +
-          '<button class="btn-icon btn-delete" data-type="client" data-id="' + c.id + '" title="永久删除">&#10005;</button>' +
+          '<button class="btn btn-sm btn-outline btn-restore" data-type="client" data-id="' + c.id + '">' + t('common.restore') + '</button>' +
+          '<button class="btn-icon btn-delete" data-type="client" data-id="' + c.id + '" title="' + t('manage.permanent_delete_btn') + '">&#10005;</button>' +
         '</td>' +
       '</tr>';
     });
@@ -819,12 +819,12 @@ function renderArchivedPage(container) {
   // Archived projects section
   if (archivedProjects.length) {
     html += '<div class="archive-section">' +
-      '<h3 class="archive-section-title">存档项目 (' + archivedProjects.length + ')</h3>' +
+      '<h3 class="archive-section-title">' + t('manage.archive_project') + ' (' + archivedProjects.length + ')</h3>' +
       '<table class="pc-table"><thead><tr>' +
-        '<th class="col-name">项目名称</th>' +
-        '<th class="col-client">客户</th>' +
-        '<th class="col-code">项目编号</th>' +
-        '<th class="col-dates">周期</th>' +
+        '<th class="col-name">' + t('manage.project_name') + '</th>' +
+        '<th class="col-client">' + t('common.client') + '</th>' +
+        '<th class="col-code">' + t('manage.project_code') + '</th>' +
+        '<th class="col-dates">' + t('manage.period') + '</th>' +
         '<th class="col-actions"></th>' +
       '</tr></thead><tbody>';
     archivedProjects.forEach(function (p) {
@@ -836,14 +836,14 @@ function renderArchivedPage(container) {
         '<td class="col-name">' +
           '<span class="pc-color-bar" style="background:' + (p.color || '#8B5CF6') + ';opacity:.5"></span>' +
           '<span class="pc-name-text">' + escapeHtml(p.name) + '</span>' +
-          '<span class="archive-badge">已存档</span>' +
+          '<span class="archive-badge">' + t('common.archive') + '</span>' +
         '</td>' +
         '<td class="col-client">' + escapeHtml(p.client_name || '') + '</td>' +
         '<td class="col-code">' + escapeHtml(p.code || '') + '</td>' +
         '<td class="col-dates">' + escapeHtml(dateRange) + '</td>' +
         '<td class="col-actions">' +
-          '<button class="btn btn-sm btn-outline btn-restore" data-type="project" data-id="' + p.id + '">恢复</button>' +
-          '<button class="btn-icon btn-delete" data-type="project" data-id="' + p.id + '" title="永久删除">&#10005;</button>' +
+          '<button class="btn btn-sm btn-outline btn-restore" data-type="project" data-id="' + p.id + '">' + t('common.restore') + '</button>' +
+          '<button class="btn-icon btn-delete" data-type="project" data-id="' + p.id + '" title="' + t('manage.permanent_delete_btn') + '">&#10005;</button>' +
         '</td>' +
       '</tr>';
     });

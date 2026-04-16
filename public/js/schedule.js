@@ -64,18 +64,18 @@
       var sYear = s.getFullYear(), eYear = e.getFullYear();
       var rangeText;
       if (sYear !== eYear) {
-        rangeText = sYear + '年' + sMonth + '月' + s.getDate() + '日 - ' + eYear + '年' + eMonth + '月' + e.getDate() + '日';
+        rangeText = sYear + t('common.year') + sMonth + t('common.month') + s.getDate() + t('common.day') + ' - ' + eYear + t('common.year') + eMonth + t('common.month') + e.getDate() + t('common.day');
       } else if (sMonth !== eMonth) {
-        rangeText = sMonth + '月' + s.getDate() + '日 - ' + eMonth + '月' + e.getDate() + '日';
+        rangeText = sMonth + t('common.month') + s.getDate() + t('common.day') + ' - ' + eMonth + t('common.month') + e.getDate() + t('common.day');
       } else {
-        rangeText = sMonth + '月' + s.getDate() + '日 - ' + e.getDate() + '日';
+        rangeText = sMonth + t('common.month') + s.getDate() + t('common.day') + ' - ' + e.getDate() + t('common.day');
       }
       rangeEl.textContent = rangeText;
     }
 
     /* Update today button label */
     var todayBtn = document.getElementById('schedule-today');
-    if (todayBtn) todayBtn.textContent = isMonth ? '本月' : '本周';
+    if (todayBtn) todayBtn.textContent = isMonth ? t('schedule.this_month') : t('schedule.this_week');
 
     /* Single aggregated request with SWR caching.
        Returns cached data instantly on view/page switches;
@@ -104,9 +104,9 @@
 
     var teams = {};
     resources.forEach(function (r) {
-      var t = r.team || '未分组';
-      if (!teams[t]) teams[t] = [];
-      teams[t].push(r);
+      var tm = r.team || t('manage.ungrouped');
+      if (!teams[tm]) teams[tm] = [];
+      teams[tm].push(r);
     });
 
     var bMap = {};
@@ -196,7 +196,7 @@
         if (!booking) return;
 
         if (!canBookForResource(booking.resource_id)) {
-          toast('您没有编辑此预订的权限', 'error');
+          toast(t('schedule.no_edit_permission'), 'error');
           return;
         }
 
@@ -217,7 +217,7 @@
         if (!booking) return;
 
         if (!canBookForResource(booking.resource_id)) {
-          toast('您没有编辑此预订的权限', 'error');
+          toast(t('schedule.no_edit_permission'), 'error');
           return;
         }
 
@@ -273,7 +273,7 @@
      Table header builder
      -------------------------------------------------- */
   function buildHeaderHTML(days, hMap) {
-    var html = '<table class="schedule-table"><thead><tr><th>人员</th>';
+    var html = '<table class="schedule-table"><thead><tr><th>' + t('schedule.resource') + '</th>';
     days.forEach(function (d) {
       var cls = [];
       if (isToday(d))   cls.push('today');
@@ -283,7 +283,7 @@
       var holidayHTML = '';
       if (holiday) {
         if (holiday.type === 'workday') {
-          holidayHTML = '<br><span class="holiday-marker workday">调休上班</span>';
+          holidayHTML = '<br><span class="holiday-marker workday">' + t('schedule.leave_makeup') + '</span>';
         } else {
           holidayHTML = '<br><span class="holiday-marker holiday">' + holiday.name + '</span>';
         }
@@ -451,8 +451,8 @@
   }
 
   function getLeaveLabel(type) {
-    var labels = { vacation: '休假', sick: '病假', personal: '事假', holiday: '法定假期', other: '请假' };
-    return labels[type] || '休假';
+    var labels = { vacation: t('schedule.leave_label'), sick: t('schedule.leave_sick'), personal: t('schedule.leave_personal'), holiday: t('schedule.leave_holiday'), other: t('schedule.leave_other') };
+    return labels[type] || t('schedule.leave_label');
   }
 
   /* --------------------------------------------------
@@ -580,16 +580,16 @@
           }
         }
         if (promises.length === 0) {
-          toast('所选范围已有相同预订', 'info');
+          toast(t('schedule.duplicate_booking'), 'info');
           return;
         }
         Promise.all(promises)
           .then(function () {
-            toast('预订已延长 ' + promises.length + ' 天', 'success');
+            toast(t('schedule.booking_extended'), 'success');
             reloadAfterMutation();
           })
           .catch(function (err) {
-            toast('延长失败：' + (err.message || ''), 'error');
+            toast(t('schedule.extend_failed') + (err.message ? ': ' + err.message : ''), 'error');
           });
 
       } else {
@@ -602,18 +602,18 @@
           return idx > currentHoverIndex && idx <= originalIndex;
         });
         if (toDelete.length === 0) {
-          toast('没有可缩短的预订', 'info');
+          toast(t('schedule.booking_shortened'), 'info');
           return;
         }
         Promise.all(toDelete.map(function (b) {
           return api('/api/bookings/' + b.id, { method: 'DELETE' });
         }))
           .then(function () {
-            toast('预订已缩短 ' + toDelete.length + ' 天', 'success');
+          toast(t('schedule.booking_shortened'), 'success');
             reloadAfterMutation();
           })
           .catch(function (err) {
-            toast('缩短失败：' + (err.message || ''), 'error');
+            toast(t('schedule.shorten_failed') + (err.message ? ': ' + err.message : ''), 'error');
           });
       }
     }
@@ -784,16 +784,16 @@
           }
         }
         if (promises.length === 0) {
-          toast('所选范围已有相同预订', 'info');
+          toast(t('schedule.duplicate_booking'), 'info');
           return;
         }
         Promise.all(promises)
           .then(function () {
-            toast('预订已延长 ' + promises.length + ' 天', 'success');
+            toast(t('schedule.booking_extended'), 'success');
             reloadAfterMutation();
           })
           .catch(function (err) {
-            toast('延长失败：' + (err.message || ''), 'error');
+            toast(t('schedule.extend_failed') + (err.message ? ': ' + err.message : ''), 'error');
           });
 
       } else {
@@ -805,18 +805,18 @@
           return idx >= originalIndex && idx < currentHoverIndex;
         });
         if (toDelete.length === 0) {
-          toast('没有可缩短的预订', 'info');
+          toast(t('schedule.booking_shortened'), 'info');
           return;
         }
         Promise.all(toDelete.map(function (b) {
           return api('/api/bookings/' + b.id, { method: 'DELETE' });
         }))
           .then(function () {
-            toast('预订已缩短 ' + toDelete.length + ' 天', 'success');
+          toast(t('schedule.booking_shortened'), 'success');
             reloadAfterMutation();
           })
           .catch(function (err) {
-            toast('缩短失败：' + (err.message || ''), 'error');
+            toast(t('schedule.shorten_failed') + (err.message ? ': ' + err.message : ''), 'error');
           });
       }
     }
@@ -978,7 +978,7 @@
       var newStart = segStartIndex + currentDelta;
       var newEnd   = segEndIndex   + currentDelta;
       if (newStart < 0 || newEnd >= dates.length) {
-        toast('超出当前视图范围，无法移动', 'error');
+        toast(t('schedule.out_of_view'), 'error');
         return;
       }
 
@@ -1009,12 +1009,12 @@
           return Promise.all(createPromises);
         })
         .then(function () {
-          var dir = currentDelta > 0 ? '向后' : '向前';
-          toast('预订已' + dir + '移 ' + Math.abs(currentDelta) + ' 天', 'success');
+          var dir = currentDelta > 0 ? '→' : '←';
+          toast(t('schedule.move') + ' ' + Math.abs(currentDelta) + 'd', 'success');
           reloadAfterMutation();
         })
         .catch(function (err) {
-          toast('移动失败：' + (err.message || ''), 'error');
+          toast(t('schedule.move_failed') + (err.message ? ': ' + err.message : ''), 'error');
           reloadAfterMutation();
         });
     }
@@ -1237,7 +1237,7 @@
 
     /* --- Day header row --- */
     html += '<tr class="m-day-row">';
-    html += '<th class="m-res-hd">人员</th>';
+    html += '<th class="m-res-hd">' + t('schedule.resource') + '</th>';
     days.forEach(function (d, idx) {
       var cls = [];
       if (isToday(d)) cls.push('m-today');
@@ -1437,7 +1437,7 @@
         viewToggle.querySelectorAll('.view-btn').forEach(function (b) { b.classList.remove('active'); });
         btn.classList.add('active');
         /* Update the "today" button label */
-        if (todayBtn) todayBtn.textContent = view === 'month' ? '本月' : '本周';
+        if (todayBtn) todayBtn.textContent = view === 'month' ? t('schedule.this_month') : t('schedule.this_week');
         /* Reset to current week's Monday */
         state.scheduleWeekStart = getMonday(new Date());
         window.loadSchedule();
@@ -1473,7 +1473,7 @@
     else if (!booking && resourceId) preSelectedIds = [resourceId];
 
     /* project select options grouped by client */
-    var projOpts = '<option value="">-- 选择项目 --</option>';
+    var projOpts = '<option value="">' + t('schedule.select_project') + '</option>';
     projOpts += projects.map(function (p) {
       var sel = (booking && booking.project_id == p.id) ? ' selected' : '';
       var clientLabel = p.client_name ? ' (' + esc(p.client_name) + ')' : '';
@@ -1504,16 +1504,16 @@
     /* footer buttons */
     var footer = '';
     if (bookingId) {
-      footer += '<button class="btn btn-danger bk-footer-left" onclick="window.deleteBooking(' + bookingId + ')">删除预订</button>';
+      footer += '<button class="btn btn-danger bk-footer-left" onclick="window.deleteBooking(' + bookingId + ')">' + t('schedule.delete_booking') + '</button>';
     }
-    footer += '<button class="btn btn-outline" onclick="closeModal()">取消</button>';
+    footer += '<button class="btn btn-outline" onclick="closeModal()">' + t('common.cancel') + '</button>';
     if (bookingId) {
-      footer += '<button class="btn btn-primary" onclick="window.saveBooking(' + bookingId + ')">保存更改</button>';
+      footer += '<button class="btn btn-primary" onclick="window.saveBooking(' + bookingId + ')">' + t('schedule.save_changes') + '</button>';
     } else {
-      footer += '<button class="btn btn-primary" id="bk-submit-btn" onclick="window.submitBookingOrLeave()">添加预订</button>';
+      footer += '<button class="btn btn-primary" id="bk-submit-btn" onclick="window.submitBookingOrLeave()">' + t('schedule.add_booking') + '</button>';
     }
 
-    var title = bookingId ? '编辑预订' : '新建';
+    var title = bookingId ? t('schedule.edit_booking') : t('common.create');
     showModal(title, body, footer);
 
     /* Make modal wider */
@@ -1539,10 +1539,10 @@
     return '<div class="bk-tabs">' +
       '<button class="bk-tab active" data-tab="booking">' +
         '<svg width="14" height="14" viewBox="0 0 20 20" fill="none" style="vertical-align:-2px;margin-right:4px"><rect x="2" y="3" width="16" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M2 7h16M6 1v4M14 1v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' +
-        '预订</button>' +
+        t('schedule.add_booking') + '</button>' +
       '<button class="bk-tab" data-tab="timeoff">' +
         '<svg width="14" height="14" viewBox="0 0 20 20" fill="none" style="vertical-align:-2px;margin-right:4px"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M7 7l6 6M13 7l-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' +
-        '休假</button>' +
+        t('schedule.leave_label') + '</button>' +
     '</div>';
   }
 
@@ -1566,14 +1566,14 @@
     /* Build dropdown options grouped by team */
     var teams = {};
     resources.forEach(function (r) {
-      var t = r.team || '未分组';
-      if (!teams[t]) teams[t] = [];
-      teams[t].push(r);
+      var tm = r.team || t('manage.ungrouped');
+      if (!teams[tm]) teams[tm] = [];
+      teams[tm].push(r);
     });
     var optionsHtml = '';
-    Object.keys(teams).forEach(function (t) {
-      optionsHtml += '<div class="ms-team-label">' + esc(t) + '</div>';
-      teams[t].forEach(function (r) {
+    Object.keys(teams).forEach(function (tm) {
+      optionsHtml += '<div class="ms-team-label">' + esc(tm) + '</div>';
+      teams[tm].forEach(function (r) {
         var sel = selIds.indexOf(r.id) >= 0 ? ' selected' : '';
         optionsHtml += '<div class="ms-option' + sel + '" data-id="' + r.id + '">' +
           '<span class="ms-option-check"></span>' +
@@ -1587,11 +1587,11 @@
     return '<div class="bk-field">' +
       '<svg class="bk-field-icon" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="7" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M3 18c0-3.3 2.7-6 7-6s7 2.7 7 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' +
       '<div class="bk-field-body">' +
-        '<div class="bk-field-label">人员（可多选）</div>' +
+        '<div class="bk-field-label">' + t('schedule.staff_multiselect') + '</div>' +
         '<div class="ms-picker" id="' + id + '-picker">' +
           '<div class="ms-selected" id="' + id + '-selected">' +
             chipsHtml +
-            '<input class="ms-search" id="' + id + '-search" placeholder="搜索人员..." autocomplete="off">' +
+            '<input class="ms-search" id="' + id + '-search" placeholder="' + t('schedule.search_resource') + '" autocomplete="off">' +
           '</div>' +
           '<div class="ms-dropdown" id="' + id + '-dropdown">' + optionsHtml + '</div>' +
         '</div>' +
@@ -1694,18 +1694,18 @@
       '<div class="bk-field-body">' +
         '<div class="bk-hours-row">' +
           '<div class="bk-hours-group">' +
-            '<label>小时/天</label>' +
+            '<label>' + t('schedule.hours_per_day') + '</label>' +
             '<input type="number" id="bk-hours" class="text-input" value="' + hoursVal + '" min="0.5" max="24" step="0.5" onchange="window._updateBkTotal()" oninput="window._updateBkTotal()">' +
           '</div>' +
           '<div class="bk-hours-group">' +
-            '<label>分钟</label>' +
+            '<label>' + t('schedule.minutes') + '</label>' +
             '<input type="number" id="bk-mins" class="text-input" value="0" min="0" max="59" step="15" onchange="window._updateBkTotal()" oninput="window._updateBkTotal()">' +
           '</div>' +
         '</div>' +
         '<div class="bk-date-row">' +
-          '<label>从</label>' +
+          '<label>' + t('common.from') + '</label>' +
           '<input type="date" id="bk-date-start" class="text-input" value="' + dateVal + '" onchange="window._updateBkTotal()">' +
-          '<label>至</label>' +
+          '<label>' + t('common.to') + '</label>' +
           '<input type="date" id="bk-date-end" class="text-input" value="' + (isEdit ? dateVal : endDateVal) + '" onchange="window._updateBkTotal()">' +
         '</div>' +
         '<div class="bk-total" id="bk-total"></div>' +
@@ -1719,9 +1719,9 @@
       '<svg class="bk-field-icon" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' +
       '<div class="bk-field-body">' +
         '<div class="bk-date-row">' +
-          '<label>从</label>' +
+          '<label>' + t('common.from') + '</label>' +
           '<input type="date" id="to-date-start" class="text-input" value="' + dateVal + '" onchange="window._updateToTotal()">' +
-          '<label>至</label>' +
+          '<label>' + t('common.to') + '</label>' +
           '<input type="date" id="to-date-end" class="text-input" value="' + endDateVal + '" onchange="window._updateToTotal()">' +
         '</div>' +
         '<div class="bk-total" id="to-total"></div>' +
@@ -1734,7 +1734,7 @@
     return '<div class="bk-field">' +
       '<svg class="bk-field-icon" viewBox="0 0 20 20" fill="none"><path d="M2 5a2 2 0 012-2h4l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V5z" stroke="currentColor" stroke-width="1.5"/></svg>' +
       '<div class="bk-field-body">' +
-        '<div class="bk-field-label">项目 / 客户</div>' +
+        '<div class="bk-field-label">' + t('schedule.project_client') + '</div>' +
         '<select id="bk-project" class="text-input">' + projOpts + '</select>' +
       '</div>' +
     '</div>';
@@ -1748,7 +1748,7 @@
         '<label class="bk-toggle">' +
           '<input type="checkbox" id="bk-tentative"' + (checked ? ' checked' : '') + '>' +
           '<span class="bk-toggle-track"></span>' +
-          '<span class="bk-toggle-label">暂定预订</span>' +
+          '<span class="bk-toggle-label">' + t('schedule.tentative') + '</span>' +
         '</label>' +
       '</div>' +
     '</div>';
@@ -1759,13 +1759,13 @@
     return '<div class="bk-field">' +
       '<svg class="bk-field-icon" viewBox="0 0 20 20" fill="none"><rect x="2" y="3" width="16" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M2 7h16" stroke="currentColor" stroke-width="1.5"/><path d="M7 11l2 2 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
       '<div class="bk-field-body">' +
-        '<div class="bk-field-label">休假类型</div>' +
+        '<div class="bk-field-label">' + t('schedule.leave_type') + '</div>' +
         '<div class="bk-leave-types">' +
-          '<button class="bk-leave-type active" data-type="vacation">年假</button>' +
-          '<button class="bk-leave-type sick" data-type="sick">病假</button>' +
-          '<button class="bk-leave-type personal" data-type="personal">事假</button>' +
-          '<button class="bk-leave-type holiday" data-type="holiday">法定假期</button>' +
-          '<button class="bk-leave-type other" data-type="other">其他</button>' +
+          '<button class="bk-leave-type active" data-type="vacation">' + t('schedule.leave_vacation') + '</button>' +
+          '<button class="bk-leave-type sick" data-type="sick">' + t('schedule.leave_sick') + '</button>' +
+          '<button class="bk-leave-type personal" data-type="personal">' + t('schedule.leave_personal') + '</button>' +
+          '<button class="bk-leave-type holiday" data-type="holiday">' + t('schedule.leave_holiday') + '</button>' +
+          '<button class="bk-leave-type other" data-type="other">' + t('schedule.leave_other') + '</button>' +
         '</div>' +
       '</div>' +
     '</div>';
@@ -1777,8 +1777,8 @@
     return '<div class="bk-field">' +
       '<svg class="bk-field-icon" viewBox="0 0 20 20" fill="none"><path d="M4 4h12M4 8h12M4 12h8M4 16h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' +
       '<div class="bk-field-body">' +
-        '<div class="bk-field-label">备注</div>' +
-        '<textarea id="' + id + '" class="text-input" rows="2" placeholder="可选备注..." style="resize:vertical">' + esc(val) + '</textarea>' +
+        '<div class="bk-field-label">' + t('common.notes') + '</div>' +
+        '<textarea id="' + id + '" class="text-input" rows="2" placeholder="' + t('schedule.optional_notes') + '" style="resize:vertical">' + esc(val) + '</textarea>' +
       '</div>' +
     '</div>';
   }
@@ -1790,13 +1790,13 @@
     if (creatorName) info += esc(creatorName);
     if (createdAt) {
       var d = createdAt.replace('T', ' ').substring(0, 16);
-      info += (info ? '，' : '') + d;
+      info += (info ? ', ' : '') + d;
     }
     return '<div class="bk-separator"></div>' +
       '<div class="bk-field">' +
         '<svg class="bk-field-icon" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="7" r="3.5" stroke="currentColor" stroke-width="1.5"/><path d="M3 17.5c0-3.5 3.1-5.5 7-5.5s7 2 7 5.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' +
         '<div class="bk-field-body">' +
-          '<div class="bk-field-label">预定人</div>' +
+          '<div class="bk-field-label">' + t('schedule.booker') + '</div>' +
           '<div style="font-size:13px;color:var(--text-secondary)">' + info + '</div>' +
         '</div>' +
       '</div>';
@@ -1817,7 +1817,7 @@
         /* Update submit button text */
         var submitBtn = document.getElementById('bk-submit-btn');
         if (submitBtn) {
-          submitBtn.textContent = target === 'timeoff' ? '添加休假' : '添加预订';
+          submitBtn.textContent = target === 'timeoff' ? t('schedule.add_leave') : t('schedule.add_booking');
         }
       });
     });
@@ -1856,7 +1856,7 @@
 
     var el = document.getElementById('bk-total');
     if (el) {
-      el.textContent = '合计: ' + totalH.toFixed(1) + 'h (' + totalDays + '天, ' + totalHPerDay.toFixed(1) + 'h/天)';
+      el.textContent = totalH.toFixed(1) + 'h (' + totalDays + 'd, ' + totalHPerDay.toFixed(1) + 'h/d)';
     }
   };
 
@@ -1872,7 +1872,7 @@
     var totalDays = countAllDays(startEl.value, endEl.value);
     var el = document.getElementById('to-total');
     if (el) {
-      el.textContent = '合计: ' + totalDays + '天';
+      el.textContent = totalDays + 'd';
     }
   };
 
@@ -1922,7 +1922,7 @@
 
     var projectId = parseInt(document.getElementById('bk-project').value, 10);
     if (!projectId) {
-      toast('请选择一个项目', 'error');
+      toast(t('schedule.select_project'), 'error');
       return;
     }
 
@@ -1933,10 +1933,10 @@
         ? getSelectedResourceIds()[0]
         : 0, 10)];
       resourceIds = getSelectedResourceIds();
-      if (resourceIds.length === 0) { toast('请选择人员', 'error'); return; }
+      if (resourceIds.length === 0) { toast(t('schedule.search_resource'), 'error'); return; }
     } else {
       resourceIds = getSelectedResourceIds();
-      if (resourceIds.length === 0) { toast('请选择至少一名人员', 'error'); return; }
+      if (resourceIds.length === 0) { toast(t('schedule.search_resource'), 'error'); return; }
     }
 
     try {
@@ -1988,13 +1988,13 @@
           conflictInfo.forEach(function (c) {
             conflictDates[c.date] = true;
           });
-          var dateList = Object.keys(conflictDates).sort().slice(0, 5).join('、');
-          if (Object.keys(conflictDates).length > 5) dateList += ' 等';
+          var dateList = Object.keys(conflictDates).sort().slice(0, 5).join(', ');
+          if (Object.keys(conflictDates).length > 5) dateList += ' ...';
 
           /* Ask user: skip leave days or cancel */
           var skipConfirmed = window.confirm(
-            '以下日期已有休假安排：' + dateList + '\n\n' +
-            '点击「确定」自动跳过休假日继续创建；\n点击「取消」放弃本次操作。'
+            t('schedule.dates_have_leave') + dateList + '\n\n' +
+            t('schedule.skip_holidays_confirm')
           );
           if (!skipConfirmed) return;
 
@@ -2062,10 +2062,10 @@
       }
       document.getElementById('modal').classList.remove('bk-modal');
       closeModal();
-      toast(id ? '预订已更新' : '预订已创建（' + resourceIds.length + '人）', 'success');
+      toast(id ? t('schedule.booking_updated') : t('schedule.booking_created'), 'success');
       reloadAfterMutation();
     } catch (err) {
-      toast(err.message || '保存失败', 'error');
+      toast(err.message || t('schedule.update_failed'), 'error');
     }
   };
 
@@ -2083,7 +2083,7 @@
     var leaveType = activeType ? activeType.dataset.type : 'vacation';
 
     if (resourceIds.length === 0 || !startDate) {
-      toast('请选择人员和日期', 'error');
+      toast(t('schedule.search_resource'), 'error');
       return;
     }
 
@@ -2103,10 +2103,10 @@
       await Promise.all(promises);
       document.getElementById('modal').classList.remove('bk-modal');
       closeModal();
-      toast('休假已添加（' + resourceIds.length + '人）', 'success');
+      toast(t('schedule.leave_added'), 'success');
       reloadAfterMutation();
     } catch (err) {
-      toast(err.message || '添加休假失败', 'error');
+      toast(err.message || t('schedule.add_leave_failed'), 'error');
     }
   }
 
@@ -2116,22 +2116,22 @@
   window.editBooking = function (id) {
     var booking = _allBookings.find(function (b) { return b.id === id; });
     if (booking && !canBookForResource(booking.resource_id)) {
-      toast('您没有编辑此预订的权限', 'error');
+      toast(t('schedule.no_edit_permission'), 'error');
       return;
     }
     showBookingModal(id);
   };
 
   window.deleteBooking = async function (id) {
-    if (!confirm('确定要删除这个预订吗？')) return;
+    if (!confirm(t('schedule.confirm_delete_booking'))) return;
     try {
       await api('/api/bookings/' + id, { method: 'DELETE' });
       document.getElementById('modal').classList.remove('bk-modal');
       closeModal();
-      toast('预订已删除', 'success');
+      toast(t('schedule.booking_deleted'), 'success');
       reloadAfterMutation();
     } catch (err) {
-      toast(err.message || '删除失败', 'error');
+      toast(err.message || t('common.delete_failed'), 'error');
     }
   };
 
@@ -2140,16 +2140,16 @@
      -------------------------------------------------- */
   function showEditLeaveModal(leaveEntry) {
     if (!canBookForResource(leaveEntry.resource_id)) {
-      toast('您没有管理此人休假的权限', 'error');
+      toast(t('schedule.no_leave_permission'), 'error');
       return;
     }
 
     var leaveTypes = [
-      { key: 'vacation', label: '年假', cls: '' },
-      { key: 'sick', label: '病假', cls: 'sick' },
-      { key: 'personal', label: '事假', cls: 'personal' },
-      { key: 'holiday', label: '法定假期', cls: 'holiday' },
-      { key: 'other', label: '其他', cls: 'other' }
+      { key: 'vacation', label: t('schedule.leave_vacation'), cls: '' },
+      { key: 'sick', label: t('schedule.leave_sick'), cls: 'sick' },
+      { key: 'personal', label: t('schedule.leave_personal'), cls: 'personal' },
+      { key: 'holiday', label: t('schedule.leave_holiday'), cls: 'holiday' },
+      { key: 'other', label: t('schedule.leave_other'), cls: 'other' }
     ];
 
     var typeBtns = leaveTypes.map(function (t) {
@@ -2161,14 +2161,14 @@
       '<div class="bk-field">' +
         '<svg class="bk-field-icon" viewBox="0 0 20 20" fill="none"><path d="M10 2a8 8 0 100 16 8 8 0 000-16z" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="14" r="0.5" fill="currentColor"/></svg>' +
         '<div class="bk-field-body">' +
-          '<div class="bk-field-label">人员</div>' +
+          '<div class="bk-field-label">' + t('schedule.resource') + '</div>' +
           '<div style="font-size:14px;font-weight:500">' + esc(leaveEntry.resource_name || '') + '</div>' +
         '</div>' +
       '</div>' +
       '<div class="bk-field">' +
         '<svg class="bk-field-icon" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' +
         '<div class="bk-field-body">' +
-          '<div class="bk-field-label">日期</div>' +
+          '<div class="bk-field-label">' + t('common.date') + '</div>' +
           '<input type="date" id="edit-leave-date" class="text-input" value="' + leaveEntry.date + '">' +
         '</div>' +
       '</div>' +
@@ -2176,7 +2176,7 @@
       '<div class="bk-field">' +
         '<svg class="bk-field-icon" viewBox="0 0 20 20" fill="none"><rect x="2" y="3" width="16" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M2 7h16" stroke="currentColor" stroke-width="1.5"/><path d="M7 11l2 2 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
         '<div class="bk-field-body">' +
-          '<div class="bk-field-label">休假类型</div>' +
+          '<div class="bk-field-label">' + t('schedule.leave_type') + '</div>' +
           '<div class="bk-leave-types" id="edit-leave-types">' + typeBtns + '</div>' +
         '</div>' +
       '</div>' +
@@ -2184,17 +2184,17 @@
       '<div class="bk-field">' +
         '<svg class="bk-field-icon" viewBox="0 0 20 20" fill="none"><path d="M4 4h12M4 8h12M4 12h8M4 16h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' +
         '<div class="bk-field-body">' +
-          '<div class="bk-field-label">备注</div>' +
-          '<textarea id="edit-leave-notes" class="text-input" rows="2" placeholder="可选备注..." style="resize:vertical">' + esc(leaveEntry.notes || '') + '</textarea>' +
+          '<div class="bk-field-label">' + t('common.notes') + '</div>' +
+          '<textarea id="edit-leave-notes" class="text-input" rows="2" placeholder="' + t('schedule.optional_notes') + '" style="resize:vertical">' + esc(leaveEntry.notes || '') + '</textarea>' +
         '</div>' +
       '</div>';
 
     var footer =
-      '<button class="btn btn-danger bk-footer-left" onclick="window._deleteLeave(' + leaveEntry.id + ')">删除休假</button>' +
-      '<button class="btn btn-outline" onclick="closeModal()">取消</button>' +
-      '<button class="btn btn-primary" onclick="window._saveLeave(' + leaveEntry.id + ')">保存更改</button>';
+      '<button class="btn btn-danger bk-footer-left" onclick="window._deleteLeave(' + leaveEntry.id + ')">' + t('schedule.delete_leave') + '</button>' +
+      '<button class="btn btn-outline" onclick="closeModal()">' + t('common.cancel') + '</button>' +
+      '<button class="btn btn-primary" onclick="window._saveLeave(' + leaveEntry.id + ')">' + t('schedule.save_changes') + '</button>';
 
-    showModal('编辑休假', body, footer);
+    showModal(t('schedule.edit_leave'), body, footer);
     document.getElementById('modal').classList.add('bk-modal');
 
     /* Init leave type toggle within the edit modal */
@@ -2213,7 +2213,7 @@
     var date = document.getElementById('edit-leave-date').value;
 
     if (!date) {
-      toast('请选择日期', 'error');
+      toast(t('common.date'), 'error');
       return;
     }
 
@@ -2224,23 +2224,23 @@
       });
       document.getElementById('modal').classList.remove('bk-modal');
       closeModal();
-      toast('休假已更新', 'success');
+      toast(t('schedule.leave_updated'), 'success');
       reloadAfterMutation();
     } catch (err) {
-      toast(err.message || '更新失败', 'error');
+      toast(err.message || t('schedule.update_failed'), 'error');
     }
   };
 
   window._deleteLeave = async function (id) {
-    if (!confirm('确定要删除这条休假记录吗？')) return;
+    if (!confirm(t('schedule.confirm_delete_leave'))) return;
     try {
       await api('/api/leave/' + id, { method: 'DELETE' });
       document.getElementById('modal').classList.remove('bk-modal');
       closeModal();
-      toast('休假已删除', 'success');
+      toast(t('schedule.leave_deleted'), 'success');
       reloadAfterMutation();
     } catch (err) {
-      toast(err.message || '删除失败', 'error');
+      toast(err.message || t('common.delete_failed'), 'error');
     }
   };
 

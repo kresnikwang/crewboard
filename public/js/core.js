@@ -406,7 +406,7 @@ function initLoginHandler() {
     const account = document.getElementById('login-account').value.trim();
     const password = document.getElementById('login-password').value;
     if (!account || !password) {
-      showAuthError('请输入账号和密码', 'login');
+      showAuthError(t('auth.err_empty_login'), 'login');
       return;
     }
     try {
@@ -423,7 +423,7 @@ function initLoginHandler() {
         enterApp();
       }
     } catch (err) {
-      showAuthError(err.message || '登录失败', 'login');
+      showAuthError(err.message || t('auth.err_login_failed'), 'login');
     }
   });
 }
@@ -436,11 +436,11 @@ function initRegisterHandler() {
     const email = document.getElementById('reg-email').value.trim();
     const password = document.getElementById('reg-password').value;
     if (!name || !password) {
-      showAuthError('请填写姓名和密码', 'register');
+      showAuthError(t('auth.err_empty_register'), 'register');
       return;
     }
     if (!phone && !email) {
-      showAuthError('手机号和邮箱请至少填写一项', 'register');
+      showAuthError(t('auth.err_need_contact'), 'register');
       return;
     }
     try {
@@ -453,7 +453,7 @@ function initRegisterHandler() {
       window.state.enterprise = data.enterprise;
       enterApp();
     } catch (err) {
-      showAuthError(err.message || '注册失败', 'register');
+      showAuthError(err.message || t('auth.err_register_failed'), 'register');
     }
   });
 }
@@ -661,7 +661,7 @@ function showFirstLoginView(user) {
       '<circle cx="10" cy="7" r="3" stroke="currentColor" stroke-width="1.5"/>' +
       '<path d="M3 18c0-3.3 2.7-6 7-6s7 2.7 7 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>' +
       '</svg>' +
-      '您好，<strong>' + (user.name || '') + '</strong>' +
+      (getLang() === 'zh' ? '您好，' : 'Hello, ') + '<strong>' + (user.name || '') + '</strong>' +
       (user.email ? '<span class="first-login-email"> &lt;' + user.email + '&gt;</span>' : '') +
       '</div>';
   }
@@ -686,19 +686,19 @@ function initFirstLoginHandler() {
     var newPwd = document.getElementById('first-new-password').value;
     var confirmPwd = document.getElementById('first-confirm-password').value;
     if (!newPwd || !confirmPwd) {
-      if (err) err.textContent = '请填写新密码和确认密码';
+      if (err) err.textContent = t('auth.err_pwd_empty');
       return;
     }
     if (newPwd.length < 6) {
-      if (err) err.textContent = '密码至少6位';
+      if (err) err.textContent = t('auth.err_pwd_min');
       return;
     }
     if (newPwd !== confirmPwd) {
-      if (err) err.textContent = '两次输入的密码不一致';
+      if (err) err.textContent = t('auth.err_pwd_mismatch');
       return;
     }
     btn.disabled = true;
-    btn.textContent = '设置中...';
+    btn.textContent = t('auth.btn_setting');
     try {
       await api('/api/auth/first-password', {
         method: 'PUT',
@@ -706,12 +706,12 @@ function initFirstLoginHandler() {
       });
       // Clear must_change_password flag in local state
       if (window.state.user) window.state.user.must_change_password = 0;
-      toast('密码设置成功，欢迎使用神马排班！');
+      toast(t('auth.pwd_set_success'));
       enterApp();
     } catch (e) {
-      if (err) err.textContent = e.message || '设置失败，请重试';
+      if (err) err.textContent = e.message || t('auth.err_set_pwd_failed');
       btn.disabled = false;
-      btn.textContent = '确认设置密码';
+      btn.textContent = t('auth.first_login_btn');
     }
   });
 }
@@ -729,25 +729,25 @@ function initForgotPasswordHandler() {
 
     var email = document.getElementById('forgot-email').value.trim();
     if (!email) {
-      if (errEl) errEl.textContent = '请输入邮箱地址';
+      if (errEl) errEl.textContent = t('auth.err_empty_email');
       return;
     }
     btn.disabled = true;
-    btn.textContent = '发送中...';
+    btn.textContent = t('auth.btn_sending');
     try {
       var data = await api('/api/auth/forgot-password', {
         method: 'POST',
         body: { email: email }
       });
       if (successEl) {
-        successEl.textContent = '重置链接已发送到您的邮箱，请查收（30分钟内有效）';
+        successEl.textContent = t('auth.reset_link_sent');
         successEl.style.display = 'block';
       }
-      btn.textContent = '已发送';
+      btn.textContent = t('auth.btn_sent');
     } catch (err) {
-      if (errEl) errEl.textContent = err.message || '发送失败，请稍后重试';
+      if (errEl) errEl.textContent = err.message || t('auth.err_send_failed');
       btn.disabled = false;
-      btn.textContent = '发送重置链接';
+      btn.textContent = t('auth.forgot_send_btn');
     }
   });
 }
@@ -763,11 +763,11 @@ function initResetPasswordHandler() {
     var newPw = document.getElementById('reset-new-password').value;
     var confirmPw = document.getElementById('reset-confirm-password').value;
     if (!newPw || newPw.length < 6) {
-      if (errEl) errEl.textContent = '密码至少6位';
+      if (errEl) errEl.textContent = t('auth.err_pwd_min');
       return;
     }
     if (newPw !== confirmPw) {
-      if (errEl) errEl.textContent = '两次输入的密码不一致';
+      if (errEl) errEl.textContent = t('auth.err_pwd_mismatch');
       return;
     }
 
@@ -776,28 +776,28 @@ function initResetPasswordHandler() {
     var match = hash.match(/token=([^&]+)/);
     var token = match ? match[1] : '';
     if (!token) {
-      if (errEl) errEl.textContent = '无效的重置链接';
+      if (errEl) errEl.textContent = t('auth.err_invalid_link');
       return;
     }
 
     btn.disabled = true;
-    btn.textContent = '重置中...';
+    btn.textContent = t('auth.btn_resetting');
     try {
       await api('/api/auth/reset-password', {
         method: 'POST',
         body: { token: token, new_password: newPw }
       });
       // Show success and redirect to login
-      if (errEl) { errEl.style.color = '#10B981'; errEl.textContent = '密码重置成功，正在跳转登录...'; }
+      if (errEl) { errEl.style.color = '#10B981'; errEl.textContent = t('auth.reset_success'); }
       window.location.hash = '';
       setTimeout(function () {
         if (errEl) { errEl.style.color = ''; errEl.textContent = ''; }
         showAuthView('login');
       }, 2000);
     } catch (err) {
-      if (errEl) errEl.textContent = err.message || '重置失败';
+      if (errEl) errEl.textContent = err.message || t('auth.err_reset_failed');
       btn.disabled = false;
-      btn.textContent = '确认重置密码';
+      btn.textContent = t('auth.reset_btn');
     }
   });
 }
@@ -818,11 +818,11 @@ function handleHashRoute() {
       api('/api/auth/reset-password/' + token).then(function (data) {
         var hint = document.getElementById('reset-email-hint');
         if (hint && data.email) {
-          hint.textContent = '重置账号：' + data.email;
+          hint.textContent = t('auth.reset_account') + data.email;
         }
       }).catch(function (err) {
         var errEl = document.getElementById('auth-error-reset');
-        if (errEl) errEl.textContent = err.message || '链接无效或已过期';
+        if (errEl) errEl.textContent = err.message || t('auth.err_link_expired');
         var btn = document.getElementById('btn-reset-password');
         if (btn) btn.disabled = true;
       });
@@ -842,6 +842,22 @@ function handleHashRoute() {
     return true;
   }
   return false;
+}
+
+// --------------- Language Toggle ---------------
+document.querySelectorAll('.lang-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    setLang(btn.dataset.lang);
+    updateLangToggle();
+  });
+});
+function updateLangToggle() {
+  const lang = getLang();
+  document.querySelectorAll('.lang-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.lang === lang);
+    b.style.fontWeight = b.dataset.lang === lang ? '600' : '400';
+    b.style.opacity = b.dataset.lang === lang ? '1' : '0.6';
+  });
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -874,4 +890,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Attempt session restore only if no special hash route
     restoreSession();
   }
+
+  // Apply i18n and language toggle
+  updateLangToggle();
+  applyI18n();
 });

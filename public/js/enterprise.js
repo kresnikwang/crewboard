@@ -33,54 +33,54 @@ window.loadEnterprise = async function loadEnterprise() {
   // No enterprise — show create / join forms
   if (!user.enterprise_id) {
     container.innerHTML =
-      '<div class="page-header"><h2>企业管理</h2></div>' +
+      '<div class="page-header"><h2>' + t('enterprise.title') + '</h2></div>' +
       '<div class="enterprise-setup">' +
         '<div class="section-card">' +
-          '<h3>创建企业</h3>' +
+          '<h3>' + t('enterprise.create') + '</h3>' +
           '<div class="form-group">' +
-            '<label>企业名称</label>' +
-            '<input type="text" id="ent-create-name" class="text-input" placeholder="输入企业名称">' +
+            '<label>' + t('enterprise.name_label') + '</label>' +
+            '<input type="text" id="ent-create-name" class="text-input" placeholder="' + t('enterprise.name_placeholder') + '">' +
           '</div>' +
-          '<button class="btn btn-primary" id="btn-create-ent">创建企业</button>' +
+          '<button class="btn btn-primary" id="btn-create-ent">' + t('enterprise.create') + '</button>' +
         '</div>' +
         '<div class="section-card">' +
-          '<h3>加入企业</h3>' +
+          '<h3>' + t('enterprise.join') + '</h3>' +
           '<div class="form-group">' +
-            '<label>企业邀请码</label>' +
-            '<input type="text" id="ent-join-code" class="text-input" placeholder="输入企业邀请码">' +
+            '<label>' + t('enterprise.invite_code_label') + '</label>' +
+            '<input type="text" id="ent-join-code" class="text-input" placeholder="' + t('enterprise.invite_code_placeholder') + '">' +
           '</div>' +
           '<div class="form-group">' +
-            '<label>附言（可选）</label>' +
-            '<input type="text" id="ent-join-msg" class="text-input" placeholder="简单介绍自己">' +
+            '<label>' + t('enterprise.message_label') + '</label>' +
+            '<input type="text" id="ent-join-msg" class="text-input" placeholder="' + t('enterprise.message_placeholder') + '">' +
           '</div>' +
-          '<button class="btn btn-primary" id="btn-join-ent">加入企业</button>' +
+          '<button class="btn btn-primary" id="btn-join-ent">' + t('enterprise.join') + '</button>' +
         '</div>' +
       '</div>';
 
     document.getElementById('btn-create-ent').addEventListener('click', async function () {
       var name = document.getElementById('ent-create-name').value.trim();
-      if (!name) { toast('请输入企业名称', 'error'); return; }
+      if (!name) { toast(t('enterprise.enter_name'), 'error'); return; }
       try {
         await api('/api/auth/enterprises', { method: 'POST', body: { name: name } });
-        toast('企业创建成功');
+        toast(t('enterprise.created'));
         var me = await api('/api/auth/me');
         state.user = me.user;
         state.enterprise = me.enterprise;
         loadEnterprise();
       } catch (err) {
-        toast(err.message || '创建失败', 'error');
+        toast(err.message || t('enterprise.create_failed'), 'error');
       }
     });
 
     document.getElementById('btn-join-ent').addEventListener('click', async function () {
       var code = document.getElementById('ent-join-code').value.trim();
-      if (!code) { toast('请输入企业邀请码', 'error'); return; }
+      if (!code) { toast(t('enterprise.enter_code'), 'error'); return; }
       var message = document.getElementById('ent-join-msg').value.trim();
       try {
         await api('/api/auth/enterprises/join', { method: 'POST', body: { code: code, message: message } });
-        toast('申请已提交，请等待管理员审批');
+        toast(t('enterprise.join_submitted'));
       } catch (err) {
-        toast(err.message || '申请失败', 'error');
+        toast(err.message || t('enterprise.join_failed'), 'error');
       }
     });
 
@@ -90,37 +90,37 @@ window.loadEnterprise = async function loadEnterprise() {
   // Has enterprise — show info, requests (if admin/owner), invite
   var ent = state.enterprise || {};
   var html =
-    '<div class="page-header"><h2>企业管理</h2></div>' +
+    '<div class="page-header"><h2>' + t('enterprise.title') + '</h2></div>' +
     '<div class="section-card">' +
-      '<h3>企业信息</h3>' +
-      '<div class="info-row"><span class="info-label">企业名称</span><span class="info-value">' + escHtml(ent.name) + '</span></div>' +
-      '<div class="info-row"><span class="info-label">邀请码（分享给同事加入）</span><span class="info-value" style="font-family:monospace;font-weight:600">' + escHtml(ent.code) + '</span></div>' +
+      '<h3>' + t('enterprise.info') + '</h3>' +
+      '<div class="info-row"><span class="info-label">' + t('enterprise.name_label') + '</span><span class="info-value">' + escHtml(ent.name) + '</span></div>' +
+      '<div class="info-row"><span class="info-label">' + t('enterprise.invite_code_desc') + '</span><span class="info-value" style="font-family:monospace;font-weight:600">' + escHtml(ent.code) + '</span></div>' +
     '</div>';
 
   if (isOwnerOrAdmin()) {
-    html += '<div class="section-card" id="ent-requests-section"><h3>加入申请</h3><div id="ent-requests">加载中...</div></div>';
+    html += '<div class="section-card" id="ent-requests-section"><h3>' + t('enterprise.requests') + '</h3><div id="ent-requests">...</div></div>';
   }
 
   // 成员列表已移至「人员管理」页面统一管理
 
   if (isOwnerOrAdmin()) {
     html += '<div class="section-card">' +
-      '<h3>邀请成员</h3>' +
-      '<p style="color:var(--text-secondary);margin-bottom:12px">输入邮箱邀请新成员加入企业，对方注册时将自动加入。</p>' +
+      '<h3>' + t('enterprise.invite_title') + '</h3>' +
+      '<p style="color:var(--text-secondary);margin-bottom:12px">' + t('enterprise.invite_desc') + '</p>' +
       '<div class="form-row">' +
         '<div class="form-group">' +
-          '<label>姓名（可选）</label>' +
-          '<input type="text" id="invite-name" class="text-input" placeholder="成员姓名">' +
+          '<label>' + t('enterprise.invite_name_label') + '</label>' +
+          '<input type="text" id="invite-name" class="text-input" placeholder="' + t('enterprise.invite_name_placeholder') + '">' +
         '</div>' +
         '<div class="form-group">' +
-          '<label>邮箱</label>' +
-          '<input type="email" id="invite-email" class="text-input" placeholder="成员邮箱地址">' +
+          '<label>' + t('enterprise.invite_email_label') + '</label>' +
+          '<input type="email" id="invite-email" class="text-input" placeholder="' + t('enterprise.invite_email_placeholder') + '">' +
         '</div>' +
         '<div class="form-group" style="display:flex;align-items:flex-end">' +
-          '<button class="btn btn-primary" id="btn-invite-member">发送邀请</button>' +
+          '<button class="btn btn-primary" id="btn-invite-member">' + t('enterprise.send_invite') + '</button>' +
         '</div>' +
       '</div>' +
-      '<div id="ent-invitations">加载中...</div>' +
+      '<div id="ent-invitations">...</div>' +
     '</div>';
   }
 
@@ -139,18 +139,18 @@ window.loadEnterprise = async function loadEnterprise() {
       inviteBtn.addEventListener('click', async function () {
         var email = document.getElementById('invite-email').value.trim();
         var name = document.getElementById('invite-name').value.trim();
-        if (!email) { toast('请输入邮箱地址', 'error'); return; }
+        if (!email) { toast(t('enterprise.invite_email_label'), 'error'); return; }
         try {
           var result = await api('/api/auth/enterprises/invite', {
             method: 'POST',
             body: { email: email, name: name }
           });
-          toast('邀请已发送');
+          toast(t('enterprise.invite_sent'));
           document.getElementById('invite-email').value = '';
           document.getElementById('invite-name').value = '';
           loadInvitations();
         } catch (err) {
-          toast(err.message || '邀请失败', 'error');
+          toast(err.message || t('enterprise.invite_failed'), 'error');
         }
       });
     }
@@ -162,36 +162,36 @@ window.loadEnterprise = async function loadEnterprise() {
 
     var settingsHtml =
       '<div class="section-card">' +
-        '<h3>Webhook 通知配置</h3>' +
+        '<h3>' + t('webhook.title') + '</h3>' +
         '<div class="form-group">' +
-          '<label>钉钉 Webhook URL</label>' +
+          '<label>' + t('webhook.dingtalk') + '</label>' +
           '<input type="text" id="set-webhook-dingtalk" class="text-input" value="' + escHtml(ent.webhook_dingtalk || '') + '" placeholder="https://oapi.dingtalk.com/robot/send?access_token=...">' +
         '</div>' +
         '<div class="form-group">' +
-          '<label>企业微信 Webhook URL</label>' +
+          '<label>' + t('webhook.wecom') + '</label>' +
           '<input type="text" id="set-webhook-wecom" class="text-input" value="' + escHtml(ent.webhook_wecom || '') + '" placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=...">' +
         '</div>' +
         '<div class="form-group">' +
-          '<label>飞书 Webhook URL</label>' +
+          '<label>' + t('webhook.feishu') + '</label>' +
           '<input type="text" id="set-webhook-feishu" class="text-input" value="' + escHtml(ent.webhook_feishu || '') + '" placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/...">' +
         '</div>' +
       '</div>' +
       '<div class="section-card">' +
-        '<h3>企业主题色</h3>' +
+        '<h3>' + t('theme.title') + '</h3>' +
         '<div class="theme-palette" id="theme-palette">';
 
-    THEME_OPTIONS.forEach(function (t) {
-      var active = t.id === currentTheme ? ' active' : '';
-      settingsHtml += '<div class="theme-option" data-theme-id="' + t.id + '">' +
-        '<div class="theme-swatch' + active + '" style="background:' + t.color + '">' +
+    getThemeOptions().forEach(function (themeOpt) {
+      var active = themeOpt.id === currentTheme ? ' active' : '';
+      settingsHtml += '<div class="theme-option" data-theme-id="' + themeOpt.id + '">' +
+        '<div class="theme-swatch' + active + '" style="background:' + themeOpt.color + '">' +
           '<span class="check-icon">\u2713</span>' +
         '</div>' +
-        '<div class="theme-label">' + t.label + '</div>' +
+        '<div class="theme-label">' + themeOpt.label + '</div>' +
       '</div>';
     });
 
     settingsHtml += '</div>' +
-      '<button class="btn btn-primary" id="btn-save-settings" style="margin-top:16px">保存</button>' +
+      '<button class="btn btn-primary" id="btn-save-settings" style="margin-top:16px">' + t('common.save') + '</button>' +
     '</div>';
 
     container.insertAdjacentHTML('beforeend', settingsHtml);
@@ -221,9 +221,9 @@ window.loadEnterprise = async function loadEnterprise() {
         await api('/api/auth/enterprises/settings', { method: 'PUT', body: payload });
         state.enterprise = Object.assign(state.enterprise || {}, payload);
         applyTheme(selectedTheme);
-        toast('设置已保存');
+        toast(t('theme.settings_saved'));
       } catch (err) {
-        toast(err.message || '保存失败', 'error');
+        toast(err.message || t('common.save_failed'), 'error');
       }
     });
   }
@@ -236,7 +236,7 @@ async function loadEnterpriseRequests() {
     var pending = requests.filter(function (r) { return r.status === 'pending'; });
 
     if (pending.length === 0) {
-      document.getElementById('ent-requests').innerHTML = '<p style="color:var(--text-secondary)">暂无待处理申请</p>';
+      document.getElementById('ent-requests').innerHTML = '<p style="color:var(--text-secondary)">' + t('enterprise.no_requests') + '</p>';
       return;
     }
 
@@ -254,13 +254,13 @@ async function loadEnterpriseRequests() {
                 (r.user_phone && r.user_email ? ' · ' : '') +
                 (r.user_email ? escHtml(r.user_email) : '') +
               '</span>' +
-              (r.message ? '<span class="member-contact" style="font-style:italic">留言: ' + escHtml(r.message) + '</span>' : '') +
+              (r.message ? '<span class="member-contact" style="font-style:italic">' + t('enterprise.request_message') + ' ' + escHtml(r.message) + '</span>' : '') +
             '</div>' +
           '</div>' +
           '<div class="member-actions" style="display:flex;align-items:center;gap:8px">' +
             '<span class="member-contact">' + escHtml(r.created_at) + '</span>' +
-            '<button class="btn btn-sm btn-primary btn-approve-req" data-req-id="' + r.id + '">批准</button>' +
-            '<button class="btn btn-sm btn-danger btn-reject-req" data-req-id="' + r.id + '">拒绝</button>' +
+            '<button class="btn btn-sm btn-primary btn-approve-req" data-req-id="' + r.id + '">' + t('enterprise.approve') + '</button>' +
+            '<button class="btn btn-sm btn-danger btn-reject-req" data-req-id="' + r.id + '">' + t('enterprise.reject') + '</button>' +
           '</div>' +
         '</div>' +
       '</div>';
@@ -276,11 +276,11 @@ async function loadEnterpriseRequests() {
             method: 'PUT',
             body: { status: 'approved' },
           });
-          toast('已批准');
+          toast(t('enterprise.approved'));
           loadEnterpriseRequests();
           loadEnterpriseMembers();
         } catch (err) {
-          toast(err.message || '操作失败', 'error');
+          toast(err.message || t('enterprise.operation_failed'), 'error');
         }
       });
     });
@@ -292,15 +292,15 @@ async function loadEnterpriseRequests() {
             method: 'PUT',
             body: { status: 'rejected' },
           });
-          toast('已拒绝');
+          toast(t('enterprise.rejected'));
           loadEnterpriseRequests();
         } catch (err) {
-          toast(err.message || '操作失败', 'error');
+          toast(err.message || t('enterprise.operation_failed'), 'error');
         }
       });
     });
   } catch (err) {
-    document.getElementById('ent-requests').innerHTML = '<p style="color:var(--text-secondary)">加载申请失败</p>';
+    document.getElementById('ent-requests').innerHTML = '<p style="color:var(--text-secondary)">' + t('enterprise.requests_load_failed') + '</p>';
   }
 }
 
@@ -311,7 +311,7 @@ async function loadInvitations() {
     if (!container) return;
 
     if (invitations.length === 0) {
-      container.innerHTML = '<p style="color:var(--text-secondary);font-size:13px">暂无待处理的邀请</p>';
+      container.innerHTML = '<p style="color:var(--text-secondary);font-size:13px">' + t('enterprise.no_invites') + '</p>';
       return;
     }
 
@@ -321,9 +321,9 @@ async function loadInvitations() {
         '<div>' +
           '<span style="font-weight:500">' + escHtml(inv.name || inv.email) + '</span>' +
           (inv.name ? '<span style="color:var(--text-secondary);margin-left:8px;font-size:13px">' + escHtml(inv.email) + '</span>' : '') +
-          '<span style="color:var(--text-secondary);margin-left:8px;font-size:12px">\u00b7 待注册</span>' +
+          '<span style="color:var(--text-secondary);margin-left:8px;font-size:12px">' + t('status.pending_register') + '</span>' +
         '</div>' +
-        '<button class="btn btn-sm btn-outline btn-cancel-invite" data-invite-id="' + inv.id + '" style="font-size:12px">取消</button>' +
+        '<button class="btn btn-sm btn-outline btn-cancel-invite" data-invite-id="' + inv.id + '" style="font-size:12px">' + t('common.cancel') + '</button>' +
       '</div>';
     });
     html += '</div>';
@@ -334,10 +334,10 @@ async function loadInvitations() {
       btn.addEventListener('click', async function () {
         try {
           await api('/api/auth/enterprises/invitations/' + btn.dataset.inviteId, { method: 'DELETE' });
-          toast('邀请已取消');
+          toast(t('enterprise.invite_cancelled'));
           loadInvitations();
         } catch (err) {
-          toast(err.message || '操作失败', 'error');
+          toast(err.message || t('enterprise.operation_failed'), 'error');
         }
       });
     });
@@ -350,21 +350,26 @@ async function loadInvitations() {
 // ============================================================
 // THEME OPTIONS (used in enterprise page)
 // ============================================================
-var THEME_OPTIONS = [
-  { id: '',            label: '默认',    color: '#4F46E5' },
-  { id: 'warm-grey',   label: '暖灰',    color: '#78716C' },
-  { id: 'cool-grey',   label: '冷灰',    color: '#6B7280' },
-  { id: 'sage',        label: '鼠尾草',  color: '#6B8E6B' },
-  { id: 'dusty-rose',  label: '玫瑰粉',  color: '#B07D8E' },
-  { id: 'slate-blue',  label: '石板蓝',  color: '#64748B' },
-  { id: 'soft-teal',   label: '青绿',    color: '#5F9EA0' },
-  { id: 'warm-sand',   label: '暖沙',    color: '#B8A080' },
-  { id: 'lavender',    label: '薰衣草',  color: '#8B7FB5' },
-  { id: 'ocean',       label: '海洋',    color: '#4682B4' },
-  { id: 'forest',      label: '森林',    color: '#5C8A5C' },
-  { id: 'clay',        label: '陶土',    color: '#C08060' },
-  { id: 'midnight',    label: '午夜',    color: '#4A4A8A' },
-];
+var THEME_OPTIONS = [];
+
+// Refresh THEME_OPTIONS at render time when t() is available
+function getThemeOptions() {
+  return [
+    { id: '',            label: t('theme.default'),     color: '#4F46E5' },
+    { id: 'warm-grey',   label: t('theme.warm_gray'),   color: '#78716C' },
+    { id: 'cool-grey',   label: t('theme.cool_gray'),   color: '#6B7280' },
+    { id: 'sage',        label: t('theme.sage'),        color: '#6B8E6B' },
+    { id: 'dusty-rose',  label: t('theme.rose'),        color: '#B07D8E' },
+    { id: 'slate-blue',  label: t('theme.slate'),       color: '#64748B' },
+    { id: 'soft-teal',   label: t('theme.teal'),        color: '#5F9EA0' },
+    { id: 'warm-sand',   label: t('theme.sand'),        color: '#B8A080' },
+    { id: 'lavender',    label: t('theme.lavender'),    color: '#8B7FB5' },
+    { id: 'ocean',       label: t('theme.ocean'),       color: '#4682B4' },
+    { id: 'forest',      label: t('theme.forest'),      color: '#5C8A5C' },
+    { id: 'clay',        label: t('theme.terracotta'),  color: '#C08060' },
+    { id: 'midnight',    label: t('theme.midnight'),    color: '#4A4A8A' },
+  ];
+}
 
 // loadSettings removed — functionality merged into loadEnterprise
 
@@ -382,51 +387,51 @@ window.loadAccount = async function loadAccount() {
     : '<div class="avatar-preview-placeholder" id="avatar-img">' + escHtml((user.name || '?').charAt(0)) + '</div>';
 
   var html =
-    '<div class="page-header"><h2>账号管理</h2></div>' +
+    '<div class="page-header"><h2>' + t('account.title') + '</h2></div>' +
     '<div class="section-card">' +
-      '<h3>个人信息</h3>' +
+      '<h3>' + t('account.personal_info') + '</h3>' +
       '<div class="avatar-upload-section">' +
         '<div class="avatar-preview" id="avatar-preview">' + avatarPreview + '</div>' +
         '<div class="avatar-upload-info">' +
-          '<button class="btn btn-outline btn-sm" id="btn-upload-avatar">上传头像</button>' +
+          '<button class="btn btn-outline btn-sm" id="btn-upload-avatar">' + t('account.upload_avatar') + '</button>' +
           '<input type="file" id="avatar-file-input" accept="image/*" style="display:none">' +
-          '<div class="avatar-hint">支持 JPG/PNG/WebP，自动压缩至 500KB 以内</div>' +
+          '<div class="avatar-hint">' + t('account.avatar_hint') + '</div>' +
         '</div>' +
       '</div>' +
       '<div class="form-group">' +
-        '<label>姓名</label>' +
+        '<label>' + t('common.name') + '</label>' +
         '<input type="text" id="acc-name" class="text-input" value="' + escHtml(user.name || '') + '">' +
       '</div>' +
       '<div class="form-group">' +
-        '<label>手机</label>' +
-        '<input type="text" id="acc-phone" class="text-input" value="' + escHtml(user.phone || '') + '" placeholder="未绑定">' +
+        '<label>' + t('common.phone') + '</label>' +
+        '<input type="text" id="acc-phone" class="text-input" value="' + escHtml(user.phone || '') + '" placeholder="' + t('status.not_linked') + '">' +
       '</div>' +
       '<div class="form-group">' +
-        '<label>邮箱</label>' +
-        '<input type="email" id="acc-email" class="text-input" value="' + escHtml(user.email || '') + '" placeholder="未绑定">' +
+        '<label>' + t('common.email') + '</label>' +
+        '<input type="email" id="acc-email" class="text-input" value="' + escHtml(user.email || '') + '" placeholder="' + t('status.not_linked') + '">' +
       '</div>' +
-      '<button class="btn btn-primary" id="btn-save-profile">保存</button>' +
+      '<button class="btn btn-primary" id="btn-save-profile">' + t('common.save') + '</button>' +
     '</div>' +
     '<div class="section-card">' +
-      '<h3>修改密码</h3>' +
+      '<h3>' + t('account.change_pwd') + '</h3>' +
       '<div class="form-group">' +
-        '<label>当前密码</label>' +
+        '<label>' + t('account.current_pwd') + '</label>' +
         '<input type="password" id="acc-old-pw" class="text-input">' +
       '</div>' +
       '<div class="form-group">' +
-        '<label>新密码</label>' +
+        '<label>' + t('account.new_pwd') + '</label>' +
         '<input type="password" id="acc-new-pw" class="text-input">' +
       '</div>' +
       '<div class="form-group">' +
-        '<label>确认新密码</label>' +
+        '<label>' + t('account.confirm_pwd') + '</label>' +
         '<input type="password" id="acc-confirm-pw" class="text-input">' +
       '</div>' +
-      '<button class="btn btn-primary" id="btn-change-pw">修改密码</button>' +
+      '<button class="btn btn-primary" id="btn-change-pw">' + t('account.change_pwd') + '</button>' +
     '</div>' +
     '<div class="section-card">' +
-      '<h3>退出登录</h3>' +
-      '<p style="font-size:13px;color:var(--text-secondary);margin-bottom:14px;">退出当前账号，返回登录页面。</p>' +
-      '<button class="btn btn-danger" id="btn-logout-account">退出登录</button>' +
+      '<h3>' + t('logout.title') + '</h3>' +
+      '<p style="font-size:13px;color:var(--text-secondary);margin-bottom:14px;">' + t('logout.desc') + '</p>' +
+      '<button class="btn btn-danger" id="btn-logout-account">' + t('logout.btn') + '</button>' +
     '</div>';
 
   container.innerHTML = html;
@@ -443,7 +448,7 @@ window.loadAccount = async function loadAccount() {
     var file = fileInput.files[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      toast('请选择图片文件', 'error');
+      toast(t('account.select_image'), 'error');
       return;
     }
     compressAndUploadAvatar(file);
@@ -454,20 +459,20 @@ window.loadAccount = async function loadAccount() {
     var name = document.getElementById('acc-name').value.trim();
     var phone = document.getElementById('acc-phone').value.trim();
     var email = document.getElementById('acc-email').value.trim();
-    if (!name) { toast('请输入姓名', 'error'); return; }
+    if (!name) { toast(t('account.enter_name'), 'error'); return; }
     try {
       await api('/api/auth/profile', {
         method: 'PUT',
         body: { name: name, phone: phone, email: email },
       });
-      toast('个人信息已更新');
+      toast(t('account.info_updated'));
       state.user.name = name;
       state.user.phone = phone;
       state.user.email = email;
       // Refresh sidebar user info
       updateSidebarUserInfo();
     } catch (err) {
-      toast(err.message || '保存失败', 'error');
+      toast(err.message || t('common.save_failed'), 'error');
     }
   });
 
@@ -476,19 +481,19 @@ window.loadAccount = async function loadAccount() {
     var oldPw = document.getElementById('acc-old-pw').value;
     var newPw = document.getElementById('acc-new-pw').value;
     var confirmPw = document.getElementById('acc-confirm-pw').value;
-    if (!oldPw || !newPw || !confirmPw) { toast('请填写所有密码字段', 'error'); return; }
-    if (newPw !== confirmPw) { toast('两次输入的新密码不一致', 'error'); return; }
+    if (!oldPw || !newPw || !confirmPw) { toast(t('account.pwd_all_fields'), 'error'); return; }
+    if (newPw !== confirmPw) { toast(t('account.pwd_mismatch'), 'error'); return; }
     try {
       await api('/api/auth/password', {
         method: 'PUT',
         body: { old_password: oldPw, new_password: newPw },
       });
-      toast('密码修改成功');
+      toast(t('account.pwd_changed'));
       document.getElementById('acc-old-pw').value = '';
       document.getElementById('acc-new-pw').value = '';
       document.getElementById('acc-confirm-pw').value = '';
     } catch (err) {
-      toast(err.message || '密码修改失败', 'error');
+      toast(err.message || t('account.pwd_failed'), 'error');
     }
   });
 
@@ -557,10 +562,10 @@ async function uploadAvatarData(dataUrl) {
       body: { avatar_data: dataUrl }
     });
     state.user.avatar = result.avatar;
-    toast('头像已更新');
+    toast(t('account.avatar_updated'));
     updateSidebarUserInfo();
   } catch (err) {
-    toast(err.message || '头像上传失败', 'error');
+    toast(err.message || t('account.avatar_failed'), 'error');
   }
 }
 

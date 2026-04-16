@@ -55,8 +55,8 @@
       var s = days[0];
       var e = days[4];
       rangeEl.textContent =
-        (s.getMonth() + 1) + '月' + s.getDate() + '日 - ' +
-        (e.getMonth() + 1) + '月' + e.getDate() + '日';
+        (s.getMonth() + 1) + t('common.month') + s.getDate() + t('common.day') + ' - ' +
+        (e.getMonth() + 1) + t('common.month') + e.getDate() + t('common.day');
     }
 
     /* ---- parallel data fetch ---- */
@@ -87,7 +87,7 @@
     if (!gridEl) return;
 
     if (!relevantProjects.length) {
-      gridEl.innerHTML = '<div class="empty-message">本周暂无排班或工时记录</div>';
+      gridEl.innerHTML = '<div class="empty-message">' + t('timesheets.no_records') + '</div>';
       return;
     }
 
@@ -139,12 +139,12 @@
      Table builder
      -------------------------------------------------- */
   function buildTable(days, projects, tsMap, scheduleMap) {
-    var html = '<table class="ts-table"><thead><tr><th>项目</th>';
+    var html = '<table class="ts-table"><thead><tr><th>' + t('timesheets.project') + '</th>';
 
     days.forEach(function (d) {
       html += '<th>' + shortDay(d) + '<br>' + fmtDate(d) + '</th>';
     });
-    html += '<th>合计</th></tr></thead><tbody>';
+    html += '<th>' + t('timesheets.total') + '</th></tr></thead><tbody>';
 
     /* ---- daily totals accumulators ---- */
     var dayTotals = [];
@@ -197,7 +197,7 @@
     });
 
     /* ---- totals row ---- */
-    html += '<tr class="ts-totals-row"><td>合计</td>';
+    html += '<tr class="ts-totals-row"><td>' + t('timesheets.total') + '</td>';
     dayTotals.forEach(function (t, idx) {
       html += '<td id="ts-day-total-' + idx + '">' + t + '</td>';
     });
@@ -205,7 +205,7 @@
 
     html += '</tbody></table>';
     html += '<div style="margin-top:16px;text-align:right">' +
-      '<button class="btn btn-primary" id="ts-save">保存工时</button>' +
+      '<button class="btn btn-primary" id="ts-save">' + t('timesheets.save_hours') + '</button>' +
       '</div>';
     return html;
   }
@@ -247,7 +247,7 @@
   function copyFromSchedule() {
     var inputs = document.querySelectorAll('.ts-input');
     if (!inputs.length) {
-      toast('请先加载工时表', 'error');
+      toast(t('timesheets.load_first'), 'error');
       return;
     }
 
@@ -295,11 +295,11 @@
     updateTotals(days, projectList);
 
     if (filled > 0) {
-      toast('已从排程复制 ' + filled + ' 条工时' + (skipped > 0 ? '，跳过 ' + skipped + ' 条已有记录' : ''), 'success');
+      toast(t('timesheets.copied') + ' ' + filled + ' ' + t('timesheets.records') + (skipped > 0 ? ', ' + skipped + ' ' + t('timesheets.skipped') : ''), 'success');
     } else if (skipped > 0) {
-      toast('所有格子已有工时记录，未覆盖', 'info');
+      toast(t('timesheets.all_filled'), 'info');
     } else {
-      toast('本周排程中没有可复制的工时', 'info');
+      toast(t('timesheets.no_hours_to_copy'), 'info');
     }
   }
 
@@ -326,10 +326,10 @@
         method: 'POST',
         body: { entries: entries }
       });
-      toast('工时已保存', 'success');
+      toast(t('timesheets.hours_saved'), 'success');
       window.loadTimesheets();
     } catch (err) {
-      toast(err.message || '保存失败', 'error');
+      toast(err.message || t('common.save_failed'), 'error');
     }
   }
 
