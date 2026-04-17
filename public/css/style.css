@@ -362,7 +362,7 @@ a { text-decoration: none; color: inherit; }
 /* Right form panel */
 .auth-form-panel {
   flex: 1; display: flex; align-items: center; justify-content: center;
-  padding: 40px; background: var(--bg);
+  padding: 40px; background: var(--bg); position: relative;
 }
 .auth-card {
   width: 400px; max-width: 100%;
@@ -451,6 +451,42 @@ a { text-decoration: none; color: inherit; }
 }
 .first-login-greeting strong { color: var(--text-primary); }
 .first-login-email { color: var(--text-secondary); font-size: 12px; }
+
+/* --- Language Switch (shared pill toggle) --- */
+.lang-switch {
+  display: flex; gap: 4px; background: var(--bg-secondary, #f3f4f6); border-radius: 8px; padding: 3px;
+}
+.lang-switch .lang-btn {
+  border: none; background: transparent; padding: 5px 14px; font-size: 13px;
+  border-radius: 6px; cursor: pointer; color: var(--text-secondary, #6b7280);
+  font-weight: 400; transition: all .2s ease; line-height: 1.4;
+}
+.lang-switch .lang-btn.active {
+  background: #fff; color: var(--text-primary, #1f2937); font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+}
+.lang-switch .lang-btn:hover:not(.active) {
+  color: var(--text-primary, #374151);
+}
+
+/* Auth page: positioned top-right */
+.auth-lang-switch {
+  position: absolute; top: 20px; right: 24px; z-index: 10;
+}
+
+/* Sidebar: dark background adaptation */
+.sidebar .lang-switch {
+  background: rgba(255,255,255,.08); margin: 0 16px 8px;
+}
+.sidebar .lang-switch .lang-btn {
+  color: rgba(255,255,255,.5); font-size: 12px; padding: 4px 0; flex: 1;
+}
+.sidebar .lang-switch .lang-btn.active {
+  background: rgba(255,255,255,.15); color: #fff; box-shadow: none;
+}
+.sidebar .lang-switch .lang-btn:hover:not(.active) {
+  color: rgba(255,255,255,.75);
+}
 
 .auth-footer {
   display: flex; align-items: center; justify-content: center; gap: 8px;
