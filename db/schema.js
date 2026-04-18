@@ -268,6 +268,18 @@ function migrate(db) {
   if (!resCols.find(c => c.name === 'wecom_userid')) {
     db.exec("ALTER TABLE resources ADD COLUMN wecom_userid TEXT DEFAULT ''");
   }
+
+  // Add WeCom app message config columns to enterprises table
+  const entCols = db.prepare('PRAGMA table_info(enterprises)').all();
+  if (!entCols.find(c => c.name === 'wecom_corp_id')) {
+    db.exec("ALTER TABLE enterprises ADD COLUMN wecom_corp_id TEXT DEFAULT ''");
+  }
+  if (!entCols.find(c => c.name === 'wecom_agent_id')) {
+    db.exec("ALTER TABLE enterprises ADD COLUMN wecom_agent_id TEXT DEFAULT ''");
+  }
+  if (!entCols.find(c => c.name === 'wecom_secret')) {
+    db.exec("ALTER TABLE enterprises ADD COLUMN wecom_secret TEXT DEFAULT ''");
+  }
 }
 
 function seedDemoData(db) {

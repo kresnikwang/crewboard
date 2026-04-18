@@ -550,12 +550,40 @@
 
   // --- webhook ---
   Object.assign(translations.zh, {
-    'webhook.title': 'Webhook 通知配置', 'webhook.dingtalk': '钉钉 Webhook URL',
-    'webhook.wecom': '企业微信 Webhook URL', 'webhook.feishu': '飞书 Webhook URL'
+    'webhook.title': '群机器人通知',
+    'webhook.group_desc': '配置群机器人 Webhook URL，排程变更时自动推送通知到群聊。',
+    'webhook.dingtalk': '钉钉机器人',
+    'webhook.wecom': '企业微信机器人',
+    'webhook.feishu': '飞书机器人',
+    'webhook.wecom_app_title': '企业微信应用消息',
+    'webhook.wecom_app_desc': '配置企业微信自建应用，排程变更时向员工个人推送通知。需在企业微信管理后台创建自建应用并获取以下参数。',
+    'webhook.wecom_corp_id': '企业 ID (CorpID)',
+    'webhook.wecom_agent_id': '应用 AgentId',
+    'webhook.wecom_secret': '应用 Secret',
+    'webhook.wecom_sync_btn': '同步企业微信通讯录',
+    'webhook.wecom_syncing': '同步中...',
+    'webhook.wecom_matched': '已匹配',
+    'webhook.wecom_unmatched': '未匹配（需手动关联）',
+    'webhook.wecom_sync_done': '企业微信通讯录同步完成',
+    'webhook.wecom_sync_fail': '同步失败，请检查企业微信配置'
   });
   Object.assign(translations.en, {
-    'webhook.title': 'Webhook Notifications', 'webhook.dingtalk': 'DingTalk Webhook URL',
-    'webhook.wecom': 'WeCom Webhook URL', 'webhook.feishu': 'Feishu Webhook URL'
+    'webhook.title': 'Group Robot Webhooks',
+    'webhook.group_desc': 'Configure robot webhook URLs to push schedule change notifications to group chats.',
+    'webhook.dingtalk': 'DingTalk Robot',
+    'webhook.wecom': 'WeCom Robot',
+    'webhook.feishu': 'Feishu Robot',
+    'webhook.wecom_app_title': 'WeCom App Messages',
+    'webhook.wecom_app_desc': 'Configure a WeCom self-built app to send personal notifications to employees on schedule changes. Create an app in WeCom admin console to get these parameters.',
+    'webhook.wecom_corp_id': 'Corp ID',
+    'webhook.wecom_agent_id': 'Agent ID',
+    'webhook.wecom_secret': 'App Secret',
+    'webhook.wecom_sync_btn': 'Sync WeCom Directory',
+    'webhook.wecom_syncing': 'Syncing...',
+    'webhook.wecom_matched': 'Matched',
+    'webhook.wecom_unmatched': 'Unmatched (manual linking needed)',
+    'webhook.wecom_sync_done': 'WeCom directory sync completed',
+    'webhook.wecom_sync_fail': 'Sync failed, please check WeCom config'
   });
 
   // --- logout & status ---

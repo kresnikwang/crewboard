@@ -163,6 +163,7 @@ window.loadEnterprise = async function loadEnterprise() {
     var settingsHtml =
       '<div class="section-card">' +
         '<h3>' + t('webhook.title') + '</h3>' +
+        '<p class="section-desc">' + t('webhook.group_desc') + '</p>' +
         '<div class="form-group">' +
           '<label>' + t('webhook.dingtalk') + '</label>' +
           '<input type="text" id="set-webhook-dingtalk" class="text-input" value="' + escHtml(ent.webhook_dingtalk || '') + '" placeholder="https://oapi.dingtalk.com/robot/send?access_token=...">' +
@@ -175,6 +176,24 @@ window.loadEnterprise = async function loadEnterprise() {
           '<label>' + t('webhook.feishu') + '</label>' +
           '<input type="text" id="set-webhook-feishu" class="text-input" value="' + escHtml(ent.webhook_feishu || '') + '" placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/...">' +
         '</div>' +
+      '</div>' +
+      '<div class="section-card">' +
+        '<h3>' + t('webhook.wecom_app_title') + '</h3>' +
+        '<p class="section-desc">' + t('webhook.wecom_app_desc') + '</p>' +
+        '<div class="form-group">' +
+          '<label>' + t('webhook.wecom_corp_id') + '</label>' +
+          '<input type="text" id="set-wecom-corp-id" class="text-input" value="' + escHtml(ent.wecom_corp_id || '') + '" placeholder="wwxxxxxxxxxx">' +
+        '</div>' +
+        '<div class="form-group">' +
+          '<label>' + t('webhook.wecom_agent_id') + '</label>' +
+          '<input type="text" id="set-wecom-agent-id" class="text-input" value="' + escHtml(ent.wecom_agent_id || '') + '" placeholder="1000002">' +
+        '</div>' +
+        '<div class="form-group">' +
+          '<label>' + t('webhook.wecom_secret') + '</label>' +
+          '<input type="password" id="set-wecom-secret" class="text-input" value="' + escHtml(ent.wecom_secret || '') + '" placeholder="Secret">' +
+        '</div>' +
+        '<button class="btn btn-secondary" id="btn-wecom-sync" style="margin-top:8px">' + t('webhook.wecom_sync_btn') + '</button>' +
+        '<div id="wecom-sync-result" style="margin-top:12px;display:none"></div>' +
       '</div>' +
       '<div class="section-card">' +
         '<h3>' + t('theme.title') + '</h3>' +
@@ -215,6 +234,9 @@ window.loadEnterprise = async function loadEnterprise() {
         webhook_dingtalk: document.getElementById('set-webhook-dingtalk').value.trim(),
         webhook_wecom: document.getElementById('set-webhook-wecom').value.trim(),
         webhook_feishu: document.getElementById('set-webhook-feishu').value.trim(),
+        wecom_corp_id: document.getElementById('set-wecom-corp-id').value.trim(),
+        wecom_agent_id: document.getElementById('set-wecom-agent-id').value.trim(),
+        wecom_secret: document.getElementById('set-wecom-secret').value.trim(),
         theme_color: selectedTheme,
       };
       try {
@@ -224,6 +246,40 @@ window.loadEnterprise = async function loadEnterprise() {
         toast(t('theme.settings_saved'));
       } catch (err) {
         toast(err.message || t('common.save_failed'), 'error');
+      }
+    });
+
+    // WeCom sync button
+    document.getElementById('btn-wecom-sync').addEventListener('click', async function () {
+      var btn = this;
+      var resultDiv = document.getElementById('wecom-sync-result');
+      btn.disabled = true;
+      btn.textContent = t('webhook.wecom_syncing');
+      resultDiv.style.display = 'none';
+      try {
+        var data = await api('/api/wecom/sync', { method: 'POST' });
+        var html = '<div style="font-size:13px;line-height:1.6">';
+        if (data.matched && data.matched.length > 0) {
+          html += '<div style="color:var(--success,#10B981);margin-bottom:8px"><strong>' + t('webhook.wecom_matched') + ' (' + data.matched.length + ')</strong></div>';
+          html += '<ul style="margin:0 0 8px 16px;padding:0">';
+          data.matched.forEach(function(m) { html += '<li>' + escHtml(m.resource) + ' \u2192 ' + escHtml(m.wecom_userid) + '</li>'; });
+          html += '</ul>';
+        }
+        if (data.unmatched && data.unmatched.length > 0) {
+          html += '<div style="color:var(--warning,#F59E0B);margin-bottom:8px"><strong>' + t('webhook.wecom_unmatched') + ' (' + data.unmatched.length + ')</strong></div>';
+          html += '<ul style="margin:0 0 0 16px;padding:0">';
+          data.unmatched.forEach(function(m) { html += '<li>' + escHtml(m.resource) + '</li>'; });
+          html += '</ul>';
+        }
+        html += '</div>';
+        resultDiv.innerHTML = html;
+        resultDiv.style.display = 'block';
+        toast(t('webhook.wecom_sync_done'));
+      } catch (err) {
+        toast(err.message || t('webhook.wecom_sync_fail'), 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = t('webhook.wecom_sync_btn');
       }
     });
   }

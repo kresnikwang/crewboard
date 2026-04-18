@@ -542,6 +542,7 @@ a { text-decoration: none; color: inherit; }
   margin-bottom: 20px;
 }
 .section-card h3 { font-size: 15px; font-weight: 600; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.section-desc { font-size: 13px; color: var(--text-secondary); margin: -6px 0 16px; line-height: 1.5; }
 
 /* Member card with permissions */
 .member-card {

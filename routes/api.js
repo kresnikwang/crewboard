@@ -2,7 +2,7 @@ const express = require('express');
 const ExcelJS = require('exceljs');
 const { holidays, getHoliday, isWorkingDay } = require('../db/holidays');
 const { notifyAll } = require('./webhook');
-const { notifyBookingCreated, notifyBookingUpdated, notifyBookingDeleted, getDepartmentUsers } = require('../utils/wecom');
+const { notifyBookingCreated, notifyBookingUpdated, notifyBookingDeleted, getDepartmentUsers, getWecomConfig } = require('../utils/wecom');
 const router = express.Router();
 
 // --------------- SSE Connection Pool ---------------
@@ -692,9 +692,13 @@ module.exports = function(db) {
   // Fetch WeCom department users and auto-match by name
   router.post('/wecom/sync', async (req, res) => {
     if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
-    if (req.user.role !== 'admin') return res.status(403).json({ error: '仅管理员可操作' });
+    if (req.user.role !== 'admin' && req.user.role !== 'owner') return res.status(403).json({ error: '仅管理员可操作' });
 
-    const wecomUsers = await getDepartmentUsers(1); // root department
+    const config = getWecomConfig(db, req.user.enterprise_id);
+    if (!config.corpId) {
+      return res.status(400).json({ error: '请先在企业管理中配置企业微信应用参数（企业ID、AgentId、Secret）' });
+    }
+    const wecomUsers = await getDepartmentUsers(config, 1); // root department
     if (wecomUsers.length === 0) {
       return res.status(500).json({ error: '无法获取企业微信通讯录，请检查配置' });
     }
@@ -729,7 +733,7 @@ module.exports = function(db) {
   // Manually set wecom_userid for a resource
   router.put('/resources/:id/wecom', (req, res) => {
     if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
-    if (req.user.role !== 'admin') return res.status(403).json({ error: '仅管理员可操作' });
+    if (req.user.role !== 'admin' && req.user.role !== 'owner') return res.status(403).json({ error: '仅管理员可操作' });
 
     const { wecom_userid } = req.body;
     db.prepare('UPDATE resources SET wecom_userid = ? WHERE id = ? AND enterprise_id = ?')

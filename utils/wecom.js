@@ -1,22 +1,46 @@
 /**
  * WeChat Work (企业微信) Application Message API
  * Sends notifications to individual employees via self-built app.
+ * Config is read from enterprise DB settings, with env var fallback.
  */
 
-const WECOM_CORP_ID = process.env.WECOM_CORP_ID || 'wwb089e4801f755a98';
-const WECOM_AGENT_ID = process.env.WECOM_AGENT_ID || '1000003';
-const WECOM_SECRET = process.env.WECOM_SECRET || 'y2Ij4aQ2D_am20LaE48xTyaSVu7KtEPBpSnUrbz0dpE';
+/* ---------- Config helper ---------- */
+function getWecomConfig(db, enterpriseId) {
+  if (db && enterpriseId) {
+    try {
+      const ent = db.prepare('SELECT wecom_corp_id, wecom_agent_id, wecom_secret FROM enterprises WHERE id = ?').get(enterpriseId);
+      if (ent && ent.wecom_corp_id) {
+        return {
+          corpId: ent.wecom_corp_id,
+          agentId: ent.wecom_agent_id || '',
+          secret: ent.wecom_secret || ''
+        };
+      }
+    } catch (_) {}
+  }
+  // Fallback to env vars
+  return {
+    corpId: process.env.WECOM_CORP_ID || '',
+    agentId: process.env.WECOM_AGENT_ID || '',
+    secret: process.env.WECOM_SECRET || ''
+  };
+}
 
-/* ---------- Access Token cache ---------- */
-let _tokenCache = { token: null, expiresAt: 0 };
+/* ---------- Access Token cache (keyed by corpId) ---------- */
+const _tokenCache = {};
 
-async function getAccessToken() {
-  // Return cached token if still valid (with 5min buffer)
-  if (_tokenCache.token && Date.now() < _tokenCache.expiresAt - 300000) {
-    return _tokenCache.token;
+async function getAccessToken(config) {
+  if (!config || !config.corpId || !config.secret) return null;
+
+  const key = config.corpId;
+  if (!_tokenCache[key]) _tokenCache[key] = { token: null, expiresAt: 0 };
+  const cache = _tokenCache[key];
+
+  if (cache.token && Date.now() < cache.expiresAt - 300000) {
+    return cache.token;
   }
 
-  const url = `https://qyapi.weixin.qq.com/cgi-bin/gettoken?corpid=${WECOM_CORP_ID}&corpsecret=${WECOM_SECRET}`;
+  const url = `https://qyapi.weixin.qq.com/cgi-bin/gettoken?corpid=${config.corpId}&corpsecret=${config.secret}`;
   try {
     const res = await fetch(url);
     const data = await res.json();
@@ -24,10 +48,8 @@ async function getAccessToken() {
       console.error('[WeCom] gettoken failed:', data.errmsg);
       return null;
     }
-    _tokenCache = {
-      token: data.access_token,
-      expiresAt: Date.now() + data.expires_in * 1000
-    };
+    cache.token = data.access_token;
+    cache.expiresAt = Date.now() + data.expires_in * 1000;
     console.log('[WeCom] Access token refreshed, expires in', data.expires_in, 's');
     return data.access_token;
   } catch (err) {
@@ -37,14 +59,14 @@ async function getAccessToken() {
 }
 
 /* ---------- Send text card message to a user ---------- */
-async function sendCardMessage(userId, title, description, url) {
-  const token = await getAccessToken();
+async function sendCardMessage(config, userId, title, description, url) {
+  const token = await getAccessToken(config);
   if (!token) return { ok: false, error: 'no access_token' };
 
   const body = {
     touser: userId,
     msgtype: 'textcard',
-    agentid: parseInt(WECOM_AGENT_ID, 10),
+    agentid: parseInt(config.agentId, 10),
     textcard: {
       title: title,
       description: description,
@@ -73,14 +95,14 @@ async function sendCardMessage(userId, title, description, url) {
 }
 
 /* ---------- Send plain text message ---------- */
-async function sendTextMessage(userId, content) {
-  const token = await getAccessToken();
+async function sendTextMessage(config, userId, content) {
+  const token = await getAccessToken(config);
   if (!token) return { ok: false, error: 'no access_token' };
 
   const body = {
     touser: userId,
     msgtype: 'text',
-    agentid: parseInt(WECOM_AGENT_ID, 10),
+    agentid: parseInt(config.agentId, 10),
     text: { content: content }
   };
 
@@ -104,8 +126,8 @@ async function sendTextMessage(userId, content) {
 }
 
 /* ---------- Fetch department user list ---------- */
-async function getDepartmentUsers(deptId) {
-  const token = await getAccessToken();
+async function getDepartmentUsers(config, deptId) {
+  const token = await getAccessToken(config);
   if (!token) return [];
 
   try {
@@ -131,36 +153,46 @@ async function getDepartmentUsers(deptId) {
 /* ---------- Booking notification helpers ---------- */
 
 function notifyBookingCreated(db, resourceId, projectName, startDate, endDate, hours, bookerName) {
-  const resource = db.prepare('SELECT wecom_userid, name FROM resources WHERE id = ?').get(resourceId);
+  const resource = db.prepare('SELECT wecom_userid, name, enterprise_id FROM resources WHERE id = ?').get(resourceId);
   if (!resource || !resource.wecom_userid) return;
+
+  const config = getWecomConfig(db, resource.enterprise_id);
+  if (!config.corpId) return;
 
   const rangeStr = startDate === endDate ? startDate : `${startDate} ~ ${endDate}`;
   const days = startDate === endDate ? 1 : Math.ceil((new Date(endDate) - new Date(startDate)) / 86400000) + 1;
 
   const content = `📋 排班通知\n请查收您的工作安排更新：\n  项目：${projectName}\n  时间：${rangeStr}（${days}天）\n  工时：${hours}h/天\n  安排人：${bookerName || '未知'}`;
 
-  sendTextMessage(resource.wecom_userid, content).catch(() => {});
+  sendTextMessage(config, resource.wecom_userid, content).catch(() => {});
 }
 
 function notifyBookingUpdated(db, resourceId, projectName, date, hours, bookerName) {
-  const resource = db.prepare('SELECT wecom_userid, name FROM resources WHERE id = ?').get(resourceId);
+  const resource = db.prepare('SELECT wecom_userid, name, enterprise_id FROM resources WHERE id = ?').get(resourceId);
   if (!resource || !resource.wecom_userid) return;
+
+  const config = getWecomConfig(db, resource.enterprise_id);
+  if (!config.corpId) return;
 
   const content = `✏️ 排班变更通知\n您的工作安排已更新：\n  项目：${projectName}\n  日期：${date}\n  工时：${hours}h\n  操作人：${bookerName || '未知'}`;
 
-  sendTextMessage(resource.wecom_userid, content).catch(() => {});
+  sendTextMessage(config, resource.wecom_userid, content).catch(() => {});
 }
 
 function notifyBookingDeleted(db, resourceId, projectName, date, bookerName) {
-  const resource = db.prepare('SELECT wecom_userid, name FROM resources WHERE id = ?').get(resourceId);
+  const resource = db.prepare('SELECT wecom_userid, name, enterprise_id FROM resources WHERE id = ?').get(resourceId);
   if (!resource || !resource.wecom_userid) return;
+
+  const config = getWecomConfig(db, resource.enterprise_id);
+  if (!config.corpId) return;
 
   const content = `🗑️ 排班取消通知\n您的以下工作安排已取消：\n  项目：${projectName}\n  日期：${date}\n  操作人：${bookerName || '未知'}`;
 
-  sendTextMessage(resource.wecom_userid, content).catch(() => {});
+  sendTextMessage(config, resource.wecom_userid, content).catch(() => {});
 }
 
 module.exports = {
+  getWecomConfig,
   getAccessToken,
   sendCardMessage,
   sendTextMessage,
