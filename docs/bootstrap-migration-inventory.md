@@ -36,4 +36,20 @@
 - [x] 确保 `style.css` 在 Bootstrap CSS 之后加载
 - [x] 在 `public/js/core.js` 增加 Bootstrap 可用性检测
 
+## 5. 阶段 2 实施记录
+
+- [x] 新增 `public/css/bootstrap-bridge.css` 兼容层
+- [x] `index.html` 中引入 `bootstrap-bridge.css`（位于 `style.css` 之后）
+- [x] CSS 加载顺序：Bootstrap CSS → style.css → bootstrap-bridge.css
+
+**兼容层主要内容：**
+
+| 内容 | 说明 |
+|---|---|
+| 设计令牌映射 | Crewboard `--primary`/`--bg`/`--border`/`--font`/`--radius` 映射到 Bootstrap `--bs-*` 变量 |
+| Bootstrap Reboot 修正 | 保持 14px 基准字号，防止 Reboot 改变全局字体大小 |
+| 组件外观对齐 | `.btn`/`.form-control`/`.table`/`.card`/`.nav-tabs`/`.modal` 对齐 Crewboard 视觉 |
+| 桥接类 | `.text-input`/`.select-input`/`.form-group`/`.section-card` 与 Bootstrap 共存 |
+| 工具类补充 | `.bg-primary-light`/`.bg-surface`/`.text-primary-custom` 等业务常用辅助类 |
+
 *文档更新时间：2026-04-19*

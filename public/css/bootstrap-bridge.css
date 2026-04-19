@@ -1,0 +1,429 @@
+/*
+ * bootstrap-bridge.css — Crewboard × Bootstrap 5 兼容层
+ * ============================================================
+ * 阶段2：建立设计令牌映射与桥接类
+ *
+ * 加载顺序（在 index.html 中）：
+ *   1. bootstrap.min.css   ← Bootstrap 默认样式
+ *   2. style.css           ← Crewboard 业务样式（覆盖 Bootstrap 默认）
+ *   3. bootstrap-bridge.css ← 本文件：把 Bootstrap 变量对齐到 Crewboard 设计令牌
+ *
+ * 目标：
+ *   - 让 Bootstrap 组件（.btn-primary、.form-control、.table 等）
+ *     天然呈现 Crewboard 的颜色、圆角、字体，而不是 Bootstrap 默认蓝色
+ *   - 为过渡期提供桥接类，让旧类名可以逐步叠加 Bootstrap 类
+ *   - 不修改任何现有 HTML 结构，不删除任何旧类名
+ * ============================================================
+ */
+
+/* ============================================================
+ * 1. 设计令牌映射：把 Crewboard CSS 变量映射到 Bootstrap 变量
+ *    Bootstrap 5.3 支持完整的 CSS variables 体系，可在 :root 覆盖
+ * ============================================================ */
+:root {
+  /* --- 主色系 --- */
+  --bs-primary:           #4F46E5;   /* = --primary */
+  --bs-primary-rgb:       79, 70, 229;
+  --bs-primary-text-emphasis:  #4338CA;
+  --bs-primary-bg-subtle: #EEF2FF;   /* = --primary-light */
+  --bs-primary-border-subtle: rgba(79, 70, 229, 0.2);
+
+  /* --- 语义色 --- */
+  --bs-success:           #10B981;   /* = --success */
+  --bs-success-rgb:       16, 185, 129;
+  --bs-warning:           #F59E0B;   /* = --warning */
+  --bs-warning-rgb:       245, 158, 11;
+  --bs-danger:            #EF4444;   /* = --danger */
+  --bs-danger-rgb:        239, 68, 68;
+
+  /* --- 页面背景与表面 --- */
+  --bs-body-bg:           #F8F9FB;   /* = --bg */
+  --bs-body-bg-rgb:       248, 249, 251;
+  --bs-secondary-bg:      #FFFFFF;   /* = --surface */
+  --bs-tertiary-bg:       #F8F9FB;
+
+  /* --- 文字 --- */
+  --bs-body-color:        #111827;   /* = --text */
+  --bs-body-color-rgb:    17, 24, 39;
+  --bs-secondary-color:   #6B7280;   /* = --text-secondary */
+  --bs-tertiary-color:    #9CA3AF;   /* = --text-tertiary */
+  --bs-emphasis-color:    #111827;
+
+  /* --- 边框 --- */
+  --bs-border-color:      #E5E7EB;   /* = --border */
+  --bs-border-color-translucent: rgba(229, 231, 235, 0.5);
+
+  /* --- 圆角 --- */
+  --bs-border-radius:     8px;       /* = --radius */
+  --bs-border-radius-sm:  6px;
+  --bs-border-radius-lg:  10px;
+  --bs-border-radius-xl:  12px;
+  --bs-border-radius-pill: 50rem;
+
+  /* --- 字体 --- */
+  --bs-body-font-family:  'Inter', -apple-system, BlinkMacSystemFont, sans-serif; /* = --font */
+  --bs-body-font-size:    0.875rem;  /* 14px，与 Crewboard 基准字号一致 */
+  --bs-body-line-height:  1.5;
+
+  /* --- 阴影 --- */
+  --bs-box-shadow:        0 1px 3px rgba(0, 0, 0, 0.08);  /* = --shadow */
+  --bs-box-shadow-sm:     0 1px 2px rgba(0, 0, 0, 0.05);
+  --bs-box-shadow-lg:     0 4px 12px rgba(0, 0, 0, 0.10);
+
+  /* --- 链接 --- */
+  --bs-link-color:        #4F46E5;
+  --bs-link-color-rgb:    79, 70, 229;
+  --bs-link-hover-color:  #4338CA;
+
+  /* --- 组件 --- */
+  --bs-card-bg:           #FFFFFF;
+  --bs-card-border-color: #E5E7EB;
+  --bs-card-border-radius: 8px;
+  --bs-card-box-shadow:   0 1px 3px rgba(0, 0, 0, 0.08);
+
+  --bs-modal-bg:          #FFFFFF;
+  --bs-modal-border-radius: 12px;
+  --bs-modal-box-shadow:  0 20px 60px rgba(0, 0, 0, 0.15);
+
+  --bs-input-bg:          #FFFFFF;
+  --bs-input-border-color: #E5E7EB;
+  --bs-input-focus-border-color: #4F46E5;
+  --bs-input-focus-box-shadow: 0 0 0 3px #EEF2FF;
+
+  --bs-btn-font-family:   'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --bs-btn-font-size:     0.8125rem; /* 13px */
+  --bs-btn-border-radius: 6px;
+}
+
+/* ============================================================
+ * 2. Bootstrap Reboot 修正
+ *    Bootstrap 的 Reboot 会重置部分元素，这里做最小化修正
+ *    确保不影响 Crewboard 现有业务样式
+ * ============================================================ */
+
+/* 保持 Crewboard 的基础字号和颜色（Reboot 默认 16px，Crewboard 用 14px） */
+body {
+  font-size: 14px;
+  font-family: var(--font, 'Inter', -apple-system, BlinkMacSystemFont, sans-serif);
+  color: var(--text, #111827);
+  background-color: var(--bg, #F8F9FB);
+}
+
+/* 确保 box-sizing 一致（Reboot 已设置，这里做兜底） */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* ============================================================
+ * 3. Bootstrap 组件外观对齐
+ *    让 Bootstrap 的 .btn-primary、.form-control、.table 等
+ *    天然呈现 Crewboard 视觉风格
+ * ============================================================ */
+
+/* --- 按钮：对齐 Crewboard 尺寸与字重 --- */
+.btn {
+  font-size: 13px;
+  font-weight: 500;
+  font-family: var(--font, 'Inter', -apple-system, BlinkMacSystemFont, sans-serif);
+  border-radius: 6px;
+  padding: 7px 14px;
+  transition: all 0.15s;
+}
+.btn-sm {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.btn-lg {
+  padding: 11px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+}
+.btn-primary {
+  background-color: #4F46E5;
+  border-color: #4F46E5;
+  color: #fff;
+}
+.btn-primary:hover,
+.btn-primary:focus {
+  background-color: #4338CA;
+  border-color: #4338CA;
+}
+.btn-primary:focus-visible {
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.3);
+}
+.btn-outline-primary {
+  color: #4F46E5;
+  border-color: #4F46E5;
+}
+.btn-outline-primary:hover {
+  background-color: #4F46E5;
+  border-color: #4F46E5;
+}
+.btn-outline-secondary {
+  color: var(--text, #111827);
+  border-color: var(--border, #E5E7EB);
+  background-color: var(--surface, #FFFFFF);
+}
+.btn-outline-secondary:hover {
+  background-color: var(--bg, #F8F9FB);
+  color: var(--text, #111827);
+  border-color: var(--border, #E5E7EB);
+}
+
+/* --- 表单控件：对齐 Crewboard 输入框风格 --- */
+.form-control,
+.form-select {
+  font-size: 13px;
+  font-family: var(--font, 'Inter', -apple-system, BlinkMacSystemFont, sans-serif);
+  border-color: var(--border, #E5E7EB);
+  border-radius: 6px;
+  padding: 7px 10px;
+  background-color: var(--surface, #FFFFFF);
+  color: var(--text, #111827);
+  transition: border-color 0.15s;
+}
+.form-control:focus,
+.form-select:focus {
+  border-color: #4F46E5;
+  box-shadow: 0 0 0 3px #EEF2FF;
+  outline: none;
+}
+.form-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary, #6B7280);
+  margin-bottom: 4px;
+}
+.form-text {
+  font-size: 11px;
+  color: var(--text-tertiary, #9CA3AF);
+}
+
+/* --- 表格：对齐 Crewboard 表格风格 --- */
+.table {
+  font-size: 13px;
+  color: var(--text, #111827);
+  --bs-table-bg: var(--surface, #FFFFFF);
+  --bs-table-striped-bg: var(--bg, #F8F9FB);
+  --bs-table-hover-bg: var(--primary-light, #EEF2FF);
+  --bs-table-border-color: var(--border, #E5E7EB);
+}
+.table th {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary, #6B7280);
+  background-color: var(--bg, #F8F9FB);
+  border-bottom-width: 2px;
+  padding: 10px 14px;
+}
+.table td {
+  padding: 10px 14px;
+  vertical-align: middle;
+}
+
+/* --- Card：对齐 Crewboard 卡片风格 --- */
+.card {
+  border-color: var(--border, #E5E7EB);
+  border-radius: var(--radius, 8px);
+  box-shadow: var(--shadow, 0 1px 3px rgba(0, 0, 0, 0.08));
+}
+.card-header {
+  background-color: var(--bg, #F8F9FB);
+  border-bottom-color: var(--border, #E5E7EB);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 14px 20px;
+}
+.card-body {
+  padding: 20px;
+}
+
+/* --- Badge：对齐 Crewboard 徽章风格 --- */
+.badge {
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+.badge.bg-primary {
+  background-color: #4F46E5 !important;
+}
+
+/* --- Alert：对齐 Crewboard 提示风格 --- */
+.alert {
+  font-size: 13px;
+  border-radius: var(--radius, 8px);
+  border: none;
+  padding: 10px 14px;
+}
+.alert-primary {
+  background-color: #EEF2FF;
+  color: #4338CA;
+  border-left: 3px solid #4F46E5;
+}
+.alert-success {
+  background-color: #D1FAE5;
+  color: #065F46;
+}
+.alert-warning {
+  background-color: #FEF3C7;
+  color: #92400E;
+}
+.alert-danger {
+  background-color: #FEE2E2;
+  color: #991B1B;
+}
+
+/* --- Nav / Tabs：对齐 Crewboard 标签页风格 --- */
+.nav-tabs {
+  border-bottom-color: var(--border, #E5E7EB);
+}
+.nav-tabs .nav-link {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary, #6B7280);
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 12px 20px;
+  margin-bottom: -1px;
+  border-radius: 0;
+  transition: all 0.15s;
+}
+.nav-tabs .nav-link:hover {
+  color: var(--text, #111827);
+  border-bottom-color: var(--border, #E5E7EB);
+  background: none;
+}
+.nav-tabs .nav-link.active {
+  color: #4F46E5;
+  border-bottom-color: #4F46E5;
+  font-weight: 600;
+  background: none;
+}
+
+/* --- Modal：对齐 Crewboard 弹窗风格（阶段5前不替换，仅做视觉对齐）--- */
+.modal-content {
+  border-radius: 12px;
+  border: none;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+}
+.modal-header {
+  border-bottom-color: var(--border, #E5E7EB);
+  padding: 16px 20px;
+}
+.modal-header .modal-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+.modal-body {
+  padding: 20px;
+}
+.modal-footer {
+  border-top-color: var(--border, #E5E7EB);
+  padding: 12px 20px;
+}
+
+/* ============================================================
+ * 4. 桥接类（Bridge Classes）
+ *    过渡期让旧类名可以叠加 Bootstrap 行为，不改 JS 选择器
+ * ============================================================ */
+
+/* 输入框桥接：.text-input 叠加 .form-control 外观 */
+.text-input {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-family: var(--font, 'Inter', -apple-system, BlinkMacSystemFont, sans-serif);
+  color: var(--text, #111827);
+  background-color: var(--surface, #FFFFFF);
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 6px;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+  outline: none;
+  appearance: none;
+}
+.text-input:focus {
+  border-color: #4F46E5;
+  box-shadow: 0 0 0 3px #EEF2FF;
+}
+
+/* 下拉/日期输入桥接 */
+.select-input,
+.date-input {
+  display: inline-block;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-family: var(--font, 'Inter', -apple-system, BlinkMacSystemFont, sans-serif);
+  color: var(--text, #111827);
+  background-color: var(--surface, #FFFFFF);
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 6px;
+  transition: border-color 0.15s;
+  outline: none;
+}
+.select-input:focus,
+.date-input:focus {
+  border-color: #4F46E5;
+  box-shadow: 0 0 0 3px #EEF2FF;
+}
+
+/* 表单分组桥接：.form-group 与 Bootstrap .mb-3 对齐 */
+.form-group {
+  margin-bottom: 14px;
+}
+.form-group label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary, #6B7280);
+  margin-bottom: 4px;
+}
+
+/* 按钮桥接：保留旧 .btn-primary / .btn-outline / .btn-danger 语义 */
+/* 注意：这里只做视觉补强，不删除 style.css 中的原有定义 */
+.btn-outline {
+  background: var(--surface, #FFFFFF);
+  color: var(--text, #111827);
+  border: 1px solid var(--border, #E5E7EB);
+}
+.btn-outline:hover {
+  background: var(--bg, #F8F9FB);
+}
+
+/* section-card 桥接：对齐 Bootstrap .card */
+.section-card {
+  background: var(--surface, #FFFFFF);
+  border-radius: var(--radius, 8px);
+  padding: 20px;
+  box-shadow: var(--shadow, 0 1px 3px rgba(0, 0, 0, 0.08));
+  margin-bottom: 20px;
+  border: 1px solid var(--border, #E5E7EB);
+}
+
+/* ============================================================
+ * 5. 工具类补充
+ *    补充 Crewboard 常用但 Bootstrap 没有直接对应的工具类
+ * ============================================================ */
+
+/* 文字颜色 */
+.text-primary-custom  { color: #4F46E5 !important; }
+.text-secondary-custom { color: #6B7280 !important; }
+.text-success-custom  { color: #10B981 !important; }
+.text-danger-custom   { color: #EF4444 !important; }
+.text-warning-custom  { color: #F59E0B !important; }
+
+/* 背景色 */
+.bg-primary-light { background-color: #EEF2FF !important; }
+.bg-surface       { background-color: #FFFFFF !important; }
+.bg-app           { background-color: #F8F9FB !important; }
+
+/* 边框 */
+.border-primary-custom { border-color: #4F46E5 !important; }
+
+/* 圆角 */
+.rounded-crewboard { border-radius: 8px !important; }
+
+/* 阴影 */
+.shadow-crewboard { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important; }
