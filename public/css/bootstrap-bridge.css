@@ -952,3 +952,157 @@ body.modal-open {
   transform: translateY(-10px);
   transition: opacity 0.3s, transform 0.3s;
 }
+
+/* ============================================================
+   PHASE 7 BRIDGE — 排班/工时页面辅助组件 + 核心区域保护
+   ============================================================ */
+
+/* ================================================================
+   【核心区域保护】
+   以下选择器内的所有 Bootstrap 样式重置均被禁止，
+   确保排班网格、预订块、工时表格的精密布局不受 Bootstrap Reboot 影响
+   ================================================================ */
+
+/* 排班网格核心区域：完全隔离 Bootstrap 的 table/td/th 重置 */
+.schedule-grid .schedule-table,
+.schedule-grid .schedule-table th,
+.schedule-grid .schedule-table td,
+.schedule-grid .schedule-table tbody,
+.schedule-grid .schedule-table thead {
+  /* 恢复 style.css 的精确控制，不受 Bootstrap .table 类影响 */
+  border-collapse: collapse !important;
+  box-sizing: border-box;
+}
+
+/* 预订块：不受 Bootstrap 任何组件样式影响 */
+.booking-block,
+.booking-block *,
+.leave-block,
+.leave-block *,
+.m-booking,
+.m-booking *,
+.m-leave,
+.m-leave * {
+  /* 防止 Bootstrap Reboot 的 box-sizing / margin / padding 重置影响精密定位 */
+  all: revert-layer; /* 仅回退 Bootstrap layer，保留 style.css 层 */
+}
+
+/* 工时表格输入格：完全由 style.css 控制，不受 Bootstrap form-control 影响 */
+.ts-input {
+  /* 强制保持 style.css 的精确尺寸和样式 */
+  width: 60px !important;
+  padding: 4px 6px !important;
+  font-size: 13px !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 4px !important;
+  background: var(--surface) !important;
+  text-align: center !important;
+  transition: border-color 0.15s, background 0.15s !important;
+  /* 防止 Bootstrap form-control 类被意外叠加 */
+  box-shadow: none !important;
+}
+.ts-input:focus {
+  border-color: var(--primary) !important;
+  background: var(--primary-light) !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+.ts-input-variance {
+  border-color: #f59e0b !important;
+  background: #fffbeb !important;
+}
+.ts-input-copied {
+  background: #d1fae5 !important;
+  transition: background 0.3s !important;
+}
+
+/* ================================================================
+   【Booking Modal 表单组件】
+   bk-field 内的 form-control / form-select 对齐 bk-field 布局
+   ================================================================ */
+
+/* booking modal 内的 form-control 尺寸对齐 bk-field 设计 */
+.bk-field .form-control,
+.bk-field .form-control-sm {
+  font-size: 13px;
+  border-color: var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 6px 10px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.bk-field .form-control:focus,
+.bk-field .form-control-sm:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+  background: var(--surface);
+}
+
+/* booking modal 内的 form-select 对齐 bk-field 设计 */
+.bk-field .form-select,
+.bk-field .form-select-sm {
+  font-size: 13px;
+  border-color: var(--border);
+  border-radius: 6px;
+  background-color: var(--surface);
+  color: var(--text);
+  padding: 6px 32px 6px 10px;
+}
+.bk-field .form-select:focus,
+.bk-field .form-select-sm:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+}
+
+/* bk-date-row 内的日期输入框：保持 flex:1 布局，不被 form-control 的 display:block 破坏 */
+.bk-date-row .form-control,
+.bk-date-row .form-control-sm {
+  flex: 1;
+  min-width: 0;
+  display: block; /* form-control 已是 block，确保 flex 容器正确分配空间 */
+}
+
+/* bk-hours-group 内的数字输入框：保持 100% 宽度 */
+.bk-hours-group .form-control,
+.bk-hours-group .form-control-sm {
+  width: 100%;
+}
+
+/* booking modal textarea 高度 */
+.bk-field textarea.form-control {
+  resize: vertical;
+  min-height: 60px;
+}
+
+/* ================================================================
+   【工时页面工具栏】
+   ts-copy-from-schedule 按钮与 btn-outline 对齐
+   ================================================================ */
+#ts-copy-from-schedule.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+}
+
+/* ================================================================
+   【排班页面视图切换按钮】
+   view-toggle btn-group 内的 view-btn 激活态
+   ================================================================ */
+.view-toggle.btn-group .view-btn.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+  z-index: 1;
+}
+.view-toggle.btn-group .view-btn:not(.active) {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border);
+}
+.view-toggle.btn-group .view-btn:not(.active):hover {
+  background: var(--primary-light);
+  color: var(--primary);
+  border-color: var(--primary);
+}

@@ -1695,18 +1695,18 @@
         '<div class="bk-hours-row">' +
           '<div class="bk-hours-group">' +
             '<label>' + t('schedule.hours_per_day') + '</label>' +
-            '<input type="number" id="bk-hours" class="text-input" value="' + hoursVal + '" min="0.5" max="24" step="0.5" onchange="window._updateBkTotal()" oninput="window._updateBkTotal()">' +
+            '<input type="number" id="bk-hours" class="text-input form-control form-control-sm" value="' + hoursVal + '" min="0.5" max="24" step="0.5" onchange="window._updateBkTotal()" oninput="window._updateBkTotal()">' +
           '</div>' +
           '<div class="bk-hours-group">' +
             '<label>' + t('schedule.minutes') + '</label>' +
-            '<input type="number" id="bk-mins" class="text-input" value="0" min="0" max="59" step="15" onchange="window._updateBkTotal()" oninput="window._updateBkTotal()">' +
+            '<input type="number" id="bk-mins" class="text-input form-control form-control-sm" value="0" min="0" max="59" step="15" onchange="window._updateBkTotal()" oninput="window._updateBkTotal()">' +
           '</div>' +
         '</div>' +
         '<div class="bk-date-row">' +
           '<label>' + t('common.from') + '</label>' +
-          '<input type="date" id="bk-date-start" class="text-input" value="' + dateVal + '" onchange="window._updateBkTotal()">' +
+          '<input type="date" id="bk-date-start" class="text-input form-control form-control-sm" value="' + dateVal + '" onchange="window._updateBkTotal()">' +
           '<label>' + t('common.to') + '</label>' +
-          '<input type="date" id="bk-date-end" class="text-input" value="' + (isEdit ? dateVal : endDateVal) + '" onchange="window._updateBkTotal()">' +
+          '<input type="date" id="bk-date-end" class="text-input form-control form-control-sm" value="' + (isEdit ? dateVal : endDateVal) + '" onchange="window._updateBkTotal()">' +
         '</div>' +
         '<div class="bk-total" id="bk-total"></div>' +
       '</div>' +
@@ -1720,9 +1720,9 @@
       '<div class="bk-field-body">' +
         '<div class="bk-date-row">' +
           '<label>' + t('common.from') + '</label>' +
-          '<input type="date" id="to-date-start" class="text-input" value="' + dateVal + '" onchange="window._updateToTotal()">' +
+          '<input type="date" id="to-date-start" class="text-input form-control form-control-sm" value="' + dateVal + '" onchange="window._updateToTotal()">' +
           '<label>' + t('common.to') + '</label>' +
-          '<input type="date" id="to-date-end" class="text-input" value="' + endDateVal + '" onchange="window._updateToTotal()">' +
+          '<input type="date" id="to-date-end" class="text-input form-control form-control-sm" value="' + endDateVal + '" onchange="window._updateToTotal()">' +
         '</div>' +
         '<div class="bk-total" id="to-total"></div>' +
       '</div>' +
@@ -1735,7 +1735,7 @@
       '<svg class="bk-field-icon" viewBox="0 0 20 20" fill="none"><path d="M2 5a2 2 0 012-2h4l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V5z" stroke="currentColor" stroke-width="1.5"/></svg>' +
       '<div class="bk-field-body">' +
         '<div class="bk-field-label">' + t('schedule.project_client') + '</div>' +
-        '<select id="bk-project" class="text-input">' + projOpts + '</select>' +
+        '<select id="bk-project" class="text-input form-select form-select-sm">' + projOpts + '</select>' +
       '</div>' +
     '</div>';
   }
@@ -1778,7 +1778,7 @@
       '<svg class="bk-field-icon" viewBox="0 0 20 20" fill="none"><path d="M4 4h12M4 8h12M4 12h8M4 16h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' +
       '<div class="bk-field-body">' +
         '<div class="bk-field-label">' + t('common.notes') + '</div>' +
-        '<textarea id="' + id + '" class="text-input" rows="2" placeholder="' + t('schedule.optional_notes') + '" style="resize:vertical">' + esc(val) + '</textarea>' +
+        '<textarea id="' + id + '" class="text-input form-control" rows="2" placeholder="' + t('schedule.optional_notes') + '" style="resize:vertical">' + esc(val) + '</textarea>' +
       '</div>' +
     '</div>';
   }
@@ -2169,7 +2169,7 @@
         '<svg class="bk-field-icon" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' +
         '<div class="bk-field-body">' +
           '<div class="bk-field-label">' + t('common.date') + '</div>' +
-          '<input type="date" id="edit-leave-date" class="text-input" value="' + leaveEntry.date + '">' +
+          '<input type="date" id="edit-leave-date" class="text-input form-control form-control-sm" value="' + leaveEntry.date + '">' +
         '</div>' +
       '</div>' +
       '<div class="bk-separator"></div>' +
@@ -2185,7 +2185,7 @@
         '<svg class="bk-field-icon" viewBox="0 0 20 20" fill="none"><path d="M4 4h12M4 8h12M4 12h8M4 16h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' +
         '<div class="bk-field-body">' +
           '<div class="bk-field-label">' + t('common.notes') + '</div>' +
-          '<textarea id="edit-leave-notes" class="text-input" rows="2" placeholder="' + t('schedule.optional_notes') + '" style="resize:vertical">' + esc(leaveEntry.notes || '') + '</textarea>' +
+          '<textarea id="edit-leave-notes" class="text-input form-control" rows="2" placeholder="' + t('schedule.optional_notes') + '" style="resize:vertical">' + esc(leaveEntry.notes || '') + '</textarea>' +
         '</div>' +
       '</div>';
 

@@ -118,4 +118,15 @@
 - [x] 左侧 tab 无法点击：`#modal-overlay.modal:not(.show)` 加 `pointer-events:none`，`hidden.bs.modal` 事件内强制清除 backdrop + `body.modal-open`
 - [x] 报表样式混乱：`report-summary.row` 和 `report-charts.row` 加 `display:flex !important` 覆盖 style.css 的 `display:grid`，未加 Bootstrap 类的旧式报表保持原有 grid 布局
 
+## 10. 阶段 7 实施记录
+
+**迁移内容：**
+- [x] `schedule.js`：Booking modal 内部表单全部 10 处 `.text-input` 叠加 `form-control`/`form-select`（数字输入、日期输入、下拉框、文本域）
+- [x] `bootstrap-bridge.css`：新增阶段7修正（booking modal 表单对齐、视图切换按钮激活态、工时页工具栏）
+
+**核心区域保护（不动）：**
+- [x] `.schedule-table`、`.booking-cell`、`.booking-block`、`.leave-block`、`.m-booking`、`.m-leave` —— 排班网格和预订块
+- [x] `.ts-table`、`.ts-input`、`.ts-input-variance`、`.ts-input-copied` —— 工时表格和输入格
+- [x] `.bk-tabs`、`.bk-tab`、`.bk-toggle`、`.bk-leave-type` —— booking modal 专属布局组件
+
 *文档更新时间：2026-04-19*
