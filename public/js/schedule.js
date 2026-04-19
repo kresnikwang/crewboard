@@ -1440,6 +1440,9 @@
         if (todayBtn) todayBtn.textContent = view === 'month' ? t('schedule.this_month') : t('schedule.this_week');
         /* Reset to current week's Monday */
         state.scheduleWeekStart = getMonday(new Date());
+        /* Invalidate schedule cache so the new view fetches fresh data
+           for its own date range (week vs month have different end dates) */
+        if (window.apiCache) window.apiCache.invalidatePrefix('/api/schedule-data');
         window.loadSchedule();
       });
     }
