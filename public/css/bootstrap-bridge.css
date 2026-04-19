@@ -1041,6 +1041,14 @@ body.modal-open {
   background: #d1fae5 !important;
   transition: background 0.3s !important;
 }
+.ts-input-synced {
+  background-color: #EEF2FF !important;
+  border-color: #A5B4FC !important;
+}
+.ts-input-synced:focus {
+  background-color: #E0E7FF !important;
+  border-color: var(--primary) !important;
+}
 
 /* ================================================================
    【Booking Modal 表单组件】
