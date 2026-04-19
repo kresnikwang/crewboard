@@ -210,6 +210,13 @@ body {
   color: var(--text, #111827);
   transition: border-color 0.15s;
 }
+
+/* 工具栏内的 form-control / form-select 保持行内布局，不占满宽 */
+.header-actions .form-control,
+.header-actions .form-select {
+  display: inline-block;
+  width: auto;
+}
 .form-control:focus,
 .form-select:focus {
   border-color: #4F46E5;
@@ -563,33 +570,12 @@ body {
   margin-bottom: 14px;
 }
 
-/* ---- 修复：report-summary 和 report-charts 布局冲突 ----
-   style.css 里这两个类用的是 display:grid，但 Bootstrap .row 是 display:flex
-   当两个类同时存在时，需要覆盖 grid 让 Bootstrap flexbox 生效 */
-.report-summary.row {
-  display: flex !important;   /* 覆盖 style.css 的 display:grid */
-  flex-wrap: wrap;
-  margin-bottom: 0;           /* 由 mb-3 控制 */
-}
-.report-summary.row > [class*='col-'] {
-  /* Bootstrap col 控制宽度，不需要额外设置 */
-}
-
+/* ---- report-summary / report-charts 布局 ----
+   style.css 已改为 display:flex，Bootstrap .row 可直接生效
+   margin-bottom 由 Bootstrap mb-3 控制，此处重置为 0 */
+.report-summary.row,
 .report-charts.row {
-  display: flex !important;   /* 覆盖 style.css 的 display:grid */
-  flex-wrap: wrap;
-  margin-bottom: 0;           /* 由 mb-3 控制 */
-}
-
-/* 未加 Bootstrap row 的旧式 report-charts（项目报表）保持原有 grid 布局 */
-.report-charts:not(.row) {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-bottom: 24px;
-}
-@media (max-width: 900px) {
-  .report-charts:not(.row) { grid-template-columns: 1fr; }
+  margin-bottom: 0;
 }
 
 /* ---- Bootstrap .card used in report summary / charts ---- */
@@ -683,10 +669,23 @@ body {
   background-color: var(--surface);
   border-color: var(--border);
   border-radius: var(--radius);
+  /* 工具栏内保持行内布局，不占满宽 */
+  display: inline-block !important;
+  width: auto !important;
 }
 .date-input.form-control:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+}
+
+/* ---- 报表工具栏内的 form-select 保持行内布局 ---- */
+#report-type.form-select {
+  display: inline-block !important;
+  width: auto !important;
+  min-width: 120px;
+  height: 32px;
+  padding: 4px 28px 4px 10px;
+  font-size: 13px;
 }
 
 /* ---- Bootstrap .input-group for search box ---- */
