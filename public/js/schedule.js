@@ -1339,8 +1339,10 @@
         if (dayLeave.type === 'sick') leaveCls += ' sick';
         else if (dayLeave.type === 'personal') leaveCls += ' personal';
         else if (dayLeave.type === 'holiday') leaveCls += ' holiday';
-        html += '<div class="' + leaveCls + '" data-leave-id="' + dayLeave.id + '">' +
-          getLeaveLabel(dayLeave.type).charAt(0) + '</div>';
+        var leaveLabel = getLeaveLabel(dayLeave.type);
+        html += '<div class="' + leaveCls + '" data-leave-id="' + dayLeave.id + '"' +
+          ' title="' + escAttr(leaveLabel + (dayLeave.notes ? ': ' + dayLeave.notes : '')) + '">' +
+          leaveLabel + '</div>';
       }
 
       /* Booking blocks */

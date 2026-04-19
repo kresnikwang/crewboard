@@ -1160,8 +1160,10 @@ a { text-decoration: none; color: inherit; }
 
 /* Leave block in month view */
 .m-leave {
-  font-size: 9px; padding: 2px 3px; border-radius: 2px; margin-bottom: 1px;
+  font-size: 8.8px; padding: 2px 4px 2px 5px; border-radius: 3px; margin-bottom: 1px;
   background: #E5E7EB; color: #374151; border-left: 2px solid #6B7280;
+  display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  cursor: pointer; line-height: 1.4;
 }
 .m-leave.sick { background: #FEF3C7; color: #92400E; border-left-color: #F59E0B; }
 .m-leave.personal { background: #E0F2FE; color: #0369A1; border-left-color: #0EA5E9; }
