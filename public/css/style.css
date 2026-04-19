@@ -190,11 +190,11 @@ a { text-decoration: none; color: inherit; }
 
 /* === TIMESHEET === */
 .timesheet-container { flex: 1; overflow: auto; padding: 24px; }
-.ts-table { width: 100%; border-collapse: collapse; background: var(--surface); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+.ts-table { width: 100%; border-collapse: collapse; background: var(--surface); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); table-layout: fixed; }
 .ts-table th { padding: 10px 12px; font-size: 12px; font-weight: 600; color: var(--text-secondary); text-align: center; border-bottom: 2px solid var(--border); background: var(--bg); }
-.ts-table th:first-child { text-align: left; padding-left: 16px; }
-.ts-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); text-align: center; }
-.ts-table td:first-child { text-align: left; font-weight: 500; }
+.ts-table th:first-child { text-align: left; padding-left: 16px; width: 300px; }
+.ts-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); text-align: center; vertical-align: middle; }
+.ts-table td:first-child { text-align: left; font-weight: 500; border-left: 3px solid transparent; }
 .ts-input {
   width: 60px; padding: 5px 4px; text-align: center; border: 1px solid var(--border); border-radius: 4px;
   font-size: 13px; font-family: var(--font); outline: none;

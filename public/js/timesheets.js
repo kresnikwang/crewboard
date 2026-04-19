@@ -212,8 +212,8 @@
       var color = p.client_color || p.color || '#6366F1';
       var codeLabel = p.code ? '<span class="ts-proj-code">' + esc(p.code) + '</span>' : '';
 
-      html += '<tr style="border-left:3px solid ' + color + '" data-project-id="' + p.id + '">' +
-        '<td class="ts-project-cell">' +
+      html += '<tr data-project-id="' + p.id + '">' +
+        '<td class="ts-project-cell" style="border-left:3px solid ' + color + '">' +
         '<span class="ts-color-dot" style="background:' + color + '"></span>' +
         codeLabel + esc(p.name) + '</td>';
 
