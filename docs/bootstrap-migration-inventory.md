@@ -71,4 +71,22 @@
 | `.btn-block` | 保留，叠加 `w-100 d-flex justify-content-center` |
 | `.auth-error` / `.auth-hint` | 保留，在 bridge.css 中增强样式 |
 
+## 7. 阶段 4 实施记录
+
+- [x] `index.html`：视图切换按钮叠加 `.btn-group`，报表工具栏 `select` 叠加 `.form-select`，日期输入叠加 `.form-control`，报表预设按钮叠加 `.btn-group`，搜索框改为 `.input-group`，pc-tabs 叠加 `.nav-tabs .nav-link`
+- [x] `manage.js`：`res-table` 叠加 `.table .table-hover .table-sm .align-middle`，`pc-table`（项目/客户/存档全部4处）叠加 `.table .table-hover .table-sm .align-middle`，角色下拉叠加 `.form-select-sm`，tab 点击处理器同步 `aria-selected`
+- [x] `reports.js`：`report-summary` 改为 Bootstrap `.row .g-3`，`summary-card` 叠加 `.card`，`report-charts` 改为 Bootstrap `.row .g-3`，`report-chart-card` 叠加 `.card`，`report-table` 叠加 `.table .table-hover .table-sm`，`drill-table` 叠加 `.table .table-sm`
+- [x] `enterprise.js`：`section-card` 叠加 `.card .mb-3`，`form-group` 叠加 `.mb-3`，`form-row` 叠加 `.row .g-3`，所有 `.text-input` 叠加 `.form-control`
+- [x] `bootstrap-bridge.css`：新增阶段4专项修正（section-card、summary-card、report-chart-card、res-table、pc-table、report-table、drill-table、form-select、form-control、input-group、nav-tabs、btn-group 等）
+
+**保留的 JS 钩子（未改动）：**
+
+| 保留项 | 原因 |
+|---|---|
+| 所有 `id` 属性 | JS 事件绑定依赖 |
+| `.res-table` / `.pc-table` / `.report-table` | JS DOM 操作钩子 |
+| `.section-card` / `.form-group` / `.form-row` | JS 内容渲染钩子 |
+| `.pc-tab` / `data-tab` | 标签页切换逻辑 |
+| `pcActiveTab` / `pcSearchQuery` 状态变量 | 搜索/筛选逻辑 |
+
 *文档更新时间：2026-04-19*

@@ -107,15 +107,16 @@
   // --------------- Summary Cards ---------------
 
   function renderSummaryCards(container, cards) {
-    var html = '<div class="report-summary">';
+    var html = '<div class="report-summary row g-3 mb-3">';
     cards.forEach(function (c) {
-      html += '<div class="summary-card">' +
-        '<div class="summary-label">' + esc(c.label) + '</div>' +
-        '<div class="summary-value"' +
+      html += '<div class="col-6 col-md-3"><div class="summary-card card h-100">' +
+        '<div class="card-body p-3">' +
+        '<div class="summary-label text-muted small mb-1">' + esc(c.label) + '</div>' +
+        '<div class="summary-value fw-bold fs-5"' +
         (c.color ? ' style="color:' + c.color + '"' : '') +
         '>' + esc(String(c.value)) + '</div>' +
-        (c.sub ? '<div class="summary-sub">' + esc(c.sub) + '</div>' : '') +
-        '</div>';
+        (c.sub ? '<div class="summary-sub text-muted small">' + esc(c.sub) + '</div>' : '') +
+        '</div></div></div>';
     });
     html += '</div>';
     container.insertAdjacentHTML('beforeend', html);
@@ -146,22 +147,22 @@
 
         /* ---- Chart area ---- */
         var chartWrap = document.createElement('div');
-        chartWrap.className = 'report-charts';
+        chartWrap.className = 'report-charts row g-3 mb-3';
         chartWrap.innerHTML =
-          '<div class="report-chart-card">' +
-            '<div class="report-chart-title">' + t('reports.team_util_dist') + '</div>' +
+          '<div class="col-md-8"><div class="report-chart-card card h-100"><div class="card-body">' +
+            '<div class="report-chart-title fw-semibold mb-2">' + t('reports.team_util_dist') + '</div>' +
             '<canvas id="chart-util-bar" height="220"></canvas>' +
-          '</div>' +
-          '<div class="report-chart-card">' +
-            '<div class="report-chart-title">' + t('reports.hours_composition') + '</div>' +
+          '</div></div></div>' +
+          '<div class="col-md-4"><div class="report-chart-card card h-100"><div class="card-body">' +
+            '<div class="report-chart-title fw-semibold mb-2">' + t('reports.hours_composition') + '</div>' +
             '<canvas id="chart-util-pie" height="220"></canvas>' +
-          '</div>';
+          '</div></div></div>';
         container.appendChild(chartWrap);
 
         /* ---- Table ---- */
         var tableWrap = document.createElement('div');
         tableWrap.className = 'report-table-wrap';
-        var tableHtml = '<table class="report-table"><thead><tr>' +
+        var tableHtml = '<table class="report-table table table-hover table-sm align-middle"><thead><tr>' +
           '<th>' + t('reports.member') + '</th><th>' + t('reports.role') + '</th><th>' + t('reports.team') + '</th>' +
           '<th>' + t('reports.booked_hours') + '</th><th>' + t('reports.actual_hours') + '</th><th>' + t('reports.available_hours') + '</th>' +
           '<th>' + t('reports.utilization_pct') + '</th><th>' + t('reports.progress') + '</th>' +
@@ -225,7 +226,7 @@
           drillRow.querySelector('td').innerHTML = '<div class="drill-empty">' + t('reports.no_project_data') + '</div>';
           return;
         }
-        var html = '<div class="drill-content"><table class="drill-table">' +
+        var html = '<div class="drill-content"><table class="drill-table table table-sm">' +
           '<thead><tr><th>' + t('common.project') + '</th><th>' + t('common.client') + '</th><th>' + t('reports.booked_hours') + '</th><th>' + t('reports.actual_hours') + '</th></tr></thead><tbody>';
         items.forEach(function (p) {
           html += '<tr>' +
@@ -344,7 +345,7 @@
         /* ---- Table ---- */
         var tableWrap = document.createElement('div');
         tableWrap.className = 'report-table-wrap';
-        var tableHtml = '<table class="report-table"><thead><tr>' +
+        var tableHtml = '<table class="report-table table table-hover table-sm align-middle"><thead><tr>' +
           '<th>' + t('common.project') + '</th><th>' + t('common.client') + '</th><th>' + t('reports.budget_hours') + '</th>' +
           '<th>' + t('reports.scheduled_hours') + '</th><th>' + t('reports.actual_hours') + '</th><th>' + t('reports.rate_cny') + '</th>' +
           '<th>' + t('reports.utilization_pct') + '</th><th>' + t('reports.progress') + '</th>' +
@@ -417,7 +418,7 @@
           drillRow.querySelector('td').innerHTML = '<div class="drill-empty">' + t('reports.no_member_data') + '</div>';
           return;
         }
-        var html = '<div class="drill-content"><table class="drill-table">' +
+        var html = '<div class="drill-content"><table class="drill-table table table-sm">' +
           '<thead><tr><th>' + t('reports.member') + '</th><th>' + t('reports.role') + '</th><th>' + t('reports.team') + '</th><th>' + t('reports.booked_hours') + '</th><th>' + t('reports.actual_hours') + '</th></tr></thead><tbody>';
         items.forEach(function (m) {
           html += '<tr>' +

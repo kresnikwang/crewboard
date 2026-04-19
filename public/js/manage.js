@@ -42,7 +42,7 @@ window.loadResources = async function loadResources() {
 
   // 列数：人员 / 职位 / 邮箱 / 手机 / 工时/天 / 系统权限 / 账号状态 [/ 操作]
   var colCount = canManage ? 8 : 7;
-  var html = '<table class="res-table"><thead><tr>' +
+  var html = '<table class="res-table table table-hover table-sm align-middle"><thead><tr>' +
     '<th style="width:28%">' + t('schedule.resource') + '</th>' +
     '<th>' + t('manage.position') + '</th>' +
     '<th>' + t('common.email') + '</th>' +
@@ -69,7 +69,7 @@ window.loadResources = async function loadResources() {
       var permCell = '';
       if (hasAccount && effectiveRole) {
         if (canManage && r.user_id !== currentUserId) {
-          permCell = '<select class="text-input res-role-select" data-user-id="' + r.user_id + '" style="width:84px;font-size:12px;padding:3px 6px">' +
+          permCell = '<select class="text-input form-select form-select-sm res-role-select" data-user-id="' + r.user_id + '" style="width:90px">' +
             '<option value="basic"'  + (effectiveRole === 'basic'   ? ' selected' : '') + '>' + t('manage.basic_user') + '</option>' +
             '<option value="manager"'+ (effectiveRole === 'manager' ? ' selected' : '') + '>' + t('manage.manager') + '</option>' +
             '<option value="admin"'  + (effectiveRole === 'admin'   ? ' selected' : '') + '>' + t('manage.admin') + '</option>' +
@@ -428,7 +428,7 @@ function renderProjectsTable(container) {
   }
 
   var table = document.createElement('table');
-  table.className = 'pc-table';
+  table.className = 'pc-table table table-hover table-sm align-middle';
   table.innerHTML =
     '<thead><tr>' +
       '<th class="col-name">' + t('manage.project_name') + '</th>' +
@@ -495,7 +495,7 @@ function renderClientsTable(container) {
   }
 
   var table = document.createElement('table');
-  table.className = 'pc-table';
+  table.className = 'pc-table table table-hover table-sm align-middle';
   table.innerHTML =
     '<thead><tr>' +
       '<th class="col-name">' + t('manage.client_name') + '</th>' +
@@ -794,8 +794,8 @@ function renderArchivedPage(container) {
   if (archivedClients.length) {
     html += '<div class="archive-section">' +
       '<h3 class="archive-section-title">' + t('manage.archive_client') + ' (' + archivedClients.length + ')</h3>' +
-      '<table class="pc-table"><thead><tr>' +
-        '<th class="col-name">' + t('manage.client_name') + '</th>' +
+      '<table class="pc-table table table-hover table-sm align-middle"><thead><tr>' +
+         '<th class="col-name">' + t('manage.client_name') + '</th>'+
         '<th class="col-details">' + t('common.notes') + '</th>' +
         '<th class="col-actions"></th>' +
       '</tr></thead><tbody>';
@@ -820,8 +820,8 @@ function renderArchivedPage(container) {
   if (archivedProjects.length) {
     html += '<div class="archive-section">' +
       '<h3 class="archive-section-title">' + t('manage.archive_project') + ' (' + archivedProjects.length + ')</h3>' +
-      '<table class="pc-table"><thead><tr>' +
-        '<th class="col-name">' + t('manage.project_name') + '</th>' +
+      '<table class="pc-table table table-hover table-sm align-middle"><thead><tr>' +
+         '<th class="col-name">' + t('manage.project_name') + '</th>'+
         '<th class="col-client">' + t('common.client') + '</th>' +
         '<th class="col-code">' + t('manage.project_code') + '</th>' +
         '<th class="col-dates">' + t('manage.period') + '</th>' +
@@ -881,8 +881,13 @@ document.addEventListener('DOMContentLoaded', function () {
   document.querySelectorAll('.pc-tab').forEach(function (tab) {
     tab.addEventListener('click', function () {
       pcActiveTab = tab.dataset.tab;
-      document.querySelectorAll('.pc-tab').forEach(function (t) { t.classList.remove('active'); });
+      document.querySelectorAll('.pc-tab').forEach(function (t) {
+        t.classList.remove('active');
+        // Bootstrap nav-link active state
+        if (t.classList.contains('nav-link')) t.setAttribute('aria-selected', 'false');
+      });
       tab.classList.add('active');
+      if (tab.classList.contains('nav-link')) tab.setAttribute('aria-selected', 'true');
       pcSearchQuery = '';
       var searchInput = document.getElementById('pc-search');
       if (searchInput) searchInput.value = '';

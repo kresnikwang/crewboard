@@ -300,9 +300,9 @@
         <div class="page-header">
           <h1 data-i18n="schedule.title">资源排程</h1>
           <div class="header-actions">
-            <div class="view-toggle" id="view-toggle">
-              <button class="view-btn active" data-view="week" data-i18n="schedule.week_view">周视图</button>
-              <button class="view-btn" data-view="month" data-i18n="schedule.month_view">月视图</button>
+            <div class="view-toggle btn-group" id="view-toggle" role="group">
+              <button class="view-btn btn btn-outline active" data-view="week" data-i18n="schedule.week_view">周视图</button>
+              <button class="view-btn btn btn-outline" data-view="month" data-i18n="schedule.month_view">月视图</button>
             </div>
             <button class="btn btn-outline" id="schedule-prev"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
             <button class="btn btn-outline" id="schedule-today" data-i18n="schedule.this_week">本周</button>
@@ -323,7 +323,7 @@
             <button class="btn btn-outline" id="ts-today" data-i18n="timesheets.this_week">本周</button>
             <button class="btn btn-outline" id="ts-next"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
             <span class="date-range" id="ts-range"></span>
-            <select id="ts-resource-select" class="select-input"></select>
+            <select id="ts-resource-select" class="select-input form-select form-select-sm"></select>
             <button class="btn btn-outline" id="ts-copy-from-schedule" title="将本周排程工时复制到工时表" data-i18n-title="timesheets.copy_tooltip">
               <svg width="15" height="15" viewBox="0 0 20 20" fill="none" style="margin-right:4px;vertical-align:-2px"><rect x="3" y="3" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M7 7h10v10H7z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
               <span data-i18n="timesheets.copy_from_schedule">从排程复制</span>
@@ -338,11 +338,11 @@
         <div class="page-header">
           <h1 data-i18n="reports.title">报表</h1>
           <div class="header-actions">
-            <select id="report-type" class="select-input">
+            <select id="report-type" class="select-input form-select form-select-sm">
               <option value="utilization" data-i18n="reports.utilization">利用率报表</option>
               <option value="projects" data-i18n="reports.project_report">项目报表</option>
             </select>
-            <div class="report-presets" id="report-presets">
+            <div class="report-presets btn-group" id="report-presets" role="group">
               <button class="btn btn-sm btn-ghost" data-preset="this_week" data-i18n="reports.this_week">本周</button>
               <button class="btn btn-sm btn-ghost" data-preset="last_week" data-i18n="reports.last_week">上周</button>
               <button class="btn btn-sm btn-ghost" data-preset="this_month" data-i18n="reports.this_month">本月</button>
@@ -350,9 +350,9 @@
               <button class="btn btn-sm btn-ghost" data-preset="this_quarter" data-i18n="reports.this_quarter">本季度</button>
               <button class="btn btn-sm btn-ghost" data-preset="this_year" data-i18n="reports.this_year">今年</button>
             </div>
-            <input type="date" id="report-start" class="date-input">
+            <input type="date" id="report-start" class="date-input form-control form-control-sm">
             <span data-i18n="common.to">至</span>
-            <input type="date" id="report-end" class="date-input">
+            <input type="date" id="report-end" class="date-input form-control form-control-sm">
             <button class="btn btn-primary" id="btn-gen-report" data-i18n="reports.generate">生成报表</button>
             <button class="btn btn-outline" id="btn-export-excel" data-i18n="reports.export_excel">导出 Excel</button>
           </div>
@@ -374,17 +374,19 @@
       <!-- Projects & Clients Page -->
       <div class="page" id="page-projects">
         <div class="page-header">
-          <div class="pc-tabs">
-            <button class="pc-tab active" data-tab="projects" id="tab-projects" data-i18n="manage.projects_tab">项目</button>
-            <button class="pc-tab" data-tab="clients" id="tab-clients" data-i18n="manage.clients_tab">客户</button>
-            <button class="pc-tab" data-tab="archived" id="tab-archived" data-i18n="manage.archive_tab">存档</button>
+          <div class="pc-tabs nav nav-tabs border-0" id="pc-tabs-nav">
+            <button class="pc-tab nav-link active" data-tab="projects" id="tab-projects" data-i18n="manage.projects_tab">项目</button>
+            <button class="pc-tab nav-link" data-tab="clients" id="tab-clients" data-i18n="manage.clients_tab">客户</button>
+            <button class="pc-tab nav-link" data-tab="archived" id="tab-archived" data-i18n="manage.archive_tab">存档</button>
           </div>
           <div class="header-actions">
-            <div class="search-box">
-              <svg width="16" height="16" viewBox="0 0 20 20" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M14 14l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-              <input type="text" id="pc-search" class="text-input" data-i18n-placeholder="common.search" placeholder="搜索...">
+            <div class="search-box input-group input-group-sm">
+              <span class="input-group-text bg-transparent border-end-0">
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M14 14l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              </span>
+              <input type="text" id="pc-search" class="text-input form-control border-start-0" data-i18n-placeholder="common.search" placeholder="搜索...">
             </div>
-            <button class="btn btn-primary" id="btn-add-new-pc">
+            <button class="btn btn-primary d-flex align-items-center gap-1" id="btn-add-new-pc">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
               <span data-i18n="common.create">新建</span>
             </button>

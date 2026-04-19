@@ -515,3 +515,195 @@ body {
 .btn-block:active {
   transform: scale(0.99);
 }
+
+/* ============================================================
+   PHASE 4 BRIDGE — Management Pages, Reports, Settings, Account
+   ============================================================ */
+
+/* ---- Section Cards (enterprise / account pages) ---- */
+.section-card.card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px 24px;
+  background: var(--surface);
+  margin-bottom: 16px;
+}
+.section-card.card h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 14px;
+}
+
+/* ---- Bootstrap .card used in report summary / charts ---- */
+.summary-card.card,
+.report-chart-card.card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  background: var(--surface);
+}
+
+/* ---- Bootstrap .table inside management pages ---- */
+.res-table.table,
+.pc-table.table,
+.report-table.table {
+  font-size: 13px;
+  color: var(--text);
+  border-color: var(--border);
+  margin-bottom: 0;
+}
+.res-table.table thead th,
+.pc-table.table thead th,
+.report-table.table thead th {
+  background: var(--bg);
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.res-table.table tbody tr:hover,
+.pc-table.table tbody tr:hover,
+.report-table.table tbody tr:hover {
+  background: rgba(79, 70, 229, 0.04);
+}
+.drill-table.table {
+  font-size: 12px;
+  color: var(--text);
+  border-color: var(--border);
+  margin-bottom: 0;
+}
+
+/* ---- Bootstrap .form-select inside management toolbars ---- */
+.select-input.form-select,
+.select-input.form-select-sm {
+  font-size: 13px;
+  color: var(--text);
+  background-color: var(--surface);
+  border-color: var(--border);
+  border-radius: var(--radius);
+  height: 32px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.select-input.form-select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+}
+
+/* ---- Bootstrap .form-control inside management forms ---- */
+.text-input.form-control {
+  font-size: 13px;
+  color: var(--text);
+  background-color: var(--surface);
+  border-color: var(--border);
+  border-radius: var(--radius);
+  height: 36px;
+  padding: 6px 10px;
+}
+.text-input.form-control:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+  background-color: var(--surface);
+}
+
+/* ---- Bootstrap .form-control for date inputs in reports toolbar ---- */
+.date-input.form-control {
+  font-size: 13px;
+  height: 32px;
+  padding: 4px 8px;
+  color: var(--text);
+  background-color: var(--surface);
+  border-color: var(--border);
+  border-radius: var(--radius);
+}
+.date-input.form-control:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+}
+
+/* ---- Bootstrap .input-group for search box ---- */
+.search-box.input-group .input-group-text {
+  background: var(--surface);
+  border-color: var(--border);
+  border-radius: var(--radius) 0 0 var(--radius);
+  color: var(--text-secondary);
+}
+.search-box.input-group .form-control {
+  border-color: var(--border);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  font-size: 13px;
+  height: 32px;
+  border-left: none;
+}
+.search-box.input-group .form-control:focus {
+  border-color: var(--primary);
+  box-shadow: none;
+  border-left: none;
+}
+
+/* ---- Bootstrap .nav-tabs for pc-tabs ---- */
+.pc-tabs.nav-tabs {
+  border-bottom: none;
+  gap: 2px;
+}
+.pc-tabs.nav-tabs .pc-tab.nav-link {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.pc-tabs.nav-tabs .pc-tab.nav-link:hover {
+  color: var(--primary);
+  background: rgba(79, 70, 229, 0.06);
+}
+.pc-tabs.nav-tabs .pc-tab.nav-link.active {
+  color: var(--primary);
+  background: transparent;
+  border-bottom: 2px solid var(--primary);
+  font-weight: 600;
+}
+
+/* ---- Bootstrap .btn-group for view-toggle ---- */
+.view-toggle.btn-group .view-btn.btn {
+  font-size: 13px;
+  padding: 4px 12px;
+  height: 32px;
+  line-height: 1.4;
+}
+.view-toggle.btn-group .view-btn.btn.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+/* ---- Bootstrap .btn-group for report-presets ---- */
+.report-presets.btn-group .btn-ghost {
+  font-size: 12px;
+  padding: 3px 8px;
+  height: 28px;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid var(--border);
+}
+.report-presets.btn-group .btn-ghost:hover {
+  background: rgba(79, 70, 229, 0.08);
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+/* ---- form-row used as Bootstrap row in enterprise invite form ---- */
+.form-row.row .form-group {
+  flex: 1;
+  min-width: 0;
+}

@@ -35,23 +35,23 @@ window.loadEnterprise = async function loadEnterprise() {
     container.innerHTML =
       '<div class="page-header"><h2>' + t('enterprise.title') + '</h2></div>' +
       '<div class="enterprise-setup">' +
-        '<div class="section-card">' +
+        '<div class="section-card card mb-3">' +
           '<h3>' + t('enterprise.create') + '</h3>' +
-          '<div class="form-group">' +
+          '<div class="form-group mb-3">' +
             '<label>' + t('enterprise.name_label') + '</label>' +
-            '<input type="text" id="ent-create-name" class="text-input" placeholder="' + t('enterprise.name_placeholder') + '">' +
+            '<input type="text" id="ent-create-name" class="text-input form-control" placeholder="' + t('enterprise.name_placeholder') + '">' +
           '</div>' +
           '<button class="btn btn-primary" id="btn-create-ent">' + t('enterprise.create') + '</button>' +
         '</div>' +
-        '<div class="section-card">' +
+        '<div class="section-card card mb-3">' +
           '<h3>' + t('enterprise.join') + '</h3>' +
-          '<div class="form-group">' +
+          '<div class="form-group mb-3">' +
             '<label>' + t('enterprise.invite_code_label') + '</label>' +
-            '<input type="text" id="ent-join-code" class="text-input" placeholder="' + t('enterprise.invite_code_placeholder') + '">' +
+            '<input type="text" id="ent-join-code" class="text-input form-control" placeholder="' + t('enterprise.invite_code_placeholder') + '">' +
           '</div>' +
-          '<div class="form-group">' +
+          '<div class="form-group mb-3">' +
             '<label>' + t('enterprise.message_label') + '</label>' +
-            '<input type="text" id="ent-join-msg" class="text-input" placeholder="' + t('enterprise.message_placeholder') + '">' +
+            '<input type="text" id="ent-join-msg" class="text-input form-control" placeholder="' + t('enterprise.message_placeholder') + '">' +
           '</div>' +
           '<button class="btn btn-primary" id="btn-join-ent">' + t('enterprise.join') + '</button>' +
         '</div>' +
@@ -91,30 +91,30 @@ window.loadEnterprise = async function loadEnterprise() {
   var ent = state.enterprise || {};
   var html =
     '<div class="page-header"><h2>' + t('enterprise.title') + '</h2></div>' +
-    '<div class="section-card">' +
+    '<div class="section-card card mb-3">' +
       '<h3>' + t('enterprise.info') + '</h3>' +
       '<div class="info-row"><span class="info-label">' + t('enterprise.name_label') + '</span><span class="info-value">' + escHtml(ent.name) + '</span></div>' +
       '<div class="info-row"><span class="info-label">' + t('enterprise.invite_code_desc') + '</span><span class="info-value" style="font-family:monospace;font-weight:600">' + escHtml(ent.code) + '</span></div>' +
     '</div>';
 
   if (isOwnerOrAdmin()) {
-    html += '<div class="section-card" id="ent-requests-section"><h3>' + t('enterprise.requests') + '</h3><div id="ent-requests">...</div></div>';
+    html += '<div class="section-card card mb-3" id="ent-requests-section"><h3>' + t('enterprise.requests') + '</h3><div id="ent-requests">...</div></div>';
   }
 
   // 成员列表已移至「人员管理」页面统一管理
 
   if (isOwnerOrAdmin()) {
-    html += '<div class="section-card">' +
+    html += '<div class="section-card card mb-3">' +
       '<h3>' + t('enterprise.invite_title') + '</h3>' +
       '<p style="color:var(--text-secondary);margin-bottom:12px">' + t('enterprise.invite_desc') + '</p>' +
-      '<div class="form-row">' +
-        '<div class="form-group">' +
+      '<div class="form-row row g-3">' +
+        '<div class="form-group mb-3">' +
           '<label>' + t('enterprise.invite_name_label') + '</label>' +
-          '<input type="text" id="invite-name" class="text-input" placeholder="' + t('enterprise.invite_name_placeholder') + '">' +
+          '<input type="text" id="invite-name" class="text-input form-control" placeholder="' + t('enterprise.invite_name_placeholder') + '">' +
         '</div>' +
-        '<div class="form-group">' +
+        '<div class="form-group mb-3">' +
           '<label>' + t('enterprise.invite_email_label') + '</label>' +
-          '<input type="email" id="invite-email" class="text-input" placeholder="' + t('enterprise.invite_email_placeholder') + '">' +
+          '<input type="email" id="invite-email" class="text-input form-control" placeholder="' + t('enterprise.invite_email_placeholder') + '">' +
         '</div>' +
         '<div class="form-group" style="display:flex;align-items:flex-end">' +
           '<button class="btn btn-primary" id="btn-invite-member">' + t('enterprise.send_invite') + '</button>' +
@@ -176,37 +176,37 @@ window.loadEnterprise = async function loadEnterprise() {
       : '<option value="">' + escHtml(t('wecom.test_no_matched_employees')) + '</option>';
 
     var settingsHtml =
-      '<div class="section-card">' +
+      '<div class="section-card card mb-3">' +
         '<h3>' + t('wecom.app_title') + '</h3>' +
         '<p style="color:var(--text-secondary);margin-bottom:12px">' + t('wecom.app_desc') + '</p>' +
-        '<div class="form-group">' +
+        '<div class="form-group mb-3">' +
           '<label>' + t('wecom.corp_id') + '</label>' +
-          '<input type="text" id="set-wecom-corp-id" class="text-input" value="' + escHtml(ent.wecom_corp_id || '') + '" placeholder="wwxxxxxxxxxxxxxxxx">' +
+          '<input type="text" id="set-wecom-corp-id" class="text-input form-control" value="' + escHtml(ent.wecom_corp_id || '') + '" placeholder="wwxxxxxxxxxxxxxxxx">' +
         '</div>' +
-        '<div class="form-group">' +
+        '<div class="form-group mb-3">' +
           '<label>' + t('wecom.agent_id') + '</label>' +
-          '<input type="text" id="set-wecom-agent-id" class="text-input" value="' + escHtml(ent.wecom_agent_id || '') + '" placeholder="1000003">' +
+          '<input type="text" id="set-wecom-agent-id" class="text-input form-control" value="' + escHtml(ent.wecom_agent_id || '') + '" placeholder="1000003">' +
         '</div>' +
-        '<div class="form-group">' +
+        '<div class="form-group mb-3">' +
           '<label>' + t('wecom.app_secret') + '</label>' +
-          '<input type="password" id="set-wecom-secret" class="text-input" value="' + escHtml(ent.wecom_secret || '') + '" placeholder="' + t('wecom.app_secret_placeholder') + '">' +
+          '<input type="password" id="set-wecom-secret" class="text-input form-control" value="' + escHtml(ent.wecom_secret || '') + '" placeholder="' + t('wecom.app_secret_placeholder') + '">' +
         '</div>' +
-        '<div class="form-group">' +
+        '<div class="form-group mb-3">' +
           '<label>' + t('wecom.department_id') + '</label>' +
-          '<input type="number" id="set-wecom-department-id" class="text-input" value="' + escHtml(String(ent.wecom_department_id || 1)) + '" min="1" placeholder="1">' +
+          '<input type="number" id="set-wecom-department-id" class="text-input form-control" value="' + escHtml(String(ent.wecom_department_id || 1)) + '" min="1" placeholder="1">' +
         '</div>' +
         '<button class="btn btn-outline" id="btn-sync-wecom">' + t('wecom.sync_contacts') + '</button>' +
       '</div>' +
-      '<div class="section-card">' +
+      '<div class="section-card card mb-3">' +
         '<h3>' + t('wecom.test_title') + '</h3>' +
         '<p style="color:var(--text-secondary);margin-bottom:12px">' + t('wecom.test_desc') + '</p>' +
-        '<div class="form-group">' +
+        '<div class="form-group mb-3">' +
           '<label>' + t('wecom.test_employee') + '</label>' +
-          '<select id="wecom-test-resource" class="text-input" ' + (matchedWeComResources.length ? '' : 'disabled') + '>' +
+          '<select id="wecom-test-resource" class="text-input form-control" ' + (matchedWeComResources.length ? '' : 'disabled') + '>' +
             resourceOptionsHtml +
           '</select>' +
         '</div>' +
-        '<div class="form-group">' +
+        '<div class="form-group mb-3">' +
           '<label>' + t('wecom.test_message_type') + '</label>' +
           '<select id="wecom-test-message-type" class="text-input">' +
             '<option value="schedule_created">' + t('wecom.test_type_schedule_created') + '</option>' +
@@ -217,7 +217,7 @@ window.loadEnterprise = async function loadEnterprise() {
         '</div>' +
         '<button class="btn btn-primary" id="btn-send-wecom-test" ' + (matchedWeComResources.length ? '' : 'disabled') + '>' + t('wecom.test_send') + '</button>' +
       '</div>' +
-      '<div class="section-card">' +
+      '<div class="section-card card mb-3">' +
         '<h3>' + t('theme.title') + '</h3>' +
         '<div class="theme-palette" id="theme-palette">';
 
@@ -486,7 +486,7 @@ window.loadAccount = async function loadAccount() {
 
   var html =
     '<div class="page-header"><h2>' + t('account.title') + '</h2></div>' +
-    '<div class="section-card">' +
+    '<div class="section-card card mb-3">' +
       '<h3>' + t('account.personal_info') + '</h3>' +
       '<div class="avatar-upload-section">' +
         '<div class="avatar-preview" id="avatar-preview">' + avatarPreview + '</div>' +
@@ -496,37 +496,37 @@ window.loadAccount = async function loadAccount() {
           '<div class="avatar-hint">' + t('account.avatar_hint') + '</div>' +
         '</div>' +
       '</div>' +
-      '<div class="form-group">' +
+      '<div class="form-group mb-3">' +
         '<label>' + t('common.name') + '</label>' +
-        '<input type="text" id="acc-name" class="text-input" value="' + escHtml(user.name || '') + '">' +
+        '<input type="text" id="acc-name" class="text-input form-control" value="' + escHtml(user.name || '') + '">' +
       '</div>' +
-      '<div class="form-group">' +
+      '<div class="form-group mb-3">' +
         '<label>' + t('common.phone') + '</label>' +
-        '<input type="text" id="acc-phone" class="text-input" value="' + escHtml(user.phone || '') + '" placeholder="' + t('status.not_linked') + '">' +
+        '<input type="text" id="acc-phone" class="text-input form-control" value="' + escHtml(user.phone || '') + '" placeholder="' + t('status.not_linked') + '">' +
       '</div>' +
-      '<div class="form-group">' +
+      '<div class="form-group mb-3">' +
         '<label>' + t('common.email') + '</label>' +
-        '<input type="email" id="acc-email" class="text-input" value="' + escHtml(user.email || '') + '" placeholder="' + t('status.not_linked') + '">' +
+        '<input type="email" id="acc-email" class="text-input form-control" value="' + escHtml(user.email || '') + '" placeholder="' + t('status.not_linked') + '">' +
       '</div>' +
       '<button class="btn btn-primary" id="btn-save-profile">' + t('common.save') + '</button>' +
     '</div>' +
-    '<div class="section-card">' +
+    '<div class="section-card card mb-3">' +
       '<h3>' + t('account.change_pwd') + '</h3>' +
-      '<div class="form-group">' +
+      '<div class="form-group mb-3">' +
         '<label>' + t('account.current_pwd') + '</label>' +
-        '<input type="password" id="acc-old-pw" class="text-input">' +
+        '<input type="password" id="acc-old-pw" class="text-input form-control">' +
       '</div>' +
-      '<div class="form-group">' +
+      '<div class="form-group mb-3">' +
         '<label>' + t('account.new_pwd') + '</label>' +
-        '<input type="password" id="acc-new-pw" class="text-input">' +
+        '<input type="password" id="acc-new-pw" class="text-input form-control">' +
       '</div>' +
-      '<div class="form-group">' +
+      '<div class="form-group mb-3">' +
         '<label>' + t('account.confirm_pwd') + '</label>' +
-        '<input type="password" id="acc-confirm-pw" class="text-input">' +
+        '<input type="password" id="acc-confirm-pw" class="text-input form-control">' +
       '</div>' +
       '<button class="btn btn-primary" id="btn-change-pw">' + t('account.change_pwd') + '</button>' +
     '</div>' +
-    '<div class="section-card">' +
+    '<div class="section-card card mb-3">' +
       '<h3>' + t('logout.title') + '</h3>' +
       '<p style="font-size:13px;color:var(--text-secondary);margin-bottom:14px;">' + t('logout.desc') + '</p>' +
       '<button class="btn btn-danger" id="btn-logout-account">' + t('logout.btn') + '</button>' +
