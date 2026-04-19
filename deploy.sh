@@ -30,11 +30,14 @@ BACKUP_FILE="db/resource-guru-backup-$(date +%Y%m%d_%H%M%S).db"
 cp db/resource-guru.db "$BACKUP_FILE"
 echo "  数据库备份至: $BACKUP_FILE"
 
-echo "=== [4/4] 重启服务 ==="
-pm2 restart crewboard
+echo "=== [4/4] 重启服务（固定端口 3000）==="
+# 使用 startOrReload 确保每次都从 ecosystem.config.js 读取最新配置（含 PORT=3000）
+# 避免 pm2 restart 不重新读取 ecosystem 导致的端口漂移
+pm2 startOrReload ecosystem.config.js --update-env
 sleep 2
 pm2 status crewboard
 
 echo ""
 echo "✅ 部署完成！版本号: $HASH"
 echo "   访问: https://resource.skandstudio.com"
+echo "   端口: 3000 (固定)"
