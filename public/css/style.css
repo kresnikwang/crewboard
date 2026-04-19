@@ -1196,3 +1196,14 @@ a { text-decoration: none; color: inherit; }
 .m-util-fill.green { background: #10B981; }
 .m-util-fill.yellow { background: #F59E0B; }
 .m-util-fill.red { background: #EF4444; }
+
+/* Custom logo styles */
+.auth-brand-logo img {
+  width: 100px;
+  height: auto;
+}
+
+.logo img {
+  width: 36px;
+  height: auto;
+}
