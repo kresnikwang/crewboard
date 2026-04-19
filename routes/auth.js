@@ -612,7 +612,9 @@ module.exports = function(db) {
 
 module.exports.authMiddleware = function(db) {
   return (req, res, next) => {
-    const token = req.headers.authorization?.replace('Bearer ', '');
+    // Support token via Authorization header (normal API calls)
+    // or via ?token= query param (EventSource / SSE cannot set custom headers)
+    const token = req.headers.authorization?.replace('Bearer ', '') || req.query.token;
     if (token) {
       const session = db.prepare('SELECT * FROM sessions WHERE token = ? AND expires_at > datetime(?)').get(token, new Date().toISOString());
       if (session) {
