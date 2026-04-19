@@ -478,6 +478,73 @@ module.exports = function(db) {
     res.json({ ok: true });
   });
 
+  // Sync timesheets from bookings for a given week (auto-fill empty cells only)
+  // POST /api/timesheets/sync-from-bookings
+  // Body: { resource_id, start, end }
+  // Returns: { synced: N, skipped: N, entries: [...] }
+  router.post('/timesheets/sync-from-bookings', (req, res) => {
+    const { resource_id, start, end } = req.body;
+    if (!resource_id || !start || !end) {
+      return res.status(400).json({ error: 'resource_id, start, end required' });
+    }
+
+    // 1. Aggregate bookings for this resource in the week (group by project+date)
+    const bookings = db.prepare(`
+      SELECT project_id, date, SUM(hours) as hours
+      FROM bookings
+      WHERE resource_id = ? AND date >= ? AND date <= ?
+      GROUP BY project_id, date
+    `).all(resource_id, start, end);
+
+    if (!bookings.length) {
+      return res.json({ synced: 0, skipped: 0, entries: [] });
+    }
+
+    // 2. Get existing timesheet entries for this resource/week
+    const existing = db.prepare(`
+      SELECT project_id, date, hours, source
+      FROM timesheets
+      WHERE resource_id = ? AND date >= ? AND date <= ?
+    `).all(resource_id, start, end);
+
+    // Build a set of already-filled cells (project_id + date)
+    const filledKeys = new Set();
+    existing.forEach(e => filledKeys.add(e.project_id + '_' + e.date));
+
+    // 3. Insert only empty cells from bookings
+    let synced = 0;
+    let skipped = 0;
+    const insertStmt = db.prepare(
+      `INSERT INTO timesheets (resource_id, project_id, date, hours, notes, status, source)
+       VALUES (?, ?, ?, ?, '', 'draft', 'booking')`
+    );
+
+    const syncTx = db.transaction(() => {
+      for (const b of bookings) {
+        const key = b.project_id + '_' + b.date;
+        if (filledKeys.has(key)) {
+          skipped++;
+        } else {
+          insertStmt.run(resource_id, b.project_id, b.date, b.hours);
+          synced++;
+        }
+      }
+    });
+    syncTx();
+
+    // 4. Return the full updated timesheet entries for the week
+    const updated = db.prepare(`
+      SELECT t.*, p.name as project_name, COALESCE(c.color, p.color) as project_color
+      FROM timesheets t
+      JOIN projects p ON t.project_id = p.id
+      LEFT JOIN clients c ON p.client_id = c.id
+      WHERE t.resource_id = ? AND t.date >= ? AND t.date <= ?
+      ORDER BY t.date
+    `).all(resource_id, start, end);
+
+    res.json({ synced, skipped, entries: updated });
+  });
+
   // === REPORTS ===
   router.get('/reports/utilization', (req, res) => {
     const { start, end } = req.query;

@@ -251,7 +251,10 @@
     'timesheets.all_filled': '所有格子已有工时记录，未覆盖',
     'timesheets.copied': '已从排程复制', 'timesheets.records': '条工时',
     'timesheets.skipped': '条已有记录', 'timesheets.load_first': '请先加载工时表',
-    'timesheets.hours_saved': '工时已保存', 'timesheets.save_hours': '保存工时'
+    'timesheets.hours_saved': '工时已保存', 'timesheets.save_hours': '保存工时',
+    'timesheets.synced_from_schedule': '已从排程自动同步',
+    'timesheets.sync_hint': '蓝色底纹格子为排程自动同步，可直接修改后保存',
+    'timesheets.no_permission': '无编辑权限'
   });
   Object.assign(translations.en, {
     'timesheets.title': 'Timesheets', 'timesheets.this_week': 'This Week',
@@ -263,7 +266,10 @@
     'timesheets.all_filled': 'All cells already have records, not overwritten',
     'timesheets.copied': 'Copied from schedule', 'timesheets.records': 'hour records',
     'timesheets.skipped': 'existing records skipped', 'timesheets.load_first': 'Please load timesheet first',
-    'timesheets.hours_saved': 'Hours saved', 'timesheets.save_hours': 'Save Hours'
+    'timesheets.hours_saved': 'Hours saved', 'timesheets.save_hours': 'Save Hours',
+    'timesheets.synced_from_schedule': 'Auto-synced from schedule',
+    'timesheets.sync_hint': 'Blue-tinted cells are auto-synced from schedule, edit freely before saving',
+    'timesheets.no_permission': 'No edit permission'
   });
 
   // --- reports ---

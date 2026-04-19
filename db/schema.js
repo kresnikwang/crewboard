@@ -267,6 +267,12 @@ function migrate(db) {
     db.exec('CREATE INDEX IF NOT EXISTS idx_prt_user ON password_reset_tokens(user_id)');
   } catch (_) {}
 
+  // Add source column to timesheets table to track booking-synced entries
+  const tsCols = db.prepare('PRAGMA table_info(timesheets)').all();
+  if (!tsCols.find(c => c.name === 'source')) {
+    db.exec("ALTER TABLE timesheets ADD COLUMN source TEXT DEFAULT 'manual'");
+  }
+
   // Add wecom_userid column to resources table for WeChat Work notifications
   const resCols = db.prepare('PRAGMA table_info(resources)').all();
   if (!resCols.find(c => c.name === 'wecom_userid')) {

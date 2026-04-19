@@ -11,7 +11,7 @@
   var api   = window.api;
   var cachedApi = window.cachedApi;
 
-  /* ---- module-level cache for current week's bookings (used by copy feature) ---- */
+  /* ---- module-level cache for current week's bookings ---- */
   var _currentBookings = [];
 
   /* --------------------------------------------------
@@ -22,26 +22,46 @@
       state.tsWeekStart = getMonday(new Date());
     }
 
-    /* ---- resource selector ---- */
+    /* ---- resolve current user's resource_id ---- */
+    var myResourceId = null;
+    if (window.state.user && window.state.user.resource_id) {
+      myResourceId = window.state.user.resource_id;
+    }
+
+    /* ---- resource selector (managers/admins can view others) ---- */
+    var perms = window.state.permissions || {};
+    var canViewOthers = perms.book_others || perms.manage_resources;
+
     var resources = state.resources && state.resources.length
       ? state.resources
       : await cachedApi('/api/resources');
     state.resources = resources;
 
-    if (!state.tsResourceId && resources.length) {
-      state.tsResourceId = resources[0].id;
+    /* Basic users: always view own resource only */
+    if (!canViewOthers && myResourceId) {
+      state.tsResourceId = myResourceId;
+    } else if (!state.tsResourceId && resources.length) {
+      /* Managers default to their own resource if available */
+      var ownRes = myResourceId && resources.find(function (r) { return r.id === myResourceId; });
+      state.tsResourceId = ownRes ? ownRes.id : resources[0].id;
     }
 
     var selectEl = document.getElementById('ts-resource-select');
     if (selectEl) {
-      selectEl.innerHTML = resources.map(function (r) {
-        var sel = r.id === state.tsResourceId ? ' selected' : '';
-        return '<option value="' + r.id + '"' + sel + '>' + esc(r.name) + '</option>';
-      }).join('');
-      selectEl.onchange = function () {
-        state.tsResourceId = parseInt(selectEl.value, 10);
-        window.loadTimesheets();
-      };
+      if (!canViewOthers) {
+        /* Hide selector for basic users — they can only see themselves */
+        selectEl.parentElement && (selectEl.parentElement.style.display = 'none');
+      } else {
+        selectEl.parentElement && (selectEl.parentElement.style.display = '');
+        selectEl.innerHTML = resources.map(function (r) {
+          var sel = r.id === state.tsResourceId ? ' selected' : '';
+          return '<option value="' + r.id + '"' + sel + '>' + esc(r.name) + '</option>';
+        }).join('');
+        selectEl.onchange = function () {
+          state.tsResourceId = parseInt(selectEl.value, 10);
+          window.loadTimesheets();
+        };
+      }
     }
 
     /* ---- Mon-Fri dates ---- */
@@ -71,8 +91,38 @@
     var timesheets = results[1];
     var bookings   = results[2];
 
-    /* ---- cache bookings for copy feature ---- */
+    /* ---- cache bookings ---- */
     _currentBookings = bookings;
+
+    /* ---- auto-sync: if there are bookings with no matching timesheet entries,
+            call the sync API to pre-fill them (only for own resource) ---- */
+    var isOwnResource = (rid === myResourceId) || !myResourceId;
+    if (isOwnResource && bookings.length > 0) {
+      var tsKeys = new Set();
+      timesheets.forEach(function (ts) {
+        tsKeys.add(ts.project_id + '_' + ts.date);
+      });
+      var hasUnsynced = bookings.some(function (b) {
+        return !tsKeys.has(b.project_id + '_' + b.date);
+      });
+
+      if (hasUnsynced) {
+        try {
+          var syncResult = await api('/api/timesheets/sync-from-bookings', {
+            method: 'POST',
+            body: { resource_id: rid, start: startStr, end: endStr }
+          });
+          if (syncResult.synced > 0) {
+            /* Reload timesheets with the newly synced data */
+            timesheets = await api('/api/timesheets?start=' + startStr + '&end=' + endStr + '&resource_id=' + rid);
+            toast(t('timesheets.synced_from_schedule') + ' ' + syncResult.synced + ' ' + t('timesheets.records'), 'info');
+          }
+        } catch (syncErr) {
+          /* Non-fatal: sync failed, continue with existing data */
+          console.warn('Auto-sync failed:', syncErr);
+        }
+      }
+    }
 
     /* ---- find relevant projects ---- */
     var relevantIds = {};
@@ -93,8 +143,11 @@
 
     /* ---- build maps ---- */
     var tsMap = {};
+    var tsSourceMap = {};
     timesheets.forEach(function (ts) {
-      tsMap[ts.project_id + '_' + ts.date] = ts.hours;
+      var key = ts.project_id + '_' + ts.date;
+      tsMap[key] = ts.hours;
+      tsSourceMap[key] = ts.source || 'manual';
     });
 
     var scheduleMap = {};
@@ -104,25 +157,26 @@
     });
 
     /* ---- render table ---- */
-    gridEl.innerHTML = buildTable(days, relevantProjects, tsMap, scheduleMap);
+    gridEl.innerHTML = buildTable(days, relevantProjects, tsMap, tsSourceMap, scheduleMap);
 
-    /* ---- permission check: basic users are read-only ---- */
-    var perms = window.state.permissions || {};
-    var isReadOnly = !perms.book_others;
+    /* ---- all users can edit and save their own timesheets ---- */
+    var isReadOnly = !isOwnResource && !canViewOthers;
 
     /* ---- attach save handler ---- */
     var saveBtn = document.getElementById('ts-save');
     if (saveBtn) {
       if (isReadOnly) {
-        saveBtn.style.display = 'none';
+        saveBtn.disabled = true;
+        saveBtn.title = t('timesheets.no_permission');
       } else {
+        saveBtn.disabled = false;
         saveBtn.onclick = function () {
           handleSave(days);
         };
       }
     }
 
-    /* ---- disable inputs for read-only users ---- */
+    /* ---- attach input handlers ---- */
     gridEl.querySelectorAll('.ts-input').forEach(function (input) {
       if (isReadOnly) {
         input.disabled = true;
@@ -138,7 +192,7 @@
   /* --------------------------------------------------
      Table builder
      -------------------------------------------------- */
-  function buildTable(days, projects, tsMap, scheduleMap) {
+  function buildTable(days, projects, tsMap, tsSourceMap, scheduleMap) {
     var html = '<table class="ts-table"><thead><tr><th>' + t('timesheets.project') + '</th>';
 
     days.forEach(function (d) {
@@ -167,6 +221,7 @@
         var dateStr = fmt(d);
         var key = p.id + '_' + dateStr;
         var val = tsMap[key];
+        var source = tsSourceMap[key] || 'manual';
         var placeholder = scheduleMap[key] || '';
         var displayVal = (val !== undefined && val !== null) ? val : '';
 
@@ -180,9 +235,13 @@
           }
         }
 
-        html += '<td><input type="number" class="ts-input' + varClass + '"' +
+        /* Synced-from-booking highlight: light tint to indicate auto-filled */
+        var syncedClass = (source === 'booking' && displayVal !== '') ? ' ts-input-synced' : '';
+
+        html += '<td><input type="number" class="ts-input' + varClass + syncedClass + '"' +
           ' data-project="' + p.id + '"' +
           ' data-date="' + dateStr + '"' +
+          ' data-source="' + source + '"' +
           ' value="' + displayVal + '"' +
           ' placeholder="' + placeholder + '"' +
           ' min="0" max="24" step="0.5"></td>';
@@ -204,7 +263,8 @@
     html += '<td id="ts-week-total">' + weekTotal + '</td></tr>';
 
     html += '</tbody></table>';
-    html += '<div style="margin-top:16px;text-align:right">' +
+    html += '<div class="ts-footer">' +
+      '<span class="ts-sync-hint">' + t('timesheets.sync_hint') + '</span>' +
       '<button class="btn btn-primary" id="ts-save">' + t('timesheets.save_hours') + '</button>' +
       '</div>';
     return html;
@@ -242,69 +302,7 @@
   }
 
   /* --------------------------------------------------
-     Copy from Schedule — fill inputs with booking hours
-     -------------------------------------------------- */
-  function copyFromSchedule() {
-    var inputs = document.querySelectorAll('.ts-input');
-    if (!inputs.length) {
-      toast(t('timesheets.load_first'), 'error');
-      return;
-    }
-
-    /* Build a map from cached bookings: project_date -> total hours */
-    var bookingMap = {};
-    _currentBookings.forEach(function (b) {
-      var key = b.project_id + '_' + b.date;
-      bookingMap[key] = (bookingMap[key] || 0) + b.hours;
-    });
-
-    var filled = 0;
-    var skipped = 0;
-
-    inputs.forEach(function (input) {
-      var key = input.dataset.project + '_' + input.dataset.date;
-      var bookingHours = bookingMap[key];
-      if (bookingHours == null) return;
-
-      if (input.value !== '' && parseFloat(input.value) === bookingHours) {
-        /* Already matches — skip */
-        return;
-      }
-
-      if (input.value !== '' && parseFloat(input.value) !== bookingHours) {
-        /* Has existing value that differs — skip to avoid overwriting */
-        skipped++;
-        return;
-      }
-
-      /* Empty cell — fill with booking hours */
-      input.value = bookingHours;
-      input.classList.add('ts-input-copied');
-      setTimeout(function () { input.classList.remove('ts-input-copied'); }, 1500);
-      filled++;
-    });
-
-    /* Trigger totals refresh */
-    var days = weekDates(state.tsWeekStart).slice(0, 5);
-    var projects = (state.resources || []).map(function () { return null; }); /* dummy */
-    /* Simpler: just re-read all inputs */
-    var allInputs = document.querySelectorAll('.ts-input');
-    var projectIds = {};
-    allInputs.forEach(function (inp) { projectIds[inp.dataset.project] = true; });
-    var projectList = Object.keys(projectIds).map(function (id) { return { id: parseInt(id, 10) }; });
-    updateTotals(days, projectList);
-
-    if (filled > 0) {
-      toast(t('timesheets.copied') + ' ' + filled + ' ' + t('timesheets.records') + (skipped > 0 ? ', ' + skipped + ' ' + t('timesheets.skipped') : ''), 'success');
-    } else if (skipped > 0) {
-      toast(t('timesheets.all_filled'), 'info');
-    } else {
-      toast(t('timesheets.no_hours_to_copy'), 'info');
-    }
-  }
-
-  /* --------------------------------------------------
-     Save handler
+     Save handler — all users can save their own timesheets
      -------------------------------------------------- */
   async function handleSave(days) {
     var inputs = document.querySelectorAll('.ts-input');
@@ -360,8 +358,8 @@
         window.loadTimesheets();
       });
     }
+    /* Keep manual copy button for managers who want to force-copy */
     if (copyBtn) {
-      /* Hide copy button for read-only (basic) users */
       var permsForCopy = window.state.permissions || {};
       if (!permsForCopy.book_others) {
         copyBtn.style.display = 'none';
@@ -370,6 +368,61 @@
       }
     }
   });
+
+  /* --------------------------------------------------
+     Manual copy from Schedule (managers only, force-overwrite)
+     -------------------------------------------------- */
+  function copyFromSchedule() {
+    var inputs = document.querySelectorAll('.ts-input');
+    if (!inputs.length) {
+      toast(t('timesheets.load_first'), 'error');
+      return;
+    }
+
+    var bookingMap = {};
+    _currentBookings.forEach(function (b) {
+      var key = b.project_id + '_' + b.date;
+      bookingMap[key] = (bookingMap[key] || 0) + b.hours;
+    });
+
+    var filled = 0;
+    var skipped = 0;
+
+    inputs.forEach(function (input) {
+      var key = input.dataset.project + '_' + input.dataset.date;
+      var bookingHours = bookingMap[key];
+      if (bookingHours == null) return;
+
+      if (input.value !== '' && parseFloat(input.value) === bookingHours) {
+        return;
+      }
+
+      if (input.value !== '' && input.dataset.source !== 'booking') {
+        skipped++;
+        return;
+      }
+
+      input.value = bookingHours;
+      input.classList.add('ts-input-copied');
+      setTimeout(function () { input.classList.remove('ts-input-copied'); }, 1500);
+      filled++;
+    });
+
+    var days = weekDates(state.tsWeekStart).slice(0, 5);
+    var allInputs = document.querySelectorAll('.ts-input');
+    var projectIds = {};
+    allInputs.forEach(function (inp) { projectIds[inp.dataset.project] = true; });
+    var projectList = Object.keys(projectIds).map(function (id) { return { id: parseInt(id, 10) }; });
+    updateTotals(days, projectList);
+
+    if (filled > 0) {
+      toast(t('timesheets.copied') + ' ' + filled + ' ' + t('timesheets.records') + (skipped > 0 ? ', ' + skipped + ' ' + t('timesheets.skipped') : ''), 'success');
+    } else if (skipped > 0) {
+      toast(t('timesheets.all_filled'), 'info');
+    } else {
+      toast(t('timesheets.no_hours_to_copy'), 'info');
+    }
+  }
 
   /* --------------------------------------------------
      HTML-escape helper
