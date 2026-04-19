@@ -32,12 +32,22 @@ app.use(express.json({ limit: '2mb' }));
 // Static files with caching in production
 if (NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, 'public'), {
-    maxAge: '7d',
-    etag: true,
+    maxAge: 0,        // 不依赖 max-age，改用 ETag 协商缓存
+    etag: true,       // 启用 ETag，文件变化时浏览器会重新请求
+    lastModified: true,
     setHeaders: (res, filePath) => {
-      // Don't cache HTML files — they change on deploy
       if (filePath.endsWith('.html')) {
-        res.setHeader('Cache-Control', 'no-cache');
+        // HTML 文件：完全不缓存，每次必须重新请求
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+      } else if (filePath.match(/\.(js|css)$/)) {
+        // JS/CSS：带 ?v=hash 版本号，允许缓存但必须 revalidate
+        // 部署时 deploy.sh 会更新版本号，触发浏览器重新下载
+        res.setHeader('Cache-Control', 'public, no-cache, must-revalidate');
+      } else if (filePath.match(/\.(png|jpg|jpeg|gif|ico|svg|woff2?)$/)) {
+        // 图片/字体：长期缓存（不常变动）
+        res.setHeader('Cache-Control', 'public, max-age=2592000');
       }
     }
   }));
