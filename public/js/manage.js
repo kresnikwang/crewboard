@@ -905,11 +905,25 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  // Close modal — remove rg-modal class
+  // Remove rg-modal / bk-modal size class when modal closes (Bootstrap 5 event)
+  var modalOverlay = document.getElementById('modal-overlay');
+  if (modalOverlay) {
+    modalOverlay.addEventListener('hidden.bs.modal', function () {
+      var modal = document.getElementById('modal');
+      if (modal) {
+        modal.classList.remove('rg-modal');
+        modal.classList.remove('bk-modal');
+      }
+    });
+  }
+  // Also patch closeModal for fallback (non-Bootstrap) path
   var origCloseModal = window.closeModal;
   window.closeModal = function () {
     var modal = document.getElementById('modal');
-    if (modal) modal.classList.remove('rg-modal');
+    if (modal) {
+      modal.classList.remove('rg-modal');
+      modal.classList.remove('bk-modal');
+    }
     origCloseModal();
   };
 });

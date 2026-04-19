@@ -89,4 +89,23 @@
 | `.pc-tab` / `data-tab` | 标签页切换逻辑 |
 | `pcActiveTab` / `pcSearchQuery` 状态变量 | 搜索/筛选逻辑 |
 
+## 8. 阶段 5 实施记录
+
+- [x] `index.html`：将 `#modal-overlay` + `#modal` 替换为标准 Bootstrap Modal HTML（`.modal.fade` + `.modal-dialog.modal-dialog-centered.modal-dialog-scrollable` + `.modal-content`），保留所有 `#modal-title`/`#modal-body`/`#modal-footer` ID
+- [x] `core.js`：重写 `showModal`/`closeModal` 使用 `bootstrap.Modal.getOrCreateInstance()`，内容清空改为监听 `hidden.bs.modal` 事件，移除旧的手动事件监听器
+- [x] `manage.js`：将 `rg-modal`/`bk-modal` 类名清除改为监听 `hidden.bs.modal` 事件
+- [x] `bootstrap-bridge.css`：新增阶段5修正（modal 内容区对齐、rg-modal/bk-modal 宽度、backdrop 颜色、body.modal-open 修正）
+
+**新增功能：**
+
+| 功能 | 说明 |
+|---|---|
+| ESC 键关闭 | Bootstrap Modal 原生支持 |
+| 点击背景关闭 | Bootstrap Modal 原生支持 |
+| 无障碍属性 | `aria-labelledby`、`aria-hidden`、`role="dialog"` |
+| 关闭动画 | Bootstrap `.fade` 动画 |
+| 滑动内容 | `modal-dialog-scrollable` |
+| 垂直居中 | `modal-dialog-centered` |
+| 尺寸切换 | `rg-modal`(540px) / `bk-modal`(520px) 通过 `:has()` CSS 选择器控制 |
+
 *文档更新时间：2026-04-19*

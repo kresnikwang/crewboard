@@ -707,3 +707,106 @@ body {
   flex: 1;
   min-width: 0;
 }
+
+/* ============================================================
+   PHASE 5 BRIDGE — Bootstrap Modal 迁移
+   ============================================================ */
+
+/* ---- 全局 Modal 容器：对齐 Crewboard 视觉 ---- */
+#modal-overlay.modal .modal-dialog {
+  max-width: 480px;
+}
+
+/* rg-modal：资源管理弹窗（540px） */
+#modal.rg-modal ~ .modal-dialog,
+.modal-dialog:has(#modal.rg-modal) {
+  max-width: 540px;
+}
+/* 直接在 modal-dialog 上加宽度，通过 JS 操控 #modal-dialog */
+#modal.rg-modal {
+  /* 宽度由 .modal-dialog 控制，这里保留兼容标记 */
+}
+
+/* bk-modal：排班弹窗（520px） */
+#modal.bk-modal {
+  /* 宽度由 .modal-dialog 控制 */
+}
+
+/* ---- Bootstrap Modal 内部结构对齐 Crewboard 设计 ---- */
+#modal-overlay .modal-content {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+#modal-overlay .modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  align-items: center;
+}
+
+#modal-overlay .modal-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+/* Bootstrap .btn-close 对齐 Crewboard 关闭按钮风格 */
+#modal-overlay .btn-close.modal-close {
+  opacity: 0.5;
+  font-size: 14px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  transition: opacity 0.15s, background 0.15s;
+}
+#modal-overlay .btn-close.modal-close:hover {
+  opacity: 1;
+  background: var(--bg);
+}
+
+#modal-overlay .modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+#modal-overlay .modal-footer {
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+  /* 若 footer 为空则隐藏 */
+}
+#modal-overlay .modal-footer:empty {
+  display: none;
+}
+
+/* ---- rg-modal / bk-modal 尺寸：通过 modal-dialog 宽度控制 ---- */
+/* 当 #modal 有 rg-modal 类时，扩大 dialog 宽度 */
+#modal-overlay:has(#modal.rg-modal) .modal-dialog {
+  max-width: 540px;
+}
+#modal-overlay:has(#modal.bk-modal) .modal-dialog {
+  max-width: 520px;
+}
+
+/* ---- Bootstrap Modal backdrop 颜色对齐 ---- */
+.modal-backdrop {
+  --bs-backdrop-bg: rgba(0, 0, 0, 0.4);
+  --bs-backdrop-opacity: 1;
+}
+
+/* ---- 禁用 Bootstrap Modal 对 body 的 overflow 修改（避免影响排班滚动）---- */
+/* Bootstrap 会给 body 加 .modal-open，这里确保主内容区不受影响 */
+body.modal-open {
+  overflow: hidden;
+  padding-right: 0 !important; /* 防止 Bootstrap 加 scrollbar-gutter 导致布局抖动 */
+}

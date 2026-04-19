@@ -339,23 +339,84 @@ window.isWeekend = isWeekend;
   };
 })();
 
-// --------------- Modal ---------------
+// --------------- Modal (Bootstrap 5 实现) ---------------
+// 全局单例：在页面生命周期内复用同一个 Bootstrap Modal 实例
+var _bsModalInstance = null;
+
+function _getModalInstance() {
+  var el = document.getElementById('modal-overlay');
+  if (!el) return null;
+  if (window.bs && window.bs.isAvailable()) {
+    // 获取已有实例或创建新实例
+    _bsModalInstance = window.bootstrap.Modal.getOrCreateInstance(el, {
+      backdrop: true,
+      keyboard: true,
+      focus: true
+    });
+    return _bsModalInstance;
+  }
+  return null;
+}
+
 window.showModal = function showModal(title, bodyHtml, footerHtml) {
   document.getElementById('modal-title').textContent = title;
   document.getElementById('modal-body').innerHTML = bodyHtml || '';
   document.getElementById('modal-footer').innerHTML = footerHtml || '';
-  document.getElementById('modal-overlay').style.display = 'flex';
+
+  var instance = _getModalInstance();
+  if (instance) {
+    instance.show();
+  } else {
+    // 降级处理：若 Bootstrap 未加载，回退到旧实现
+    var overlay = document.getElementById('modal-overlay');
+    if (overlay) {
+      overlay.style.display = 'flex';
+      overlay.classList.add('show');
+    }
+  }
 };
 
 window.closeModal = function closeModal() {
-  document.getElementById('modal-overlay').style.display = 'none';
-  document.getElementById('modal-body').innerHTML = '';
-  document.getElementById('modal-footer').innerHTML = '';
+  var instance = _getModalInstance();
+  if (instance) {
+    instance.hide();
+  } else {
+    var overlay = document.getElementById('modal-overlay');
+    if (overlay) {
+      overlay.style.display = 'none';
+      overlay.classList.remove('show');
+    }
+  }
+
+  // 延迟清除内容（等待 Bootstrap 关闭动画完成）
+  setTimeout(function() {
+    var body = document.getElementById('modal-body');
+    var footer = document.getElementById('modal-footer');
+    if (body) body.innerHTML = '';
+    if (footer) footer.innerHTML = '';
+  }, 300);
+
   // Clear any drag-selection highlights left on the schedule grid
   if (typeof window._clearDragHighlight === 'function') {
     window._clearDragHighlight();
   }
 };
+
+// 监听 Bootstrap Modal 的 hidden 事件，确保内容清空在动画结束后执行
+document.addEventListener('DOMContentLoaded', function() {
+  var el = document.getElementById('modal-overlay');
+  if (el) {
+    el.addEventListener('hidden.bs.modal', function() {
+      var body = document.getElementById('modal-body');
+      var footer = document.getElementById('modal-footer');
+      if (body) body.innerHTML = '';
+      if (footer) footer.innerHTML = '';
+      if (typeof window._clearDragHighlight === 'function') {
+        window._clearDragHighlight();
+      }
+    });
+  }
+});
 
 // --------------- Auth View Switching ---------------
 function showAuthView(view) {
@@ -907,19 +968,9 @@ document.addEventListener('DOMContentLoaded', () => {
   initNavigation();
   initSidebarUserMenu();
 
-  // Modal close button
-  const modalClose = document.getElementById('modal-close');
-  if (modalClose) {
-    modalClose.addEventListener('click', closeModal);
-  }
-
-  // Close modal on overlay click
-  const overlay = document.getElementById('modal-overlay');
-  if (overlay) {
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) closeModal();
-    });
-  }
+  // Note: Bootstrap Modal handles close button (.btn-close) and backdrop click natively.
+  // The old manual event listeners for #modal-close and overlay click are no longer needed.
+  // closeModal() is still called explicitly from JS for programmatic dismissal.
 
   // Check hash route first (e.g. #reset-password?token=xxx)
   if (!handleHashRoute()) {

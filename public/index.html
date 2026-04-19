@@ -413,15 +413,17 @@
     </main>
   </div>
 
-  <!-- Modal -->
-  <div class="modal-overlay" id="modal-overlay">
-    <div class="modal" id="modal">
-      <div class="modal-header">
-        <h2 id="modal-title"></h2>
-        <button class="modal-close" id="modal-close">&times;</button>
+  <!-- Modal (Bootstrap 5 标准结构，向后兼容 #modal-title / #modal-body / #modal-footer) -->
+  <div class="modal fade" id="modal-overlay" tabindex="-1" aria-labelledby="modal-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" id="modal-dialog">
+      <div class="modal-content" id="modal">
+        <div class="modal-header">
+          <h2 class="modal-title" id="modal-title"></h2>
+          <button type="button" class="btn-close modal-close" id="modal-close" aria-label="Close"></button>
+        </div>
+        <div class="modal-body" id="modal-body"></div>
+        <div class="modal-footer" id="modal-footer"></div>
       </div>
-      <div class="modal-body" id="modal-body"></div>
-      <div class="modal-footer" id="modal-footer"></div>
     </div>
   </div>
 
