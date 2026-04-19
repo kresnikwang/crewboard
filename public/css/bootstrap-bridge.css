@@ -427,3 +427,91 @@ body {
 
 /* 阴影 */
 .shadow-crewboard { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important; }
+
+/* ============================================================
+ * 6. 阶段3 认证页专项修正
+ *    确保 .input-with-icon 结构与 .form-control 共存
+ *    防止 Bootstrap Reboot 对图标定位的干扰
+ * ============================================================ */
+
+/* 带图标的输入框：确保 .form-control 在其中正确占满宽度 */
+.input-with-icon {
+  position: relative;
+}
+.input-with-icon .form-control,
+.input-with-icon .text-input {
+  padding-left: 38px;  /* 为左侧图标留出空间 */
+  width: 100%;
+}
+.input-with-icon .input-icon {
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-tertiary, #9CA3AF);
+  pointer-events: none;
+  z-index: 5;  /* 确保图标在 form-control 上方 */
+}
+
+/* 认证页错误提示：对齐 Bootstrap .invalid-feedback 风格 */
+.auth-error {
+  color: var(--danger, #EF4444);
+  font-size: 13px;
+  text-align: center;
+  margin-top: 8px;
+  min-height: 20px;
+}
+.auth-error:not(:empty) {
+  padding: 6px 10px;
+  background-color: #FEE2E2;
+  border-radius: 6px;
+  border-left: 3px solid #EF4444;
+  text-align: left;
+}
+
+/* 认证页成功提示 */
+.auth-success {
+  color: var(--success, #10B981);
+  font-size: 13px;
+  text-align: center;
+  margin-top: 12px;
+}
+.auth-success:not([style*='display:none']):not(:empty) {
+  padding: 8px 12px;
+  background-color: #D1FAE5;
+  border-radius: 6px;
+  border-left: 3px solid #10B981;
+  text-align: left;
+}
+
+/* 认证提示框：对齐 Bootstrap .alert-primary 风格 */
+.auth-hint {
+  font-size: 12px;
+  color: var(--text-secondary, #6B7280);
+  text-align: center;
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: var(--primary-light, #EEF2FF);
+  border-radius: 6px;
+  border: 1px solid rgba(79, 70, 229, 0.12);
+  line-height: 1.5;
+}
+
+/* 登录按钮：确保 .btn-block + .w-100 在 Bootstrap 5 中正确显示 */
+.btn-block {
+  width: 100%;
+  justify-content: center;
+  padding: 11px;
+  font-size: 14px;
+  margin-top: 8px;
+  border-radius: 8px;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(79, 70, 229, 0.3);
+  transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
+}
+.btn-block:hover {
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+}
+.btn-block:active {
+  transform: scale(0.99);
+}

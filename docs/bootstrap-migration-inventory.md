@@ -52,4 +52,23 @@
 | 桥接类 | `.text-input`/`.select-input`/`.form-group`/`.section-card` 与 Bootstrap 共存 |
 | 工具类补充 | `.bg-primary-light`/`.bg-surface`/`.text-primary-custom` 等业务常用辅助类 |
 
+## 6. 阶段 3 实施记录
+
+- [x] 登录视图：输入框叠加 `form-control`，`form-group` 叠加 `mb-3`，`label` 叠加 `form-label`，按钮叠加 `w-100 d-flex justify-content-center`
+- [x] 注册视图：双列表单改用 `row g-2` + `col-6`，其余同登录视图
+- [x] 首次登录改密视图：同步迁移
+- [x] 忘记密码视图：同步迁移
+- [x] 重置密码视图：同步迁移
+- [x] `bootstrap-bridge.css` 新增第6节：阶段3 认证页专项修正（图标定位、错误提示、按钮样式）
+
+**迁移原则遵守情况：**
+
+| 项目 | 处理方式 |
+|---|---|
+| 所有表单控件 `id` | 全部保留，JS 选择器不受影响 |
+| `.auth-view` / `.auth-view.active` | 保留，登录/注册视图切换逻辑不受影响 |
+| `.text-input` | 保留，叠加 `form-control`（双类并存） |
+| `.btn-block` | 保留，叠加 `w-100 d-flex justify-content-center` |
+| `.auth-error` / `.auth-hint` | 保留，在 bridge.css 中增强样式 |
+
 *文档更新时间：2026-04-19*
