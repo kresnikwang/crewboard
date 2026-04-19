@@ -3,6 +3,42 @@
    Global state, auth, navigation, helpers, UI utilities
    ============================================================ */
 
+// --------------- Bootstrap 5 可用性检测（阶段1）---------------
+// 检测 Bootstrap 是否已成功加载，为后续阶段的组件使用提供安全入口
+window.bs = (function() {
+  function isAvailable() {
+    return typeof window.bootstrap !== 'undefined';
+  }
+
+  function version() {
+    return isAvailable() ? window.bootstrap.Tooltip.VERSION : null;
+  }
+
+  if (isAvailable()) {
+    console.log('[Bootstrap] 已成功加载，版本：' + version());
+  } else {
+    console.warn('[Bootstrap] 未检测到 Bootstrap，请检查 CDN 引入是否正常');
+  }
+
+  return {
+    isAvailable,
+    version,
+    // 安全获取 Bootstrap 组件实例（后续阶段使用）
+    Modal: function(el, opts) {
+      if (!isAvailable()) return null;
+      return new window.bootstrap.Modal(el, opts);
+    },
+    Toast: function(el, opts) {
+      if (!isAvailable()) return null;
+      return new window.bootstrap.Toast(el, opts);
+    },
+    Tooltip: function(el, opts) {
+      if (!isAvailable()) return null;
+      return new window.bootstrap.Tooltip(el, opts);
+    },
+  };
+})();
+
 // --------------- Global State ---------------
 window.state = {
   currentPage: 'schedule',
