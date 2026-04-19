@@ -80,6 +80,43 @@ pm2 startOrReload ecosystem.config.js --update-env
 - nginx：proxy_pass → 127.0.0.1:3000 ✓
 - pm2 save：已保存最新配置
 
+## Bootstrap 5 迁移（已完成 2026-04-19）
+
+### 迁移概览
+全项目分9个阶段将 Bootstrap 5.3.3 引入 Crewboard，采用「叠加兼容」策略，保留所有 JS 钩子不变。
+
+### CSS 文件加载顺序
+```
+Bootstrap 5.3.3 CSS (CDN)  → 第9行
+style.css (业务样式)        → 第11行（覆盖 Bootstrap 默认值）
+bootstrap-bridge.css        → 第13行（设计令牌映射 + 修正层）
+```
+
+### 各阶段完成内容
+| 阶段 | 内容 |
+|---|---|
+| 0 | 基线审计，生成 docs/bootstrap-migration-inventory.md |
+| 1 | 引入 Bootstrap CDN，core.js 加 window.bs 封装 |
+| 2 | 创建 bootstrap-bridge.css，设计令牌映射（--bs-* ← Crewboard 变量）|
+| 3 | 认证页（登录/注册/改密/忘记密码）表单迁移 |
+| 4 | 管理页（资源/项目/客户）表格、工具栏、报表卡片迁移 |
+| 5 | 全局 Modal 迁移到 Bootstrap Modal（ESC/背景点击/焦点陷阱）|
+| 6 | Toast 通知迁移到 Bootstrap Toast（aria-live/autohide）|
+| 7 | 排班 Booking Modal 表单迁移，排班核心区域严格保护 |
+| 8 | 响应式布局：移动端汉堡菜单、sidebar 抽屉、工具栏折行 |
+| 9 | 清理 style.css 中被 Bootstrap 完全接管的 modal/toast 冗余样式 |
+
+### 保护不迁移的区域（JS 钩子 / 排班核心）
+- `.schedule-table`、`.booking-cell`、`.booking-block`、`.leave-block`（排班网格）
+- `.ts-table`、`.ts-input`（工时表格）
+- `.bk-tabs`、`.bk-tab`、`.bk-toggle`、`.bk-leave-type`（Booking Modal 专属组件）
+- 所有 `.auth-view`、`.pc-tab`、`.text-input`（JS 事件绑定钩子，保留原类名）
+
+### 部署注意事项
+- `deploy.sh` 会自动 `git stash` 处理版本号注入冲突，再 `git pull`
+- 版本号通过 `sed` 将 `__VERSION__` 替换为当前 commit hash，注入到 index.html
+- bootstrap-bridge.css 也需要版本号注入（已在 deploy.sh 中处理）
+
 ## 技术备忘
 - 服务器 OS：CentOS/RHEL（kernel 4.18），Node.js v18，PM2 v6
 - 数据库文件：`db/resource-guru.db`（SQLite，WAL 模式）

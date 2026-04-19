@@ -289,22 +289,11 @@ a { text-decoration: none; color: inherit; }
 .card-meta { font-size: 12px; color: var(--text-secondary); }
 .card-actions { display: flex; gap: 4px; }
 
-/* === MODAL === */
-.modal-overlay {
-  display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,.4); z-index: 100; align-items: center; justify-content: center;
-}
-.modal-overlay.active { display: flex; }
-.modal {
-  background: var(--surface); border-radius: 12px; width: 480px; max-width: 90vw; max-height: 80vh;
-  overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.15); display: flex; flex-direction: column;
-}
-.modal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); }
-.modal-header h2 { font-size: 16px; font-weight: 600; }
-.modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-secondary); padding: 4px 8px; border-radius: 4px; }
-.modal-close:hover { background: var(--bg); }
-.modal-body { padding: 20px; overflow-y: auto; flex: 1; }
-.modal-footer { padding: 12px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+/* === MODAL ===
+   Removed in Phase 9 — fully replaced by Bootstrap Modal + bootstrap-bridge.css Phase 5
+   Bootstrap handles: .modal.fade, .modal-dialog, .modal-content, .modal-header,
+   .modal-body, .modal-footer, .btn-close, backdrop, ESC key, focus trap.
+*/
 
 /* Weekend column styling */
 .schedule-table th.weekend, .booking-cell.weekend { background: #F3F4F6; }
@@ -623,21 +612,11 @@ a { text-decoration: none; color: inherit; }
 .month-table .m-day-row th.m-holiday { color: #991B1B; background: #FEF2F2; }
 .month-table .m-day-row th.m-makeup { color: #92400E; background: #FFFBEB; }
 
-/* Toast notification */
-.toast-container {
-  position: fixed; bottom: 24px; right: 24px; z-index: 200;
-  display: flex; flex-direction: column-reverse; gap: 8px; pointer-events: none;
-}
-.toast {
-  padding: 12px 20px; background: #1E1B3A; color: #fff; border-radius: 8px;
-  font-size: 13px; box-shadow: 0 8px 24px rgba(0,0,0,.2);
-  pointer-events: auto; opacity: 1; transition: opacity .3s, transform .3s;
-  transform: translateY(0);
-}
-.toast.toast-enter { opacity: 0; transform: translateY(10px); }
-.toast.toast-exit { opacity: 0; transform: translateY(-10px); }
-.toast.success { background: #059669; }
-.toast.error { background: #DC2626; }
+/* === TOAST NOTIFICATION ===
+   Removed in Phase 9 — fully replaced by Bootstrap Toast + bootstrap-bridge.css Phase 6
+   Bootstrap handles: .toast, .toast-container, autohide, aria-live, animations.
+   New toast() function in core.js uses window.bootstrap.Toast API.
+*/
 
 /* === BOOKING/TIME-OFF MODAL (ResourceGuru-style) === */
 .bk-modal { width: 520px; max-width: 95vw; }

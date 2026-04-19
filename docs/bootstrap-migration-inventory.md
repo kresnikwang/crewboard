@@ -141,4 +141,24 @@
 - [x] `.schedule-table`（min-width: 900px，移动端保持横向滚动）
 - [x] `.ts-table`、`.ts-input`（工时表格和输入格）
 
+## 12. 阶段 9 实施记录（CSS 清理）
+
+**清理原则：只删除 Bootstrap 完全接管的块，保留业务专用和 JS 钩子**
+
+**清理内容：**
+- [x] `style.css`：删除 `/* === MODAL === */` 区块（14 行实际规则），替换为注释指向 Bootstrap Modal + Phase 5 bridge
+- [x] `style.css`：删除 `/* Toast notification */` 区块（14 行实际规则），替换为注释指向 Bootstrap Toast + Phase 6 bridge
+- [x] `MEMORY.md`：记录完整迁移历史、CSS 加载顺序、保护区域和部署注意事项
+
+**未清理（保守策略）：**
+
+| 保留项 | 保留原因 |
+|---|---|
+| `.btn`、`.btn-primary`、`.btn-outline` 等 | bridge.css 是叠加增强，style.css 基础定义为未覆盖场景提供 fallback |
+| `.text-input`、`.form-group`、`.form-row` | JS 钩子，保留 |
+| `.section-card`、`.member-*`、`.role-*` | 业务专用，无 Bootstrap 等价物 |
+| 所有排班/工时相关类 | 严格保护区域 |
+
+**Bootstrap 5 全项目迁移完成 ✅**
+
 *文档更新时间：2026-04-19*
