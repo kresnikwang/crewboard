@@ -47,7 +47,7 @@ a { text-decoration: none; color: inherit; }
 .date-range { font-size: 13px; font-weight: 500; color: var(--text-secondary); min-width: 180px; text-align: center; }
 
 /* === BUTTONS === */
-.btn {
+.btn:not(.btn-close) {
   display: inline-flex; align-items: center; gap: 4px; padding: 7px 14px; border-radius: 6px;
   font-size: 13px; font-weight: 500; border: none; cursor: pointer; transition: all .15s;
   font-family: var(--font); white-space: nowrap;

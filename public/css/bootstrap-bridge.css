@@ -120,14 +120,41 @@ body {
  *    天然呈现 Crewboard 视觉风格
  * ============================================================ */
 
-/* --- 按钮：对齐 Crewboard 尺寸与字重 --- */
-.btn {
+/* --- 按鈕：对齐 Crewboard 尺寸与字重 --- */
+.btn:not(.btn-close) {
   font-size: 13px;
   font-weight: 500;
   font-family: var(--font, 'Inter', -apple-system, BlinkMacSystemFont, sans-serif);
   border-radius: 6px;
   padding: 7px 14px;
   transition: all 0.15s;
+}
+
+/* 修复：恢复 Bootstrap .btn-close 原生样式（被 .btn 规则覆盖导致图标不显示） */
+.btn-close {
+  display: inline-block !important;
+  width: 1em !important;
+  height: 1em !important;
+  padding: 0.25em !important;
+  background-size: 1em !important;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23000'%3e%3cpath d='M.293.293a1 1 0 0 1 1.414 0L8 6.586 14.293.293a1 1 0 1 1 1.414 1.414L9.414 8l6.293 6.293a1 1 0 0 1-1.414 1.414L8 9.414l-6.293 6.293a1 1 0 0 1-1.414-1.414L6.586 8 .293 1.707a1 1 0 0 1 0-1.414z'/%3e%3c/svg%3e") !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  border: 0 !important;
+  border-radius: 0.375rem !important;
+  opacity: 0.5 !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  z-index: 10 !important;
+  position: relative !important;
+}
+.btn-close:hover {
+  opacity: 0.75 !important;
+}
+.btn-close:focus {
+  outline: 0 !important;
+  box-shadow: 0 0 0 0.25rem rgba(79, 70, 229, 0.25) !important;
+  opacity: 1 !important;
 }
 .btn-sm {
   padding: 4px 10px;
