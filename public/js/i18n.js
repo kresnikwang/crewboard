@@ -586,6 +586,59 @@
     'webhook.wecom_sync_fail': 'Sync failed, please check WeCom config'
   });
 
+  Object.assign(translations.zh, {
+    'wecom.app_title': '企业微信应用消息',
+    'wecom.app_desc': '配置企业微信自建应用，用于同步通讯录并向成员发送排班变更通知。',
+    'wecom.corp_id': '企业 ID',
+    'wecom.agent_id': 'Agent ID',
+    'wecom.app_secret': 'App Secret',
+    'wecom.app_secret_placeholder': '请输入企业微信应用 Secret',
+    'wecom.department_id': '部门 ID',
+    'wecom.sync_contacts': '同步企业微信通讯录',
+    'wecom.sync_success': '企业微信同步成功，已匹配成员数',
+    'wecom.sync_partial': '企业微信同步完成，但仍有未匹配成员',
+    'wecom.sync_failed': '企业微信同步失败',
+    'wecom.test_title': '企业微信应用消息测试',
+    'wecom.test_desc': '选择一个已绑定企业微信 ID 的员工，并发送不同类型的测试消息。',
+    'wecom.test_employee': '测试员工',
+    'wecom.test_message_type': '消息类型',
+    'wecom.test_type_schedule_created': '排班创建通知',
+    'wecom.test_type_schedule_updated': '排班变更通知',
+    'wecom.test_type_schedule_deleted': '排班取消通知',
+    'wecom.test_type_text_card': '卡片消息',
+    'wecom.test_send': '发送测试消息',
+    'wecom.test_send_success': '测试消息发送成功',
+    'wecom.test_send_failed': '测试消息发送失败',
+    'wecom.test_select_employee': '请选择要发送测试消息的员工',
+    'wecom.test_no_matched_employees': '暂无已绑定企业微信 ID 的员工，请先同步通讯录'
+  });
+  Object.assign(translations.en, {
+    'wecom.app_title': 'WeCom App Messages',
+    'wecom.app_desc': 'Configure a WeCom self-built app for directory sync and schedule change notifications.',
+    'wecom.corp_id': 'Corp ID',
+    'wecom.agent_id': 'Agent ID',
+    'wecom.app_secret': 'App Secret',
+    'wecom.app_secret_placeholder': 'Enter WeCom app secret',
+    'wecom.department_id': 'Department ID',
+    'wecom.sync_contacts': 'Sync WeCom Contacts',
+    'wecom.sync_success': 'WeCom sync succeeded, matched members',
+    'wecom.sync_partial': 'WeCom sync finished with unmatched members',
+    'wecom.sync_failed': 'WeCom sync failed',
+    'wecom.test_title': 'WeCom App Message Test',
+    'wecom.test_desc': 'Choose an employee with a bound WeCom user ID and send a test message type.',
+    'wecom.test_employee': 'Employee',
+    'wecom.test_message_type': 'Message Type',
+    'wecom.test_type_schedule_created': 'Schedule Created Notification',
+    'wecom.test_type_schedule_updated': 'Schedule Updated Notification',
+    'wecom.test_type_schedule_deleted': 'Schedule Cancelled Notification',
+    'wecom.test_type_text_card': 'Text Card Message',
+    'wecom.test_send': 'Send Test Message',
+    'wecom.test_send_success': 'Test message sent successfully',
+    'wecom.test_send_failed': 'Failed to send test message',
+    'wecom.test_select_employee': 'Please choose an employee to receive the test message',
+    'wecom.test_no_matched_employees': 'No employees with a bound WeCom user ID yet. Please sync contacts first'
+  });
+
   // --- logout & status ---
   Object.assign(translations.zh, {
     'logout.title': '退出登录', 'logout.desc': '退出当前账号，返回登录页面。',

@@ -82,6 +82,10 @@ function initDB() {
       webhook_dingtalk TEXT DEFAULT '',
       webhook_wecom TEXT DEFAULT '',
       webhook_feishu TEXT DEFAULT '',
+      wecom_corp_id TEXT DEFAULT '',
+      wecom_agent_id TEXT DEFAULT '',
+      wecom_secret TEXT DEFAULT '',
+      wecom_department_id INTEGER DEFAULT 1,
       currency TEXT DEFAULT 'CNY',
       theme_color TEXT DEFAULT '',
       created_at TEXT DEFAULT (datetime('now'))
@@ -269,7 +273,7 @@ function migrate(db) {
     db.exec("ALTER TABLE resources ADD COLUMN wecom_userid TEXT DEFAULT ''");
   }
 
-  // Add WeCom app message config columns to enterprises table
+  // Add enterprise-level WeCom app configuration fields
   const entCols = db.prepare('PRAGMA table_info(enterprises)').all();
   if (!entCols.find(c => c.name === 'wecom_corp_id')) {
     db.exec("ALTER TABLE enterprises ADD COLUMN wecom_corp_id TEXT DEFAULT ''");
@@ -280,6 +284,10 @@ function migrate(db) {
   if (!entCols.find(c => c.name === 'wecom_secret')) {
     db.exec("ALTER TABLE enterprises ADD COLUMN wecom_secret TEXT DEFAULT ''");
   }
+  if (!entCols.find(c => c.name === 'wecom_department_id')) {
+    db.exec('ALTER TABLE enterprises ADD COLUMN wecom_department_id INTEGER DEFAULT 1');
+  }
+  db.exec('UPDATE enterprises SET wecom_department_id = 1 WHERE wecom_department_id IS NULL OR wecom_department_id = 0');
 }
 
 function seedDemoData(db) {

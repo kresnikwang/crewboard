@@ -156,44 +156,66 @@ window.loadEnterprise = async function loadEnterprise() {
     }
   }
 
-  // Webhook & Theme settings (owner/admin only)
+  // WeCom & Theme settings (owner/admin only)
   if (isOwnerOrAdmin()) {
     var currentTheme = ent.theme_color || '';
+    var allResources = [];
+    try {
+      allResources = await api('/api/resources');
+    } catch (_) {
+      allResources = [];
+    }
+    var matchedWeComResources = allResources.filter(function (resource) {
+      return !!(resource && resource.wecom_userid);
+    });
+    var resourceOptionsHtml = matchedWeComResources.length
+      ? matchedWeComResources.map(function (resource) {
+          var label = resource.name + (resource.email ? ' · ' + resource.email : '') + ' · ' + resource.wecom_userid;
+          return '<option value="' + escHtml(String(resource.id)) + '">' + escHtml(label) + '</option>';
+        }).join('')
+      : '<option value="">' + escHtml(t('wecom.test_no_matched_employees')) + '</option>';
 
     var settingsHtml =
       '<div class="section-card">' +
-        '<h3>' + t('webhook.title') + '</h3>' +
-        '<p class="section-desc">' + t('webhook.group_desc') + '</p>' +
+        '<h3>' + t('wecom.app_title') + '</h3>' +
+        '<p style="color:var(--text-secondary);margin-bottom:12px">' + t('wecom.app_desc') + '</p>' +
         '<div class="form-group">' +
-          '<label>' + t('webhook.dingtalk') + '</label>' +
-          '<input type="text" id="set-webhook-dingtalk" class="text-input" value="' + escHtml(ent.webhook_dingtalk || '') + '" placeholder="https://oapi.dingtalk.com/robot/send?access_token=...">' +
+          '<label>' + t('wecom.corp_id') + '</label>' +
+          '<input type="text" id="set-wecom-corp-id" class="text-input" value="' + escHtml(ent.wecom_corp_id || '') + '" placeholder="wwxxxxxxxxxxxxxxxx">' +
         '</div>' +
         '<div class="form-group">' +
-          '<label>' + t('webhook.wecom') + '</label>' +
-          '<input type="text" id="set-webhook-wecom" class="text-input" value="' + escHtml(ent.webhook_wecom || '') + '" placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=...">' +
+          '<label>' + t('wecom.agent_id') + '</label>' +
+          '<input type="text" id="set-wecom-agent-id" class="text-input" value="' + escHtml(ent.wecom_agent_id || '') + '" placeholder="1000003">' +
         '</div>' +
         '<div class="form-group">' +
-          '<label>' + t('webhook.feishu') + '</label>' +
-          '<input type="text" id="set-webhook-feishu" class="text-input" value="' + escHtml(ent.webhook_feishu || '') + '" placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/...">' +
+          '<label>' + t('wecom.app_secret') + '</label>' +
+          '<input type="password" id="set-wecom-secret" class="text-input" value="' + escHtml(ent.wecom_secret || '') + '" placeholder="' + t('wecom.app_secret_placeholder') + '">' +
         '</div>' +
+        '<div class="form-group">' +
+          '<label>' + t('wecom.department_id') + '</label>' +
+          '<input type="number" id="set-wecom-department-id" class="text-input" value="' + escHtml(String(ent.wecom_department_id || 1)) + '" min="1" placeholder="1">' +
+        '</div>' +
+        '<button class="btn btn-outline" id="btn-sync-wecom">' + t('wecom.sync_contacts') + '</button>' +
       '</div>' +
       '<div class="section-card">' +
-        '<h3>' + t('webhook.wecom_app_title') + '</h3>' +
-        '<p class="section-desc">' + t('webhook.wecom_app_desc') + '</p>' +
+        '<h3>' + t('wecom.test_title') + '</h3>' +
+        '<p style="color:var(--text-secondary);margin-bottom:12px">' + t('wecom.test_desc') + '</p>' +
         '<div class="form-group">' +
-          '<label>' + t('webhook.wecom_corp_id') + '</label>' +
-          '<input type="text" id="set-wecom-corp-id" class="text-input" value="' + escHtml(ent.wecom_corp_id || '') + '" placeholder="wwxxxxxxxxxx">' +
+          '<label>' + t('wecom.test_employee') + '</label>' +
+          '<select id="wecom-test-resource" class="text-input" ' + (matchedWeComResources.length ? '' : 'disabled') + '>' +
+            resourceOptionsHtml +
+          '</select>' +
         '</div>' +
         '<div class="form-group">' +
-          '<label>' + t('webhook.wecom_agent_id') + '</label>' +
-          '<input type="text" id="set-wecom-agent-id" class="text-input" value="' + escHtml(ent.wecom_agent_id || '') + '" placeholder="1000002">' +
+          '<label>' + t('wecom.test_message_type') + '</label>' +
+          '<select id="wecom-test-message-type" class="text-input">' +
+            '<option value="schedule_created">' + t('wecom.test_type_schedule_created') + '</option>' +
+            '<option value="schedule_updated">' + t('wecom.test_type_schedule_updated') + '</option>' +
+            '<option value="schedule_deleted">' + t('wecom.test_type_schedule_deleted') + '</option>' +
+            '<option value="text_card">' + t('wecom.test_type_text_card') + '</option>' +
+          '</select>' +
         '</div>' +
-        '<div class="form-group">' +
-          '<label>' + t('webhook.wecom_secret') + '</label>' +
-          '<input type="password" id="set-wecom-secret" class="text-input" value="' + escHtml(ent.wecom_secret || '') + '" placeholder="Secret">' +
-        '</div>' +
-        '<button class="btn btn-secondary" id="btn-wecom-sync" style="margin-top:8px">' + t('webhook.wecom_sync_btn') + '</button>' +
-        '<div id="wecom-sync-result" style="margin-top:12px;display:none"></div>' +
+        '<button class="btn btn-primary" id="btn-send-wecom-test" ' + (matchedWeComResources.length ? '' : 'disabled') + '>' + t('wecom.test_send') + '</button>' +
       '</div>' +
       '<div class="section-card">' +
         '<h3>' + t('theme.title') + '</h3>' +
@@ -227,61 +249,81 @@ window.loadEnterprise = async function loadEnterprise() {
       });
     });
 
-    // Save settings button
-    document.getElementById('btn-save-settings').addEventListener('click', async function () {
-      var payload = {
+    function getEnterpriseSettingsPayload() {
+      return {
         name: (state.enterprise && state.enterprise.name) || '',
-        webhook_dingtalk: document.getElementById('set-webhook-dingtalk').value.trim(),
-        webhook_wecom: document.getElementById('set-webhook-wecom').value.trim(),
-        webhook_feishu: document.getElementById('set-webhook-feishu').value.trim(),
+        webhook_dingtalk: (state.enterprise && state.enterprise.webhook_dingtalk) || '',
+        webhook_wecom: (state.enterprise && state.enterprise.webhook_wecom) || '',
+        webhook_feishu: (state.enterprise && state.enterprise.webhook_feishu) || '',
         wecom_corp_id: document.getElementById('set-wecom-corp-id').value.trim(),
         wecom_agent_id: document.getElementById('set-wecom-agent-id').value.trim(),
         wecom_secret: document.getElementById('set-wecom-secret').value.trim(),
+        wecom_department_id: document.getElementById('set-wecom-department-id').value.trim() || '1',
         theme_color: selectedTheme,
       };
+    }
+
+    async function saveEnterpriseSettings(showToastMessage) {
+      var payload = getEnterpriseSettingsPayload();
+      await api('/api/auth/enterprises/settings', { method: 'PUT', body: payload });
+      state.enterprise = Object.assign(state.enterprise || {}, payload);
+      applyTheme(selectedTheme);
+      if (showToastMessage) toast(t('theme.settings_saved'));
+      return payload;
+    }
+
+    // Save settings button
+    document.getElementById('btn-save-settings').addEventListener('click', async function () {
       try {
-        await api('/api/auth/enterprises/settings', { method: 'PUT', body: payload });
-        state.enterprise = Object.assign(state.enterprise || {}, payload);
-        applyTheme(selectedTheme);
-        toast(t('theme.settings_saved'));
+        await saveEnterpriseSettings(true);
       } catch (err) {
         toast(err.message || t('common.save_failed'), 'error');
       }
     });
 
-    // WeCom sync button
-    document.getElementById('btn-wecom-sync').addEventListener('click', async function () {
-      var btn = this;
-      var resultDiv = document.getElementById('wecom-sync-result');
-      btn.disabled = true;
-      btn.textContent = t('webhook.wecom_syncing');
-      resultDiv.style.display = 'none';
+    document.getElementById('btn-sync-wecom').addEventListener('click', async function () {
       try {
-        var data = await api('/api/wecom/sync', { method: 'POST' });
-        var html = '<div style="font-size:13px;line-height:1.6">';
-        if (data.matched && data.matched.length > 0) {
-          html += '<div style="color:var(--success,#10B981);margin-bottom:8px"><strong>' + t('webhook.wecom_matched') + ' (' + data.matched.length + ')</strong></div>';
-          html += '<ul style="margin:0 0 8px 16px;padding:0">';
-          data.matched.forEach(function(m) { html += '<li>' + escHtml(m.resource) + ' \u2192 ' + escHtml(m.wecom_userid) + '</li>'; });
-          html += '</ul>';
+        await saveEnterpriseSettings(false);
+        var result = await api('/api/wecom/sync', { method: 'POST' });
+        if (result.unmatched && result.unmatched.length) {
+          toast(t('wecom.sync_partial') + '：' + result.matched.length + ' / ' + (result.matched.length + result.unmatched.length), 'info');
+        } else {
+          toast(t('wecom.sync_success') + '：' + result.matched.length, 'success');
         }
-        if (data.unmatched && data.unmatched.length > 0) {
-          html += '<div style="color:var(--warning,#F59E0B);margin-bottom:8px"><strong>' + t('webhook.wecom_unmatched') + ' (' + data.unmatched.length + ')</strong></div>';
-          html += '<ul style="margin:0 0 0 16px;padding:0">';
-          data.unmatched.forEach(function(m) { html += '<li>' + escHtml(m.resource) + '</li>'; });
-          html += '</ul>';
-        }
-        html += '</div>';
-        resultDiv.innerHTML = html;
-        resultDiv.style.display = 'block';
-        toast(t('webhook.wecom_sync_done'));
+        var me = await api('/api/auth/me');
+        state.user = me.user;
+        state.enterprise = me.enterprise;
+        loadEnterprise();
       } catch (err) {
-        toast(err.message || t('webhook.wecom_sync_fail'), 'error');
-      } finally {
-        btn.disabled = false;
-        btn.textContent = t('webhook.wecom_sync_btn');
+        var msg = err.message || t('wecom.sync_failed');
+        toast(msg, 'error');
       }
     });
+
+    var sendWeComTestBtn = document.getElementById('btn-send-wecom-test');
+    if (sendWeComTestBtn) {
+      sendWeComTestBtn.addEventListener('click', async function () {
+        var resourceId = document.getElementById('wecom-test-resource').value;
+        var messageType = document.getElementById('wecom-test-message-type').value;
+        if (!resourceId) {
+          toast(t('wecom.test_select_employee'), 'error');
+          return;
+        }
+        try {
+          await saveEnterpriseSettings(false);
+          var result = await api('/api/wecom/test-message', {
+            method: 'POST',
+            body: {
+              resource_id: resourceId,
+              message_type: messageType
+            }
+          });
+          toast(t('wecom.test_send_success') + '：' + result.resource.name + ' · ' + result.message_label, 'success');
+        } catch (err) {
+          toast(err.message || t('wecom.test_send_failed'), 'error');
+        }
+      });
+    }
   }
 };
 
