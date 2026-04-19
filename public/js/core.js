@@ -1013,6 +1013,37 @@ document.addEventListener('DOMContentLoaded', () => {
   initNavigation();
   initSidebarUserMenu();
 
+  // --------------- Mobile Sidebar (Hamburger) ---------------
+  (function initMobileSidebar() {
+    var sidebar    = document.getElementById('sidebar');
+    var overlay    = document.getElementById('sidebar-overlay');
+    var hamburger  = document.getElementById('hamburger-btn');
+    var closeBtn   = document.getElementById('sidebar-close-btn');
+    if (!sidebar || !overlay || !hamburger) return;
+
+    function openSidebar() {
+      sidebar.classList.add('sidebar-open');
+      overlay.classList.add('sidebar-overlay-visible');
+      document.body.style.overflow = 'hidden';
+    }
+    function closeSidebar() {
+      sidebar.classList.remove('sidebar-open');
+      overlay.classList.remove('sidebar-overlay-visible');
+      document.body.style.overflow = '';
+    }
+
+    hamburger.addEventListener('click', openSidebar);
+    overlay.addEventListener('click', closeSidebar);
+    if (closeBtn) closeBtn.addEventListener('click', closeSidebar);
+
+    // Auto-close sidebar when a nav item is clicked on mobile
+    document.querySelectorAll('.nav-item').forEach(function(item) {
+      item.addEventListener('click', function() {
+        if (window.innerWidth <= 768) closeSidebar();
+      });
+    });
+  })();
+
   // Note: Bootstrap Modal handles close button (.btn-close) and backdrop click natively.
   // The old manual event listeners for #modal-close and overlay click are no longer needed.
   // closeModal() is still called explicitly from JS for programmatic dismissal.

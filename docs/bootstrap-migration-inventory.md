@@ -129,4 +129,16 @@
 - [x] `.ts-table`、`.ts-input`、`.ts-input-variance`、`.ts-input-copied` —— 工时表格和输入格
 - [x] `.bk-tabs`、`.bk-tab`、`.bk-toggle`、`.bk-leave-type` —— booking modal 专属布局组件
 
+## 11. 阶段 8 实施记录
+
+**迁移内容：**
+- [x] `index.html`：新增移动端顶部栏 `#mobile-topbar`（汉堡菜单按钮 + logo）和 `#sidebar-overlay`
+- [x] `index.html`：Sidebar 内增加关闭按钮 `#sidebar-close-btn`
+- [x] `core.js`：`initMobileSidebar()` 函数，处理汉堡菜单开关、overlay 点击关闭、nav-item 点击自动关闭
+- [x] `bootstrap-bridge.css`：阶段8响应式规则（768px/576px 断点，涵盖 sidebar、工具栏、登录页、报表、booking modal）
+
+**保护不动：**
+- [x] `.schedule-table`（min-width: 900px，移动端保持横向滚动）
+- [x] `.ts-table`、`.ts-input`（工时表格和输入格）
+
 *文档更新时间：2026-04-19*

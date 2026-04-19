@@ -1106,3 +1106,251 @@ body.modal-open {
   color: var(--primary);
   border-color: var(--primary);
 }
+
+/* ============================================================
+   PHASE 8 BRIDGE — 响应式布局与移动端适配
+   ============================================================ */
+
+/* ================================================================
+   【移动端顶部导航栏】
+   默认隐藏，≤768px 时显示
+   ================================================================ */
+.mobile-topbar {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 52px;
+  background: var(--sidebar-bg);
+  color: #fff;
+  align-items: center;
+  padding: 0 16px;
+  gap: 12px;
+  z-index: 1040;
+  box-shadow: 0 2px 8px rgba(0,0,0,.2);
+}
+.mobile-topbar .logo {
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hamburger-btn {
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s;
+}
+.hamburger-btn:hover { background: rgba(255,255,255,.12); }
+
+/* Sidebar close button (mobile only) */
+.sidebar-close-btn {
+  display: none;
+  background: none;
+  border: none;
+  color: rgba(255,255,255,.7);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: color .15s;
+  margin-left: auto;
+}
+.sidebar-close-btn:hover { color: #fff; }
+
+/* Sidebar overlay */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 1039;
+  backdrop-filter: blur(2px);
+}
+.sidebar-overlay.sidebar-overlay-visible {
+  display: block;
+}
+
+/* ================================================================
+   【响应式断点：≤768px（平板/手机横屏）】
+   ================================================================ */
+@media (max-width: 768px) {
+  /* 显示移动顶部栏 */
+  .mobile-topbar { display: flex; }
+
+  /* 主布局：垂直堆叠，顶部为 topbar 留出空间 */
+  .app {
+    flex-direction: column;
+    padding-top: 52px; /* mobile-topbar 高度 */
+  }
+
+  /* Sidebar：默认隐藏，open 时以 overlay 方式从左侧滑入 */
+  .sidebar {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    width: 240px;
+    z-index: 1040;
+    transform: translateX(-100%);
+    transition: transform .25s ease;
+    box-shadow: 4px 0 24px rgba(0,0,0,.25);
+  }
+  .sidebar.sidebar-open {
+    transform: translateX(0);
+  }
+
+  /* 显示 sidebar 关闭按钮 */
+  .sidebar-close-btn { display: flex; }
+
+  /* sidebar-header 在移动端横向排列 logo 和关闭按钮 */
+  .sidebar-header {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .sidebar-header .logo { flex: 1; }
+  .sidebar-header .sidebar-enterprise {
+    width: 100%;
+    margin-top: 4px;
+  }
+
+  /* 主内容区全宽 */
+  .main-content {
+    width: 100%;
+    min-width: 0;
+  }
+
+  /* 页面头部：标题和操作区竖向堆叠 */
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 16px;
+    min-height: auto;
+  }
+  .page-header h1 { font-size: 16px; }
+
+  /* 操作区全宽，允许换行 */
+  .header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* 报表日期范围：独占一行 */
+  #report-start, #report-end {
+    flex: 1;
+    min-width: 120px;
+  }
+
+  /* 日期范围文字 */
+  .date-range {
+    min-width: auto;
+    font-size: 12px;
+  }
+
+  /* 报表预设按钮组：允许换行 */
+  .report-presets.btn-group {
+    flex-wrap: wrap;
+  }
+
+  /* 企业/账号设置容器：去除最大宽度限制 */
+  .enterprise-container,
+  .settings-container {
+    padding: 16px;
+    max-width: 100%;
+  }
+
+  /* 工时表容器 */
+  .timesheet-container {
+    padding: 12px;
+  }
+
+  /* 报表容器 */
+  .report-container {
+    padding: 12px;
+  }
+}
+
+/* ================================================================
+   【响应式断点：≤576px（手机竖屏）】
+   ================================================================ */
+@media (max-width: 576px) {
+  /* 视图切换按钮组：全宽 */
+  .view-toggle.btn-group {
+    width: 100%;
+  }
+  .view-toggle.btn-group .view-btn {
+    flex: 1;
+  }
+
+  /* 排班/工时导航按钮组：紧凑 */
+  #schedule-prev, #schedule-next,
+  #ts-prev, #ts-next {
+    padding: 6px 10px;
+  }
+
+  /* 新建预订按钮：全宽 */
+  #btn-add-booking {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* 报表生成/导出按钮：等宽分布 */
+  #btn-gen-report, #btn-export-excel {
+    flex: 1;
+    justify-content: center;
+  }
+
+  /* 搜索框全宽 */
+  .search-box.input-group {
+    width: 100%;
+  }
+
+  /* 登录/注册页面在极小屏幕的优化 */
+  .auth-form-panel { padding: 16px; }
+  .auth-view h2 { font-size: 18px; }
+
+  /* booking modal 在小屏全宽 */
+  .bk-modal {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+  }
+  .modal-dialog:has(.bk-modal) {
+    margin: 0;
+    max-width: 100%;
+  }
+
+  /* 报表 summary cards：每行2个 */
+  .report-summary.row .col-6 {
+    /* 保持 col-6 即每行2个，不需要额外修改 */
+  }
+
+  /* 报表图表：单列 */
+  .report-charts.row > [class*="col-"] {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+}
+
+/* ================================================================
+   【桌面端：确保 mobile-topbar 和 sidebar-overlay 不显示】
+   ================================================================ */
+@media (min-width: 769px) {
+  .mobile-topbar { display: none !important; }
+  .sidebar-overlay { display: none !important; }
+  .sidebar {
+    position: relative;
+    transform: none !important;
+    transition: none;
+  }
+  .sidebar-close-btn { display: none !important; }
+  .app { padding-top: 0; }
+}
