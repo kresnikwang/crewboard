@@ -708,11 +708,9 @@ a { text-decoration: none; color: inherit; }
 .bk-leave-type.other.active { background: #F3F4F6; color: #4B5563; border-color: #9CA3AF; }
 .bk-leave-type.holiday.active { background: #FEE2E2; color: #991B1B; border-color: #EF4444; }
 
-/* Leave block on schedule */
+/* Leave block on schedule — all types use unified grey */
 .leave-block { background: #E5E7EB !important; color: #374151 !important; border-left: 3px solid #6B7280 !important; font-size: 11px; }
-.leave-block.sick { background: #FEF3C7 !important; color: #92400E !important; border-left-color: #F59E0B !important; }
-.leave-block.personal { background: #E0F2FE !important; color: #0369A1 !important; border-left-color: #0EA5E9 !important; }
-.leave-block.holiday { background: #FEE2E2 !important; color: #991B1B !important; border-left-color: #EF4444 !important; }
+.leave-block.sick, .leave-block.personal, .leave-block.holiday { background: #E5E7EB !important; color: #374151 !important; border-left-color: #6B7280 !important; }
 
 /* Multi-select resource picker */
 .ms-picker { position: relative; }
@@ -1165,9 +1163,8 @@ a { text-decoration: none; color: inherit; }
   display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   cursor: pointer; line-height: 1.4;
 }
-.m-leave.sick { background: #FEF3C7; color: #92400E; border-left-color: #F59E0B; }
-.m-leave.personal { background: #E0F2FE; color: #0369A1; border-left-color: #0EA5E9; }
-.m-leave.holiday { background: #FEE2E2; color: #991B1B; border-left-color: #EF4444; }
+/* All leave types unified grey — same as .leave-block */
+.m-leave.sick, .m-leave.personal, .m-leave.holiday { background: #E5E7EB; color: #374151; border-left-color: #6B7280; }
 
 /* Utilization bar at bottom of cell */
 .m-util-bar {
