@@ -1044,9 +1044,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   })();
 
-  // Note: Bootstrap Modal handles close button (.btn-close) and backdrop click natively.
-  // The old manual event listeners for #modal-close and overlay click are no longer needed.
-  // closeModal() is still called explicitly from JS for programmatic dismissal.
+  // Bootstrap Modal handles close button via data-bs-dismiss="modal".
+  // Also add a manual click listener as a backup for robustness.
+  var modalCloseBtn = document.getElementById('modal-close');
+  if (modalCloseBtn) {
+    modalCloseBtn.addEventListener('click', function() {
+      window.closeModal();
+    });
+  }
 
   // Check hash route first (e.g. #reset-password?token=xxx)
   if (!handleHashRoute()) {
