@@ -309,33 +309,69 @@ window.fmtDate = fmtDate;
 window.isToday = isToday;
 window.isWeekend = isWeekend;
 
-// --------------- Toast Notification (queued & stacked) ---------------
+// --------------- Toast Notification (Bootstrap 5 实现) ---------------
+// 保留 window.toast(msg, type) 接口不变，内部改用 Bootstrap Toast API
+// type: 'success' | 'error' | 'info'
 (function () {
   var container = null;
+
   function getContainer() {
     if (!container) {
       container = document.createElement('div');
-      container.className = 'toast-container';
+      // 使用 Bootstrap 的 .toast-container 定位类，叠加自定义定位类
+      container.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+      container.style.zIndex = '9999';
       document.body.appendChild(container);
     }
     return container;
   }
+
+  // 类型到图标和背景色映射
+  var TYPE_MAP = {
+    success: { icon: '✓', bg: '#059669', label: 'Success' },
+    error:   { icon: '✕', bg: '#DC2626', label: 'Error' },
+    info:    { icon: 'ℹ', bg: '#4F46E5', label: 'Info' }
+  };
+
   window.toast = function toast(msg, type) {
     type = type || 'success';
+    var meta = TYPE_MAP[type] || TYPE_MAP.success;
+
+    // 创建 Bootstrap Toast 结构
     var el = document.createElement('div');
-    el.className = 'toast toast-' + type + ' toast-enter';
-    el.textContent = msg;
+    el.className = 'toast toast-' + type;
+    el.setAttribute('role', 'alert');
+    el.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
+    el.setAttribute('aria-atomic', 'true');
+    el.innerHTML =
+      '<div class="toast-body d-flex align-items-center gap-2">' +
+        '<span class="toast-icon" aria-hidden="true">' + meta.icon + '</span>' +
+        '<span class="toast-msg">' + msg + '</span>' +
+      '</div>';
+
     var c = getContainer();
     c.appendChild(el);
-    // Trigger enter animation
-    requestAnimationFrame(function () {
-      el.classList.remove('toast-enter');
-    });
-    // Auto-remove after 2.5s
-    setTimeout(function () {
-      el.classList.add('toast-exit');
-      setTimeout(function () { el.remove(); }, 300);
-    }, 2500);
+
+    if (window.bs && window.bs.isAvailable()) {
+      // 使用 Bootstrap Toast API
+      var bsToast = new window.bootstrap.Toast(el, {
+        autohide: true,
+        delay: 2500
+      });
+      el.addEventListener('hidden.bs.toast', function () {
+        el.remove();
+      });
+      bsToast.show();
+    } else {
+      // 降级处理：手动动画
+      requestAnimationFrame(function () {
+        el.classList.add('show');
+      });
+      setTimeout(function () {
+        el.classList.remove('show');
+        setTimeout(function () { el.remove(); }, 300);
+      }, 2500);
+    }
   };
 })();
 
@@ -414,6 +450,15 @@ document.addEventListener('DOMContentLoaded', function() {
       if (typeof window._clearDragHighlight === 'function') {
         window._clearDragHighlight();
       }
+      // 安全废除：确保没有残留的 backdrop 元素阔塞点击
+      // Bootstrap 正常情况下会自动清除，这里仅作保险
+      document.querySelectorAll('.modal-backdrop').forEach(function(el) {
+        el.remove();
+      });
+      // 确保 body 上的 modal-open 类被移除
+      document.body.classList.remove('modal-open');
+      document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
     });
   }
 });

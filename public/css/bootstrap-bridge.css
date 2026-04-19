@@ -536,6 +536,35 @@ body {
   margin-bottom: 14px;
 }
 
+/* ---- 修复：report-summary 和 report-charts 布局冲突 ----
+   style.css 里这两个类用的是 display:grid，但 Bootstrap .row 是 display:flex
+   当两个类同时存在时，需要覆盖 grid 让 Bootstrap flexbox 生效 */
+.report-summary.row {
+  display: flex !important;   /* 覆盖 style.css 的 display:grid */
+  flex-wrap: wrap;
+  margin-bottom: 0;           /* 由 mb-3 控制 */
+}
+.report-summary.row > [class*='col-'] {
+  /* Bootstrap col 控制宽度，不需要额外设置 */
+}
+
+.report-charts.row {
+  display: flex !important;   /* 覆盖 style.css 的 display:grid */
+  flex-wrap: wrap;
+  margin-bottom: 0;           /* 由 mb-3 控制 */
+}
+
+/* 未加 Bootstrap row 的旧式 report-charts（项目报表）保持原有 grid 布局 */
+.report-charts:not(.row) {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+@media (max-width: 900px) {
+  .report-charts:not(.row) { grid-template-columns: 1fr; }
+}
+
 /* ---- Bootstrap .card used in report summary / charts ---- */
 .summary-card.card,
 .report-chart-card.card {
@@ -543,6 +572,13 @@ body {
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   background: var(--surface);
+}
+/* card-body 内边距对齐 Crewboard 风格 */
+.summary-card.card .card-body {
+  padding: 16px 20px;
+}
+.report-chart-card.card .card-body {
+  padding: 16px 20px;
 }
 
 /* ---- Bootstrap .table inside management pages ---- */
@@ -804,9 +840,115 @@ body {
   --bs-backdrop-opacity: 1;
 }
 
+/* ---- 修复：Bootstrap Modal 在隐藏状态下不应拦截点击事件 ---- */
+/* Bootstrap .modal.fade 默认是 position:fixed; width:100%; height:100%
+   即使 display:none 也会在 fade 动画期间暂时占据点击区域
+   通过 pointer-events:none 确保未显示时不拦截任何事件 */
+#modal-overlay.modal:not(.show) {
+  pointer-events: none;
+}
+#modal-overlay.modal.show {
+  pointer-events: auto;
+}
+
+/* ---- 修复：确保左侧导航 sidebar 的 z-index 高于 backdrop，但低于 modal ---- */
+/* Bootstrap backdrop z-index: 1050，modal z-index: 1055
+   sidebar 默认没有 z-index，会被 backdrop 覆盖导致点击失效
+   但 sidebar 在 modal 关闭后应该正常可点击，所以不需要提升 z-index */
+/* 真正原因：Bootstrap Modal 在 show 状态时是 position:fixed 全屏覆盖，这是正常行为 */
+/* 关闭后如果 sidebar 仍无法点击，说明 backdrop 没有被清除 */
+
+/* ---- 修复：强制清除残留的 backdrop（防止动画期间关闭页面导致残留）---- */
+/* Bootstrap 在 hidden.bs.modal 后会自动清除 backdrop，正常情况下不需要额外处理 */
+
 /* ---- 禁用 Bootstrap Modal 对 body 的 overflow 修改（避免影响排班滚动）---- */
 /* Bootstrap 会给 body 加 .modal-open，这里确保主内容区不受影响 */
 body.modal-open {
   overflow: hidden;
   padding-right: 0 !important; /* 防止 Bootstrap 加 scrollbar-gutter 导致布局抖动 */
+}
+
+/* ============================================================
+   PHASE 6 BRIDGE — Bootstrap Toast 迁移
+   ============================================================ */
+
+/* ---- Toast 容器定位（Bootstrap .toast-container 已处理，这里补充兼容） ---- */
+/* Bootstrap 的 .toast-container.position-fixed.bottom-0.end-0.p-3 已正确定位 */
+/* 覆盖 style.css 中旧的 .toast-container 定位，防止双重定位 */
+.toast-container {
+  position: fixed !important;
+  bottom: 24px !important;
+  right: 24px !important;
+  top: auto !important;
+  left: auto !important;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+  pointer-events: none;
+  padding: 0 !important; /* 覆盖 Bootstrap p-3，使用 gap 控制间距 */
+}
+
+/* ---- Toast 元素样式（覆盖 Bootstrap 默认白色背景，保持 Crewboard 深色风格） ---- */
+.toast.toast-success,
+.toast.toast-error,
+.toast.toast-info {
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: var(--font);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  pointer-events: auto;
+  min-width: 220px;
+  max-width: 360px;
+  color: #fff;
+  /* Bootstrap Toast 默认背景为白色，这里覆盖 */
+  --bs-toast-bg: transparent;
+  --bs-toast-border-color: transparent;
+  --bs-toast-color: #fff;
+}
+
+.toast.toast-success { background: #059669; }
+.toast.toast-error   { background: #DC2626; }
+.toast.toast-info    { background: #4F46E5; }
+
+/* Toast body 内边距 */
+.toast.toast-success .toast-body,
+.toast.toast-error .toast-body,
+.toast.toast-info .toast-body {
+  padding: 12px 20px;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Toast 图标 */
+.toast-icon {
+  font-size: 14px;
+  font-weight: 700;
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+/* Toast 文字 */
+.toast-msg {
+  flex: 1;
+  line-height: 1.4;
+}
+
+/* Bootstrap Toast show/hide 动画 */
+.toast:not(.show) {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.3s, transform 0.3s;
+}
+.toast.show {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.3s, transform 0.3s;
+}
+.toast.hiding {
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: opacity 0.3s, transform 0.3s;
 }

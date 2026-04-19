@@ -108,4 +108,14 @@
 | 垂直居中 | `modal-dialog-centered` |
 | 尺寸切换 | `rg-modal`(540px) / `bk-modal`(520px) 通过 `:has()` CSS 选择器控制 |
 
+## 9. 阶段 6 实施记录
+
+- [x] `core.js`：重写 `window.toast()` 内部使用 `bootstrap.Toast` API，保留接口不变，添加 `role="alert"`、`aria-live`、`aria-atomic` 无障碍属性
+- [x] `bootstrap-bridge.css`：新增阶段6 Toast 修正（深色背景、图标、动画、容器定位）
+
+**同步修复的 Bug：**
+
+- [x] 左侧 tab 无法点击：`#modal-overlay.modal:not(.show)` 加 `pointer-events:none`，`hidden.bs.modal` 事件内强制清除 backdrop + `body.modal-open`
+- [x] 报表样式混乱：`report-summary.row` 和 `report-charts.row` 加 `display:flex !important` 覆盖 style.css 的 `display:grid`，未加 Bootstrap 类的旧式报表保持原有 grid 布局
+
 *文档更新时间：2026-04-19*
