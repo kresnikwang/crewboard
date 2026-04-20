@@ -51,6 +51,7 @@ function initDB() {
       hours REAL NOT NULL DEFAULT 8,
       is_tentative INTEGER DEFAULT 0,
       notes TEXT DEFAULT '',
+      split_after INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now'))
     );
 

@@ -375,11 +375,21 @@ module.exports = function(db) {
   });
 
   router.put('/bookings/:id', (req, res) => {
-    const { resource_id, project_id, date, hours, is_tentative, notes } = req.body;
+    const { resource_id, project_id, date, hours, is_tentative, notes, split_after } = req.body;
     const existing = db.prepare('SELECT * FROM bookings WHERE id=?').get(req.params.id);
     if (!existing) return res.status(404).json({ error: '预订不存在' });
     if (!canEditBooking(req.user, existing)) {
       return res.status(403).json({ error: '您只能编辑自己创建的排程' });
+    }
+
+    // Only update split_after if explicitly provided
+    if (typeof split_after !== 'undefined') {
+      db.prepare('UPDATE bookings SET split_after=? WHERE id=?')
+        .run(split_after ? 1 : 0, req.params.id);
+      // For split_after update, skip notification as it's a visual change only
+      res.json({ ok: true });
+      sseBroadcast(req.user?.enterprise_id, 'schedule-change', { action: 'update', id: +req.params.id }, req.user?.id);
+      return;
     }
 
     db.prepare('UPDATE bookings SET resource_id=?, project_id=?, date=?, hours=?, is_tentative=?, notes=? WHERE id=?')

@@ -64,16 +64,16 @@
       }
     }
 
-    /* ---- Mon-Fri dates ---- */
-    var days = weekDates(state.tsWeekStart).slice(0, 5);
+    /* ---- Mon-Sun dates (7 days including weekend for overtime) ---- */
+    var days = weekDates(state.tsWeekStart).slice(0, 7);
     var startStr = fmt(days[0]);
-    var endStr   = fmt(days[4]);
+    var endStr   = fmt(days[6]);
 
     /* ---- update range label ---- */
     var rangeEl = document.getElementById('ts-range');
     if (rangeEl) {
       var s = days[0];
-      var e = days[4];
+      var e = days[6];
       rangeEl.textContent =
         (s.getMonth() + 1) + t('common.month') + s.getDate() + t('common.day') + ' - ' +
         (e.getMonth() + 1) + t('common.month') + e.getDate() + t('common.day');
@@ -195,8 +195,10 @@
   function buildTable(days, projects, tsMap, tsSourceMap, scheduleMap) {
     var html = '<table class="ts-table"><thead><tr><th>' + t('timesheets.project') + '</th>';
 
-    days.forEach(function (d) {
-      html += '<th>' + shortDay(d) + '<br>' + fmtDate(d) + '</th>';
+    days.forEach(function (d, idx) {
+      var isWeekend = d.getDay() === 0 || d.getDay() === 6;
+      var weekendCls = isWeekend ? ' ts-weekend' : '';
+      html += '<th class="' + weekendCls.trim() + '">' + shortDay(d) + '<br>' + fmtDate(d) + '</th>';
     });
     html += '<th>' + t('timesheets.total') + '</th></tr></thead><tbody>';
 
@@ -224,6 +226,8 @@
         var source = tsSourceMap[key] || 'manual';
         var placeholder = scheduleMap[key] || '';
         var displayVal = (val !== undefined && val !== null) ? val : '';
+        var isWeekend = d.getDay() === 0 || d.getDay() === 6;
+        var weekendCls = isWeekend ? ' ts-weekend' : '';
 
         /* Variance highlight: if actual differs from scheduled by >20% */
         var varClass = '';
@@ -238,7 +242,7 @@
         /* Synced-from-booking highlight: light tint to indicate auto-filled */
         var syncedClass = (source === 'booking' && displayVal !== '') ? ' ts-input-synced' : '';
 
-        html += '<td><input type="number" class="ts-input' + varClass + syncedClass + '"' +
+        html += '<td class="' + weekendCls.trim() + '"><input type="number" class="ts-input' + varClass + syncedClass + '"' +
           ' data-project="' + p.id + '"' +
           ' data-date="' + dateStr + '"' +
           ' data-source="' + source + '"' +
@@ -258,7 +262,9 @@
     /* ---- totals row ---- */
     html += '<tr class="ts-totals-row"><td>' + t('timesheets.total') + '</td>';
     dayTotals.forEach(function (t, idx) {
-      html += '<td id="ts-day-total-' + idx + '">' + t + '</td>';
+      var isWeekend = days[idx].getDay() === 0 || days[idx].getDay() === 6;
+      var weekendCls = isWeekend ? ' ts-weekend' : '';
+      html += '<td class="' + weekendCls.trim() + '" id="ts-day-total-' + idx + '">' + t + '</td>';
     });
     html += '<td id="ts-week-total">' + weekTotal + '</td></tr>';
 
@@ -408,7 +414,7 @@
       filled++;
     });
 
-    var days = weekDates(state.tsWeekStart).slice(0, 5);
+    var days = weekDates(state.tsWeekStart).slice(0, 7);
     var allInputs = document.querySelectorAll('.ts-input');
     var projectIds = {};
     allInputs.forEach(function (inp) { projectIds[inp.dataset.project] = true; });

@@ -225,11 +225,23 @@
       });
     });
 
+    /* attach split handlers */
+    document.querySelectorAll('.split-handle').forEach(function (handle) {
+      handle.addEventListener('click', function (e) {
+        e.stopPropagation();
+        e.preventDefault();
+        var bookingId = parseInt(handle.dataset.bookingId, 10);
+        if (bookingId) {
+          window.splitBooking(bookingId);
+        }
+      });
+    });
+
     /* attach move (drag) handlers to booking block bodies */
     document.querySelectorAll('.booking-block, .m-booking').forEach(function (block) {
       block.addEventListener('mousedown', function (e) {
-        // Ignore if clicking on the resize handle (left or right)
-        if (e.target.closest('.resize-handle') || e.target.closest('.resize-handle-left')) return;
+        // Ignore if clicking on the resize handle (left or right) or split handle
+        if (e.target.closest('.resize-handle') || e.target.closest('.resize-handle-left') || e.target.closest('.split-handle')) return;
         // Only primary mouse button
         if (e.button !== 0) return;
 
@@ -318,45 +330,263 @@
 
   /* --------------------------------------------------
      Detect continuous booking spans for a resource.
-     Returns a map: bookingId -> { cls: 'span-s'|'span-m'|'span-e', showText: bool }
+     Returns a map: bookingId -> { cls: 'span-s'|'span-m'|'span-e', showText: bool, spanLen: number, sortIdx: number }
      A span is consecutive days with same (project_id, hours, is_tentative).
+     Bookings are sorted by spanLen (desc) so longer spans appear on top.
      -------------------------------------------------- */
   function detectSpans(resourceId, days, bMap) {
     var info = {};
     var dateFmts = days.map(fmt);
 
-    // Build sorted booking lists per day (consistent order across days)
-    var dayLists = dateFmts.map(function (dateStr) {
+    // Build raw booking lists per day
+    var rawDayLists = dateFmts.map(function (dateStr) {
       var key = resourceId + '_' + dateStr;
-      return (bMap[key] || []).slice().sort(function (a, b) {
-        return a.project_id - b.project_id || a.hours - b.hours || a.id - b.id;
+      return (bMap[key] || []).slice();
+    });
+
+    // Helper: find booking for a specific date from _allBookings (not just current view)
+    var matchFnBuilder = function (b) {
+      return function (other) {
+        return other.project_id === b.project_id &&
+               parseFloat(other.hours) === parseFloat(b.hours) &&
+               !!other.is_tentative === !!b.is_tentative;
+      };
+    };
+
+    // Helper: check if there's a booking on a specific date (from _allBookings, not just current view)
+    var hasBookingOnDate = function (dateStr, matchFn) {
+      // Use _allBookings directly to find bookings outside current view
+      return _allBookings.some(function (b) {
+        return b.resource_id === resourceId && b.date === dateStr && matchFn(b);
+      });
+    };
+
+    // First pass: identify all spans and calculate their lengths (using full dataset)
+    var spanLengths = {}; // bookingId -> span length (in days)
+    var spanStartDate = {}; // bookingId -> start date of span
+    var spanEndDate = {}; // bookingId -> end date of span
+    var processed = {}; // track which booking ids have been processed
+
+    for (var di = 0; di < dateFmts.length; di++) {
+      rawDayLists[di].forEach(function (b) {
+        if (processed[b.id]) return;
+
+        var matchFn = matchFnBuilder(b);
+
+        // Find the full span for this booking (extend beyond current view if needed)
+        var spanIds = [b.id];
+        var startDate = b.date;
+        var endDate = b.date;
+
+        // Look backward for more bookings in this span (outside current view)
+        var prevDate = new Date(b.date);
+        prevDate.setDate(prevDate.getDate() - 1);
+        while (true) {
+          var prevDateStr = fmt(prevDate);
+          var prevBooking = _allBookings.find(function (ob) {
+            return ob.resource_id === resourceId &&
+                   ob.date === prevDateStr &&
+                   matchFn(ob);
+          });
+          if (!prevBooking) break;
+          // Check if prevBooking has split_after (can't extend past split)
+          if (prevBooking.split_after === 1 || prevBooking.split_after === true) break;
+          spanIds.unshift(prevBooking.id);
+          startDate = prevDateStr;
+          prevDate.setDate(prevDate.getDate() - 1);
+        }
+
+        // Look forward for more bookings in this span
+        var nextDate = new Date(b.date);
+        nextDate.setDate(nextDate.getDate() + 1);
+        while (true) {
+          var nextDateStr = fmt(nextDate);
+          var nextBooking = _allBookings.find(function (ob) {
+            return ob.resource_id === resourceId &&
+                   ob.date === nextDateStr &&
+                   matchFn(ob);
+          });
+          if (!nextBooking) break;
+          // Check for split point (this booking has split_after)
+          var currBooking = _allBookings.find(function (ob) {
+            return ob.id === spanIds[spanIds.length - 1];
+          });
+          if (currBooking && (currBooking.split_after === 1 || currBooking.split_after === true)) break;
+          spanIds.push(nextBooking.id);
+          endDate = nextDateStr;
+          nextDate.setDate(nextDate.getDate() + 1);
+        }
+
+        // Record span info for all bookings in this span
+        spanIds.forEach(function (id) {
+          spanLengths[id] = spanIds.length;
+          spanStartDate[id] = startDate;
+          spanEndDate[id] = endDate;
+        });
+        processed[b.id] = true;
+      });
+    }
+
+    // Second pass: detect group bookings (same project + same dates, multiple resources)
+    var isGroupBooking = {}; // bookingId -> boolean
+    for (var di = 0; di < dateFmts.length; di++) {
+      rawDayLists[di].forEach(function (b) {
+        if (isGroupBooking[b.id] !== undefined) return; // already computed
+
+        var start = spanStartDate[b.id] || b.date;
+        var end = spanEndDate[b.id] || b.date;
+
+        // Check if any other resource has the same project in the same date range
+        var isGroup = _allBookings.some(function (other) {
+          if (other.id === b.id) return false;
+          if (other.project_id !== b.project_id) return false;
+          if (other.resource_id === resourceId) return false; // must be different resource
+          // Check if dates overlap
+          var otherStart = spanStartDate[other.id] || other.date;
+          var otherEnd = spanEndDate[other.id] || other.date;
+          return start <= otherEnd && otherStart <= end;
+        });
+        isGroupBooking[b.id] = isGroup;
+      });
+    }
+
+    // Third pass: sort each day by group booking first, then by spanLen (desc)
+    var dayLists = rawDayLists.map(function (list, di) {
+      return list.slice().sort(function (a, b) {
+        var groupA = isGroupBooking[a.id] ? 1 : 0;
+        var groupB = isGroupBooking[b.id] ? 1 : 0;
+        var lenA = spanLengths[a.id] || 1;
+        var lenB = spanLengths[b.id] || 1;
+        // Group booking first, then longer spans on top
+        return groupB - groupA || lenB - lenA || a.project_id - b.project_id || a.hours - b.hours || a.id - b.id;
       });
     });
 
+    // Fourth pass: assign span classes based on full span info (not just current view)
     for (var di = 0; di < dateFmts.length; di++) {
-      dayLists[di].forEach(function (b) {
-        var prevList = di > 0 ? dayLists[di - 1] : [];
-        var nextList = di < dateFmts.length - 1 ? dayLists[di + 1] : [];
+      dayLists[di].forEach(function (b, sortIdx) {
+        var matchFn = matchFnBuilder(b);
+        var bDate = b.date;
+        var startDate = spanStartDate[b.id] || bDate;
+        var endDate = spanEndDate[b.id] || bDate;
 
-        var matchFn = function (other) {
-          return other.project_id === b.project_id &&
-                 other.hours === b.hours &&
-                 other.is_tentative === b.is_tentative;
-        };
-        var hasPrev = prevList.some(matchFn);
-        var hasNext = nextList.some(matchFn);
+        // Check if there's a previous day in the span (outside view if needed)
+        var prevDate = new Date(bDate);
+        prevDate.setDate(prevDate.getDate() - 1);
+        var prevDateStr = fmt(prevDate);
+        var hasPrev = prevDateStr >= startDate && prevDateStr < bDate &&
+                      hasBookingOnDate(prevDateStr, matchFn);
 
-        if (hasPrev && hasNext) {
-          info[b.id] = { cls: 'span-m', showText: true };
-        } else if (hasPrev && !hasNext) {
-          info[b.id] = { cls: 'span-e', showText: true };
-        } else if (!hasPrev && hasNext) {
-          info[b.id] = { cls: 'span-s', showText: true };
+        // Check if there's a next day in the span (outside view if needed)
+        var nextDate = new Date(bDate);
+        nextDate.setDate(nextDate.getDate() + 1);
+        var nextDateStr = fmt(nextDate);
+        var hasNext = nextDateStr > bDate && nextDateStr <= endDate &&
+                      hasBookingOnDate(nextDateStr, matchFn);
+
+        // Check if this booking is after a split point
+        var isAfterSplit = false;
+        if (hasPrev) {
+          var prevBooking = _allBookings.find(function (ob) {
+            return ob.resource_id === resourceId &&
+                   ob.date === prevDateStr &&
+                   matchFn(ob);
+          });
+          isAfterSplit = prevBooking && (prevBooking.split_after === 1 || prevBooking.split_after === true);
         }
-        // else: solo booking, no span class needed
+
+        // Force span-e if this booking has split_after flag
+        var isSplitPoint = b.split_after === 1 || b.split_after === true;
+
+        // split_after only affects the RIGHT side (no visual connection to next day)
+        // It does NOT affect the LEFT side (can still be span-m or span-e if hasPrev)
+        // isAfterSplit affects the LEFT side (treat as new span start)
+        var effectiveHasNext = hasNext && !isSplitPoint;
+        var effectiveHasPrev = hasPrev && !isAfterSplit;
+
+        var cls = null;
+        if (effectiveHasPrev && effectiveHasNext) {
+          cls = 'span-m';
+        } else if (effectiveHasPrev && !effectiveHasNext) {
+          cls = 'span-e';
+        } else if (!effectiveHasPrev && effectiveHasNext) {
+          cls = 'span-s';
+        }
+        // else: solo booking (cls = null), has both left and right resize handles
+
+        info[b.id] = {
+          cls: cls,
+          showText: true,
+          spanLen: spanLengths[b.id] || 1,
+          sortIdx: sortIdx  // Store the sort index for consistent ordering
+        };
       });
     }
     return info;
+  }
+
+  /* --------------------------------------------------
+     Get span group for a booking: returns array of bookings
+     that form a continuous span with same (project_id, hours, is_tentative)
+     Respects visual split markers (span-e ends a group)
+     -------------------------------------------------- */
+  function getSpanGroup(bookingId, bMap, days) {
+    var target = _allBookings.find(function (b) { return b.id === bookingId; });
+    if (!target) return null;
+
+    var resourceId = target.resource_id;
+    var dateFmts = days.map(fmt);
+
+    // Find all bookings for this resource in current view
+    // Filter bookings for this resource and target's project
+    // Same project + same hours + same tentative status forms a group
+    var targetProjectId = target.project_id;
+    var targetHours = target.hours;
+    var targetTentative = target.is_tentative;
+
+    var resourceBookings = _allBookings.filter(function (b) {
+      return b.resource_id === resourceId &&
+             dateFmts.indexOf(b.date) >= 0 &&
+             b.project_id === targetProjectId &&
+             parseFloat(b.hours) === parseFloat(targetHours) &&
+             !!b.is_tentative === !!targetTentative;
+    }).sort(function (a, b) { return a.date.localeCompare(b.date); });
+
+    // Group consecutive bookings, respecting split_after markers
+    var groups = [];
+    var currentGroup = [];
+
+    for (var i = 0; i < resourceBookings.length; i++) {
+      var b = resourceBookings[i];
+      if (currentGroup.length === 0) {
+        currentGroup.push(b);
+      } else {
+        var last = currentGroup[currentGroup.length - 1];
+        var lastDate = new Date(last.date);
+        var curDate = new Date(b.date);
+        var dayDiff = Math.round((curDate - lastDate) / 86400000);
+
+        // Check if last booking has split_after flag (persisted split marker)
+        var isSplitAfter = last.split_after === 1 || last.split_after === true;
+
+        if (dayDiff <= 3 && !isSplitAfter) {
+          currentGroup.push(b);
+        } else {
+          groups.push(currentGroup);
+          currentGroup = [b];
+        }
+      }
+    }
+    if (currentGroup.length > 0) groups.push(currentGroup);
+
+    // Find which group contains the target booking
+    for (var g = 0; g < groups.length; g++) {
+      var group = groups[g];
+      if (group.some(function (b) { return b.id === bookingId; })) {
+        return group.length > 1 ? group : null; // Only return if it's a multi-day span
+      }
+    }
+    return null;
   }
 
   /* --------------------------------------------------
@@ -380,7 +610,10 @@
       var dateStr = fmt(d);
       var key = r.id + '_' + dateStr;
       var dayBookings = (bMap[key] || []).slice().sort(function (a, b) {
-        return a.project_id - b.project_id || a.hours - b.hours || a.id - b.id;
+        // Use sortIdx from spanInfo: longer spans appear on top
+        var idxA = (spanInfo[a.id] && spanInfo[a.id].sortIdx !== undefined) ? spanInfo[a.id].sortIdx : 999;
+        var idxB = (spanInfo[b.id] && spanInfo[b.id].sortIdx !== undefined) ? spanInfo[b.id].sortIdx : 999;
+        return idxA - idxB;
       });
       var dayLeave    = lMap[key];
 
@@ -410,10 +643,11 @@
         var bgColor = projColor + '30';
 
         var si = spanInfo[b.id];
-        var spanCls = si ? ' ' + si.cls : '';
+        var spanCls = si && si.cls ? ' ' + si.cls : '';
         var showText = si ? si.showText : true;
         // Only span-start (or solo) gets the left colored border
-        var hasBorderLeft = !si || si.cls === 'span-s';
+        // Solo booking (cls is null) should also have left border and resize handles
+        var hasBorderLeft = !si || si.cls === 'span-s' || !si.cls;
         var borderStyle = hasBorderLeft ? 'border-left:3px solid ' + projColor + ';' : '';
 
         html += '<div class="booking-block' + tentCls + spanCls + '"' +
@@ -432,8 +666,13 @@
           html += '<span class="booking-hours">' + b.hours + 'h</span> ' +
             '<span class="booking-project" title="' + escAttr(b.project_name + (b.client_name ? ' (' + b.client_name + ')' : '')) + '">' + esc(truncate(b.project_name, 25)) + '</span>';
         }
-        if (!si || si.cls === 'span-e') {
+        // Show resize handle for end of span or solo booking (cls is null)
+        if (!si || si.cls === 'span-e' || !si.cls) {
           html += '<div class="resize-handle"></div>';
+        }
+        // Show split handle for span-start and span-middle (split point between days)
+        if (si && (si.cls === 'span-s' || si.cls === 'span-m')) {
+          html += '<div class="split-handle" data-booking-id="' + b.id + '" title="Split Booking"></div>';
         }
         html += '</div>';
       });
@@ -460,6 +699,7 @@
      -------------------------------------------------- */
   function initResizeBooking(blockElement, booking, startEvent) {
     var isResizing = true;
+    var startX = startEvent.clientX; // 记录起始 X 坐标，用于判断向左缩短的意图
 
     // ── 1. 收集当前视图中该资源所有日期格 ──────────────────────────
     var scheduleGrid = document.getElementById('schedule-grid');
@@ -478,6 +718,41 @@
     // ── 2. 找出当前预定块所属的「连续同项目 booking」范围 ──────────
     // 用于向左缩短时知道哪些 booking 可以删除
     // 这里只需要知道原始日期即可，缩短时删除从 newEnd+1 到 originalDate 的 bookings
+    // 同时获取该段的结束日期（处理跨周边界的情况）
+    var sameProjectBookings = _allBookings.filter(function (b) {
+      return b.resource_id === booking.resource_id &&
+             b.project_id  === booking.project_id;
+    }).sort(function (a, b) { return a.date.localeCompare(b.date); });
+
+    // 找包含当前 booking 的连续段（需要检查 split_after 标记）
+    var endDate = booking.date;
+    for (var i = 0; i < sameProjectBookings.length; i++) {
+      if (sameProjectBookings[i].date === booking.date) {
+        // 从这个 booking 往后找连续的
+        endDate = booking.date;
+        for (var j = i; j < sameProjectBookings.length; j++) {
+          if (j === i) {
+            endDate = sameProjectBookings[j].date;
+            // 如果当前 booking 有 split_after，停止延伸
+            if (sameProjectBookings[j].split_after === 1 || sameProjectBookings[j].split_after === true) {
+              break;
+            }
+          } else {
+            var prevBooking = sameProjectBookings[j-1];
+            var prevDate = new Date(prevBooking.date);
+            var currDate = new Date(sameProjectBookings[j].date);
+            var diffDays = (currDate - prevDate) / 86400000;
+            // 允许跨过周末（diffDays <= 3），但要检查前一个 booking 是否有 split_after
+            if (diffDays <= 3 && !(prevBooking.split_after === 1 || prevBooking.split_after === true)) {
+              endDate = sameProjectBookings[j].date;
+            } else {
+              break;
+            }
+          }
+        }
+        break;
+      }
+    }
 
     // ── 3. 视觉状态 ────────────────────────────────────────────────
     blockElement.classList.add('resizing');
@@ -489,35 +764,51 @@
 
     // 高亮预览：把 originalIndex 到 hoverIndex 之间的格子加 resize-preview 类
     var previewCells = [];
+    var lastClientX = startX; // 跟踪鼠标 X 坐标
     function clearPreview() {
       previewCells.forEach(function (c) { c.classList.remove('resize-preview', 'resize-preview-shrink'); });
       previewCells = [];
     }
-    function applyPreview(hoverIndex) {
+    function applyPreview(hoverIndex, isShrinkIntent) {
       clearPreview();
-      if (hoverIndex === originalIndex) return; // 没有变化，不高亮
-      var isShrink = hoverIndex < originalIndex;
-      // 延长：高亮 originalIndex+1 到 hoverIndex（新增的天）
-      // 缩短：高亮 hoverIndex+1 到 originalIndex（将被删除的天）
-      var lo = isShrink ? hoverIndex + 1 : originalIndex + 1;
-      var hi = isShrink ? originalIndex  : hoverIndex;
-      for (var i = lo; i <= hi; i++) {
-        var c = dateMap[dates[i]];
+      var isShrink = hoverIndex < originalIndex || (hoverIndex === originalIndex && isShrinkIntent);
+      if (hoverIndex === originalIndex && !isShrinkIntent) return; // 没有变化，不高亮
+
+      if (isShrink && hoverIndex === originalIndex) {
+        // 向左缩短但还在同一格子（视图边界），高亮当前格子表示将被删除
+        var c = dateMap[dates[originalIndex]];
         if (c) {
-          c.classList.add('resize-preview');
-          if (isShrink) c.classList.add('resize-preview-shrink');
+          c.classList.add('resize-preview', 'resize-preview-shrink');
           previewCells.push(c);
+        }
+      } else {
+        // 延长：高亮 originalIndex+1 到 hoverIndex（新增的天）
+        // 缩短：高亮 hoverIndex+1 到 originalIndex（将被删除的天）
+        var lo = isShrink ? hoverIndex + 1 : originalIndex + 1;
+        var hi = isShrink ? originalIndex  : hoverIndex;
+        for (var i = lo; i <= hi; i++) {
+          var c = dateMap[dates[i]];
+          if (c) {
+            c.classList.add('resize-preview');
+            if (isShrink) c.classList.add('resize-preview-shrink');
+            previewCells.push(c);
+          }
         }
       }
     }
 
     var currentHoverIndex = originalIndex;
+    var isShrinkIntent = false; // 跟踪用户是否有向左缩短的意图
 
     // ── 4. mousemove：用 elementFromPoint 追踪悬停格（rAF 节流）───
     var _rafRight = null;
     function handleMouseMove(e) {
       if (!isResizing) return;
       e.preventDefault();
+      lastClientX = e.clientX;
+      // 检测向左缩短意图：鼠标向左移动超过 30px
+      isShrinkIntent = e.clientX < startX - 30;
+
       if (_rafRight) return;
       _rafRight = requestAnimationFrame(function () {
         _rafRight = null;
@@ -538,9 +829,10 @@
         var hoverIndex = dates.indexOf(hoverDate);
         if (hoverIndex === -1) return;
 
-        if (hoverIndex !== currentHoverIndex) {
+        // 更新预览（即使 hoverIndex 没变，但 isShrinkIntent 可能变了）
+        if (hoverIndex !== currentHoverIndex || isShrinkIntent) {
           currentHoverIndex = hoverIndex;
-          applyPreview(hoverIndex);
+          applyPreview(hoverIndex, isShrinkIntent);
         }
       });
     }
@@ -550,7 +842,11 @@
       if (!isResizing) return;
       cleanup();
 
-      if (currentHoverIndex === originalIndex) return; // 没有移动，不操作
+      // 检查是否有实际移动：要么 index 变化，要么鼠标向左移动了足够距离
+      var movedLeft = e.clientX < startX - 30; // 向左移动超过 30px
+      var hasMoved = currentHoverIndex !== originalIndex || movedLeft;
+
+      if (!hasMoved) return; // 没有移动，不操作
 
       if (currentHoverIndex > originalIndex) {
         // ── 向右：延长 ──
@@ -594,13 +890,35 @@
 
       } else {
         // ── 向左：缩短 ──
-        // 删除 currentHoverIndex+1 ~ originalIndex 范围内同资源同项目的 bookings
-        var toDelete = _allBookings.filter(function (b) {
-          if (b.resource_id !== booking.resource_id) return false;
-          if (b.project_id  !== booking.project_id)  return false;
-          var idx = dates.indexOf(b.date);
-          return idx > currentHoverIndex && idx <= originalIndex;
-        });
+        // 删除 hoverDate+1 ~ endDate 范围内同资源同项目的 bookings
+        var hoverDate = dates[currentHoverIndex];
+        var toDelete;
+
+        if (currentHoverIndex === originalIndex && movedLeft) {
+          // 向左缩短但还在同一格子（视图边界）
+          // 只有 solo booking（endDate === booking.date）才删除当前 booking
+          // 连续 booking 需要把鼠标拖到前一个格子才能缩短
+          if (endDate === booking.date) {
+            // Solo booking：删除当前 booking
+            toDelete = _allBookings.filter(function (b) {
+              if (b.resource_id !== booking.resource_id) return false;
+              if (b.project_id  !== booking.project_id)  return false;
+              return b.date === booking.date;
+            });
+          } else {
+            // 连续 booking：鼠标还在同一格子，不执行操作
+            toast(t('schedule.drag_further_to_shorten') || '请继续向左拖动以缩短', 'info');
+            return;
+          }
+        } else {
+          // 正常缩短：删除从 hoverDate 之后到 endDate
+          toDelete = _allBookings.filter(function (b) {
+            if (b.resource_id !== booking.resource_id) return false;
+            if (b.project_id  !== booking.project_id)  return false;
+            return b.date > hoverDate && b.date <= endDate;
+          });
+        }
+
         if (toDelete.length === 0) {
           toast(t('schedule.booking_shortened'), 'info');
           return;
@@ -666,7 +984,7 @@
       })
       .sort(function (a, b) { return a.date < b.date ? -1 : 1; });
 
-    // 找包含当前 booking 的连续段
+    // 找包含当前 booking 的连续段（需要检查 split_after 标记）
     var groupSegment = [];
     var currentSeg = [];
     for (var gi = 0; gi < sameGroup.length; gi++) {
@@ -678,7 +996,8 @@
         var prevD = new Date(prev.date);
         var curD  = new Date(cur.date);
         var diff  = Math.round((curD - prevD) / 86400000);
-        if (diff <= 3) { // 允许跨过周末
+        // 允许跨过周末，但要检查前一个 booking 是否有 split_after
+        if (diff <= 3 && !(prev.split_after === 1 || prev.split_after === true)) {
           currentSeg.push(cur);
         } else {
           if (currentSeg.some(function (s) { return s.id === booking.id; })) {
@@ -696,7 +1015,21 @@
     // 段的最早日期为左侧锚点
     var startDate = groupSegment[0].date;
     var originalIndex = dates.indexOf(startDate);
-    if (originalIndex === -1) return;
+
+    // 如果 startDate 在视图外（跨周边界），找到视图内第一个可见的日期作为锚点
+    if (originalIndex === -1) {
+      // 找出 groupSegment 中在当前视图内的第一个日期
+      var firstVisibleDate = null;
+      for (var gi = 0; gi < groupSegment.length; gi++) {
+        var idx = dates.indexOf(groupSegment[gi].date);
+        if (idx !== -1) {
+          firstVisibleDate = groupSegment[gi].date;
+          originalIndex = idx;
+          break;
+        }
+      }
+      if (originalIndex === -1) return; // 整个 span 都不在视图中
+    }
 
     // 3. 视觉状态
     blockElement.classList.add('resizing');
@@ -797,12 +1130,14 @@
           });
 
       } else {
-        // 右拖：缩短（删除 originalIndex ~ currentHoverIndex-1 的 booking）
+        // 右拖：缩短（删除 startDate ~ hoverDate 之前的 booking）
+        // 使用日期字符串比较，避免依赖视图内的索引（处理跨周边界的情况）
+        var hoverDate = dates[currentHoverIndex];
         var toDelete = _allBookings.filter(function (b) {
           if (b.resource_id !== booking.resource_id) return false;
           if (b.project_id  !== booking.project_id)  return false;
-          var idx = dates.indexOf(b.date);
-          return idx >= originalIndex && idx < currentHoverIndex;
+          // 删除从 startDate（包含）到 hoverDate（不包含）之间的所有 booking
+          return b.date >= startDate && b.date < hoverDate;
         });
         if (toDelete.length === 0) {
           toast(t('schedule.booking_shortened'), 'info');
@@ -1323,7 +1658,10 @@
       var dateStr = fmt(d);
       var key = r.id + '_' + dateStr;
       var dayBookings = (bMap[key] || []).slice().sort(function (a, b) {
-        return a.project_id - b.project_id || a.hours - b.hours || a.id - b.id;
+        // Use sortIdx from spanInfo for consistent ordering with detectSpans
+        var idxA = (spanInfo[a.id] && spanInfo[a.id].sortIdx !== undefined) ? spanInfo[a.id].sortIdx : 999;
+        var idxB = (spanInfo[b.id] && spanInfo[b.id].sortIdx !== undefined) ? spanInfo[b.id].sortIdx : 999;
+        return idxA - idxB;
       });
       var dayLeave = lMap[key];
       var weekend = isWeekend(d);
@@ -1353,9 +1691,9 @@
         var bgColor = projColor + '30';
 
         var si = spanInfo[b.id];
-        var spanCls = si ? ' ' + si.cls : '';
+        var spanCls = si && si.cls ? ' ' + si.cls : '';
         var showText = si ? si.showText : true;
-        var hasBorderLeft = !si || si.cls === 'span-s';
+        var hasBorderLeft = !si || si.cls === 'span-s' || !si.cls;
         var borderStyle = hasBorderLeft ? 'border-left:2px solid ' + projColor + ';' : '';
 
         html += '<div class="m-booking' + spanCls + '" data-booking-id="' + b.id + '"' +
@@ -1371,8 +1709,13 @@
           html += '<span class="m-booking-hours">' + b.hours + 'h</span> ' +
             '<span class="booking-project" title="' + escAttr(b.project_name + (b.client_name ? ' (' + b.client_name + ')' : '')) + '">' + esc(truncate(b.project_name, 25)) + '</span>';
         }
-        if (!si || si.cls === 'span-e') {
+        // Show resize handle for end of span or solo booking (cls is null)
+        if (!si || si.cls === 'span-e' || !si.cls) {
           html += '<div class="resize-handle"></div>';
+        }
+        // Show split handle for span-start and span-middle (split point between days)
+        if (si && (si.cls === 'span-s' || si.cls === 'span-m')) {
+          html += '<div class="split-handle" data-booking-id="' + b.id + '" title="Split Booking"></div>';
         }
         html += '</div>';
       });
@@ -1538,6 +1881,120 @@
     updateBookingTotal();
   }
 
+  /* --------------------------------------------------
+     Batch edit modal for continuous span bookings
+     -------------------------------------------------- */
+  async function showBatchEditModal(bookingIds) {
+    var groupBookings = _allBookings.filter(function (b) {
+      return bookingIds.indexOf(b.id) >= 0;
+    }).sort(function (a, b) { return a.date.localeCompare(b.date); });
+    if (groupBookings.length === 0) return;
+
+    var first = groupBookings[0];
+    var last = groupBookings[groupBookings.length - 1];
+    var resource = (state.resources || []).find(function (r) { return r.id === first.resource_id; });
+    var resName = resource ? resource.name : '';
+
+    var body =
+      '<div class="bk-batch-info">' +
+        '<div class="bk-batch-row"><svg class="bk-field-icon" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="7" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M3 18c0-3.3 2.7-6 7-6s7 2.7 7 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' +
+          '<div class="bk-batch-label">' + t('schedule.resource') + '</div><div class="bk-batch-value">' + esc(resName) + '</div></div>' +
+        '<div class="bk-batch-row"><svg class="bk-field-icon" viewBox="0 0 20 20" fill="none"><rect x="2" y="3" width="16" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M2 7h16M6 1v4M14 1v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' +
+          '<div class="bk-batch-label">' + t('schedule.date_range') + '</div><div class="bk-batch-value">' + first.date + ' ~ ' + last.date + '</div>' +
+          '<span class="bk-batch-days">(' + groupBookings.length + ' ' + t('schedule.days') + ')</span></div>' +
+        '<div class="bk-batch-row"><svg class="bk-field-icon" viewBox="0 0 20 20" fill="none"><path d="M4 4h12M4 8h12M4 12h8M4 16h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' +
+          '<div class="bk-batch-label">' + t('schedule.project') + '</div><div class="bk-batch-value">' + esc(first.project_name || '') + '</div></div>' +
+      '</div>' +
+      '<div class="bk-separator"></div>' +
+      '<div class="bk-field"><svg class="bk-field-icon" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M10 7v3l2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' +
+        '<div class="bk-field-body"><div class="bk-field-label">' + t('schedule.hours_per_day') + '</div>' +
+          '<div class="bk-time-inputs">' +
+            '<input type="number" id="batch-hours" class="text-input form-control" value="' + first.hours + '" min="0.5" max="24" step="0.5" style="width:100px;text-align:center">' +
+          '</div></div></div>' +
+      '<div class="bk-field" style="margin-top:12px">' +
+        '<label class="bk-toggle"><input type="checkbox" id="batch-tentative"' + (first.is_tentative ? ' checked' : '') + '><span class="bk-toggle-track"></span><span class="bk-toggle-label">' + t('schedule.tentative') + '</span></label>' +
+      '</div>' +
+      '<div class="bk-separator"></div>' +
+      '<div class="bk-field"><svg class="bk-field-icon" viewBox="0 0 20 20" fill="none"><path d="M4 4h12M4 8h12M4 12h8M4 16h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' +
+        '<div class="bk-field-body"><div class="bk-field-label">' + t('common.notes') + '</div>' +
+          '<textarea id="batch-notes" class="text-input form-control" rows="2" style="resize:vertical" placeholder="' + t('schedule.optional_notes') + '">' + esc(first.notes || '') + '</textarea>' +
+        '</div></div>' +
+      '<div class="bk-batch-preview" id="batch-preview">' +
+        '<div class="bk-batch-preview-title">' + t('schedule.preview_changes') + '</div>' +
+        '<div class="bk-batch-preview-list">' + groupBookings.map(function (b) {
+          return '<div class="bk-batch-preview-item"><span class="bk-batch-date">' + b.date + '</span><span class="bk-batch-arrow">→</span><span class="bk-batch-new" id="preview-' + b.id + '">' + first.hours + 'h</span></div>';
+        }).join('') + '</div></div>';
+
+    var footer =
+      '<button class="btn btn-danger bk-footer-left" onclick="window.deleteBatchBooking([' + bookingIds.join(',') + '])">' + t('schedule.delete_all') + '</button>' +
+      '<button class="btn btn-outline" onclick="closeModal()">' + t('common.cancel') + '</button>' +
+      '<button class="btn btn-primary" onclick="window.saveBatchBooking([' + bookingIds.join(',') + '])">' + t('schedule.save_all') + '</button>';
+
+    showModal(t('schedule.batch_edit') + ' (' + groupBookings.length + ' ' + t('schedule.days') + ')', body, footer);
+    document.getElementById('modal').classList.add('bk-modal');
+
+    // Live preview: update hours in preview when input changes
+    var hoursInput = document.getElementById('batch-hours');
+    function updatePreview() {
+      var total = parseFloat(hoursInput.value) || 0;
+      groupBookings.forEach(function (b) {
+        var el = document.getElementById('preview-' + b.id);
+        if (el) el.textContent = total + 'h';
+      });
+    }
+    hoursInput.addEventListener('input', updatePreview);
+  }
+
+  /* ---- Batch save ---- */
+  window.saveBatchBooking = async function (bookingIds) {
+    var totalH = parseFloat(document.getElementById('batch-hours').value) || 0;
+    var tentative = document.getElementById('batch-tentative').checked;
+    var notes = document.getElementById('batch-notes').value;
+
+    if (totalH <= 0) { toast(t('schedule.invalid_hours'), 'error'); return; }
+
+    try {
+      var promises = bookingIds.map(function (id) {
+        var b = _allBookings.find(function (x) { return x.id === id; });
+        if (!b) return Promise.resolve();
+        return api('/api/bookings/' + id, {
+          method: 'PUT',
+          body: {
+            resource_id: b.resource_id,
+            project_id: b.project_id,
+            date: b.date,
+            hours: totalH,
+            is_tentative: tentative,
+            notes: notes
+          }
+        });
+      });
+      await Promise.all(promises.filter(Boolean));
+      document.getElementById('modal').classList.remove('bk-modal');
+      closeModal();
+      toast(t('schedule.batch_updated'), 'success');
+      reloadAfterMutation();
+    } catch (err) {
+      toast(err.message || t('common.update_failed'), 'error');
+    }
+  };
+
+  /* ---- Batch delete ---- */
+  window.deleteBatchBooking = async function (bookingIds) {
+    if (!confirm(t('schedule.confirm_delete_batch'))) return;
+    try {
+      await Promise.all(bookingIds.map(function (id) {
+        return api('/api/bookings/' + id, { method: 'DELETE' });
+      }));
+      document.getElementById('modal').classList.remove('bk-modal');
+      closeModal();
+      toast(t('schedule.batch_deleted'), 'success');
+      reloadAfterMutation();
+    } catch (err) {
+      toast(err.message || t('common.delete_failed'), 'error');
+    }
+  };
+
   /* ---- Modal tabs HTML ---- */
   function buildModalTabs(bookingId) {
     if (bookingId) return ''; /* no tabs when editing */
@@ -1702,10 +2159,6 @@
             '<label>' + t('schedule.hours_per_day') + '</label>' +
             '<input type="number" id="bk-hours" class="text-input form-control form-control-sm" value="' + hoursVal + '" min="0.5" max="24" step="0.5" onchange="window._updateBkTotal()" oninput="window._updateBkTotal()">' +
           '</div>' +
-          '<div class="bk-hours-group">' +
-            '<label>' + t('schedule.minutes') + '</label>' +
-            '<input type="number" id="bk-mins" class="text-input form-control form-control-sm" value="0" min="0" max="59" step="15" onchange="window._updateBkTotal()" oninput="window._updateBkTotal()">' +
-          '</div>' +
         '</div>' +
         '<div class="bk-date-row">' +
           '<label>' + t('common.from') + '</label>' +
@@ -1850,12 +2303,11 @@
 
   window._updateBkTotal = function () {
     var hours = parseFloat((document.getElementById('bk-hours') || {}).value) || 0;
-    var mins = parseInt((document.getElementById('bk-mins') || {}).value) || 0;
     var startEl = document.getElementById('bk-date-start');
     var endEl = document.getElementById('bk-date-end');
     if (!startEl || !endEl) return;
 
-    var totalHPerDay = hours + mins / 60;
+    var totalHPerDay = hours;
     var totalDays = countAllDays(startEl.value, endEl.value);
     var totalH = totalHPerDay * totalDays;
 
@@ -1921,9 +2373,7 @@
      5. saveBooking
      -------------------------------------------------- */
   window.saveBooking = async function (id) {
-    var hours = parseFloat(document.getElementById('bk-hours').value) || 0;
-    var mins = parseInt((document.getElementById('bk-mins') || {}).value) || 0;
-    var totalH = hours + mins / 60;
+    var totalH = parseFloat(document.getElementById('bk-hours').value) || 0;
 
     var projectId = parseInt(document.getElementById('bk-project').value, 10);
     if (!projectId) {
@@ -1946,16 +2396,89 @@
 
     try {
       if (id) {
-        /* single day update for existing booking */
-        var data = {
-          resource_id: resourceIds[0],
-          project_id: projectId,
-          date: document.getElementById('bk-date-start').value,
-          hours: Math.round(totalH * 10) / 10,
-          is_tentative: document.getElementById('bk-tentative').checked,
-          notes: document.getElementById('bk-notes').value
-        };
-        await api('/api/bookings/' + id, { method: 'PUT', body: data });
+        /* editing existing booking — check if date range changed */
+        var startDateVal = document.getElementById('bk-date-start').value;
+        var endDateVal   = document.getElementById('bk-date-end').value || startDateVal;
+        var origBooking  = _allBookings.find(function (b) { return b.id === id; });
+        var origDate     = origBooking ? origBooking.date : startDateVal;
+        var origEndDate  = origBooking ? (origBooking.end_date || origBooking.date) : startDateVal;
+
+        var dateChanged = (startDateVal !== origDate) || (endDateVal !== origEndDate);
+
+        if (!dateChanged) {
+          /* simple update — just update this booking */
+          var data = {
+            resource_id: resourceIds[0],
+            project_id: projectId,
+            date: startDateVal,
+            hours: Math.round(totalH * 10) / 10,
+            is_tentative: document.getElementById('bk-tentative').checked,
+            notes: document.getElementById('bk-notes').value
+          };
+          await api('/api/bookings/' + id, { method: 'PUT', body: data });
+        } else {
+          /* date range changed — delete old and create new range */
+          await api('/api/bookings/' + id, { method: 'DELETE' });
+
+          /* --- Leave conflict check (same as new booking) --- */
+          var lMap = {};
+          if (window._allLeave) {
+            window._allLeave.forEach(function (l) {
+              var k = l.resource_id + '_' + l.date;
+              lMap[k] = true;
+            });
+          }
+
+          var rangeDates = [];
+          var dCursor = new Date(startDateVal);
+          var dEnd    = new Date(endDateVal);
+          while (dCursor <= dEnd) {
+            rangeDates.push(dCursor.toISOString().split('T')[0]);
+            dCursor.setDate(dCursor.getDate() + 1);
+          }
+
+          var validDates = rangeDates.filter(function (d) {
+            return !lMap[resourceIds[0] + '_' + d];
+          });
+
+          if (validDates.length === 0) {
+            toast(t('schedule.all_dates_have_leave'), 'error');
+            reloadAfterMutation();
+            return;
+          }
+
+          /* Group into contiguous segments */
+          var segments = [];
+          var seg = [validDates[0]];
+          for (var vi = 1; vi < validDates.length; vi++) {
+            var prev = new Date(validDates[vi - 1]);
+            var curr = new Date(validDates[vi]);
+            var diff = (curr - prev) / 86400000;
+            if (diff === 1) {
+              seg.push(validDates[vi]);
+            } else {
+              segments.push(seg);
+              seg = [validDates[vi]];
+            }
+          }
+          segments.push(seg);
+
+          var createPromises = segments.map(function (s) {
+            return api('/api/bookings', {
+              method: 'POST',
+              body: {
+                resource_id: resourceIds[0],
+                project_id: projectId,
+                date: s[0],
+                end_date: s[s.length - 1],
+                hours: Math.round(totalH * 10) / 10,
+                is_tentative: document.getElementById('bk-tentative').checked,
+                notes: document.getElementById('bk-notes').value
+              }
+            });
+          });
+          await Promise.all(createPromises);
+        }
       } else {
         /* --- Leave conflict check --- */
         var startDateVal = document.getElementById('bk-date-start').value;
@@ -2124,8 +2647,120 @@
       toast(t('schedule.no_edit_permission'), 'error');
       return;
     }
-    showBookingModal(id);
+    // Check if this booking belongs to a continuous span group
+    var isMonth = state.scheduleView === 'month';
+    var days = isMonth
+      ? (function () { var d = []; for (var w = 0; w < 4; w++) for (var dd = 0; dd < 7; dd++) d.push(addDays(state.scheduleWeekStart, w * 7 + dd)); return d; })()
+      : weekDates(state.scheduleWeekStart);
+    var bMap = {};
+    _allBookings.forEach(function (b) {
+      var key = b.resource_id + '_' + b.date;
+      if (!bMap[key]) bMap[key] = [];
+      bMap[key].push(b);
+    });
+    var group = getSpanGroup(id, bMap, days);
+    if (group) {
+      // Multi-day span: edit all days together (user can split first if they want single-day edit)
+      var ids = group.map(function (b) { return b.id; });
+      showBatchEditModal(ids);
+    } else {
+      showBookingModal(id);
+    }
   };
+
+  /* Split a multi-day booking at the clicked point (called by split-handle click) */
+  window.splitBooking = function (id) {
+    var booking = _allBookings.find(function (b) { return b.id === id; });
+    if (!booking) return;
+    if (!canBookForResource(booking.resource_id)) {
+      toast(t('schedule.no_edit_permission'), 'error');
+      return;
+    }
+    
+    // Check if this booking belongs to a continuous span group
+    var isMonth = state.scheduleView === 'month';
+    var days = isMonth
+      ? (function () { var d = []; for (var w = 0; w < 4; w++) for (var dd = 0; dd < 7; dd++) d.push(addDays(state.scheduleWeekStart, w * 7 + dd)); return d; })()
+      : weekDates(state.scheduleWeekStart);
+    var bMap = {};
+    _allBookings.forEach(function (b) {
+      var key = b.resource_id + '_' + b.date;
+      if (!bMap[key]) bMap[key] = [];
+      bMap[key].push(b);
+    });
+    var group = getSpanGroup(id, bMap, days);
+    
+    if (!group || group.length < 2) {
+      toast(t('schedule.cannot_split'), 'info');
+      return;
+    }
+    
+    var clicked = group.find(function (b) { return b.id === id; });
+    var idx = group.indexOf(clicked);
+    
+    // Split into left (including clicked day) and right parts
+    var rightIds = group.slice(idx + 1).map(function (b) { return b.id; });
+    
+    if (rightIds.length === 0) {
+      toast(t('schedule.cannot_split'), 'info');
+      return;
+    }
+    
+    // Mark the split point: clicked block becomes span-e (end of left group)
+    // Right part starts fresh with span-s, but we need to recalculate the entire structure
+    var leftIds = group.slice(0, idx + 1).map(function (b) { return b.id; });
+    var rightIds = group.slice(idx + 1).map(function (b) { return b.id; });
+    
+    // Persist the split: update clicked booking's split_after flag in database
+    var clickedId = clicked.id;
+    api('/api/bookings/' + clickedId, {
+      method: 'PUT',
+      body: { split_after: 1 }
+    }).then(function () {
+      // Update local cache
+      var bk = _allBookings.find(function (b) { return b.id === clickedId; });
+      if (bk) bk.split_after = 1;
+      
+      // Re-render schedule to ensure UI consistency
+      loadSchedule();
+      
+      toast(t('schedule.split_ready'), 'success');
+    }).catch(function (err) {
+      console.error('Split failed:', err);
+      toast(t('schedule.split_failed') + (err.message ? ': ' + err.message : ''), 'error');
+    });
+  }
+  
+  /* Update split handles after re-split based on new span structures */
+  function updateSplitHandlesAfterReSplit(leftIds, rightIds) {
+    // Helper to update handles for a group
+    function updateGroupHandles(ids) {
+      ids.forEach(function (id, i) {
+        var block = document.querySelector('.booking-block[data-booking-id="' + id + '"], .m-booking[data-booking-id="' + id + '"]');
+        if (!block) return;
+        
+        // Remove existing split handle
+        var existing = block.querySelector('.split-handle');
+        if (existing) existing.remove();
+        
+        // Add split handle if not the last block of the group
+        if (ids.length > 1 && i < ids.length - 1) {
+          var splitHandle = document.createElement('div');
+          splitHandle.className = 'split-handle';
+          splitHandle.dataset.bookingId = id;
+          splitHandle.title = 'Split Booking';
+          splitHandle.addEventListener('click', function (e) {
+            e.stopPropagation();
+            e.preventDefault();
+            window.splitBooking(id);
+          });
+          block.appendChild(splitHandle);
+        }
+      });
+    }
+    updateGroupHandles(leftIds);
+    updateGroupHandles(rightIds);
+  }
 
   window.deleteBooking = async function (id) {
     if (!confirm(t('schedule.confirm_delete_booking'))) return;
