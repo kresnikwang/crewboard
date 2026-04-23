@@ -305,7 +305,7 @@ module.exports = function(db) {
   function canEditBooking(user, booking) {
     if (!user) return false;
     if (user.role === 'admin') return true;
-    if (user.role === 'manager') return booking.created_by === user.id;
+    if (user.role === 'manager') return true;
     return false;
   }
 
