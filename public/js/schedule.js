@@ -1640,29 +1640,12 @@
     var totalDays = days.length;
     var colCount = totalDays + 1; /* +1 for resource name column */
 
-    /* Determine week boundaries and month labels */
-    var weeks = [];
-    for (var i = 0; i < totalDays; i += 7) {
-      weeks.push(days.slice(i, i + 7));
-    }
-
-    /* Build month header row — spans for each month */
-    var monthSpans = buildMonthSpans(days);
-
     var html = '<div class="month-scroll"><table class="month-table">';
 
-    /* --- Month label row --- */
-    html += '<thead><tr class="m-month-row">';
-    html += '<th class="m-res-hd"></th>';
-    monthSpans.forEach(function (ms) {
-      html += '<th colspan="' + ms.span + '"><span class="m-month-label">' +
-        MONTH_NAMES[ms.month] + ' ' + ms.year + '</span></th>';
-    });
-    html += '</tr>';
-
-    /* --- Day header row --- */
-    html += '<tr class="m-day-row">';
+    /* --- Single header row: resource + dates (like week view) --- */
+    html += '<thead><tr class="m-day-row">';
     html += '<th class="m-res-hd">' + t('schedule.resource') + '</th>';
+    var prevMonth = -1;
     days.forEach(function (d, idx) {
       var cls = [];
       if (isToday(d)) cls.push('m-today');
@@ -1684,11 +1667,18 @@
           holidayDot = '<span class="m-makeup-dot" title="' + holiday.name + '"></span>';
         }
       }
+      /* Show month label inline when month changes */
+      var monthLabel = '';
+      var m = d.getMonth();
+      if (m !== prevMonth) {
+        monthLabel = '<span class="m-month-inline">' + MONTH_NAMES[m] + '</span>';
+        prevMonth = m;
+      }
       var dayNum = '<span class="m-day-num">' + d.getDate() + '</span>';
       html += '<th class="' + cls.join(' ') + '" style="position:relative">' +
         weekLabel +
         '<span class="m-day-name">' + DAY_SHORT[d.getDay()] + '</span>' +
-        dayNum + holidayDot + '</th>';
+        monthLabel + dayNum + holidayDot + '</th>';
     });
     html += '</tr></thead><tbody>';
 

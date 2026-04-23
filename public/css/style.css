@@ -1125,24 +1125,20 @@ a { text-decoration: none; color: inherit; }
 }
 .month-table th.m-res-hd { z-index: 16; }
 
-/* Month row at top */
-.month-table .m-month-row th {
-  position: sticky; top: 0; z-index: 13;
-  background: var(--surface); padding: 6px 0; font-size: 13px; font-weight: 600;
-  color: var(--text); text-align: left; border-bottom: none;
-}
-.month-table .m-month-row th.m-res-hd { z-index: 17; }
-.m-month-label { padding-left: 8px; }
-
-/* Week + day header row */
+/* Month view header — single sticky row (consistent with week view) */
 .month-table .m-day-row th {
-  position: sticky; top: 30px; z-index: 13;
-  background: var(--bg); padding: 4px 0; text-align: center;
+  position: sticky; top: 0; z-index: 13;
+  background: var(--surface); padding: 6px 0; text-align: center;
   font-size: 10px; font-weight: 600; color: var(--text-secondary);
   text-transform: uppercase; letter-spacing: .3px;
   width: 36px; min-width: 36px;
+  border-bottom: 2px solid var(--border);
 }
-.month-table .m-day-row th.m-res-hd { z-index: 17; background: var(--bg); }
+.month-table .m-day-row th.m-res-hd {
+  z-index: 17; background: var(--surface);
+  text-align: left; padding-left: 16px;
+  font-size: 11px; color: var(--text-secondary);
+}
 .month-table .m-day-row th.m-today { color: var(--primary); }
 .month-table .m-day-row th.m-today .m-day-num {
   background: var(--primary); color: #fff; border-radius: 50%;
@@ -1154,6 +1150,16 @@ a { text-decoration: none; color: inherit; }
 .m-week-label {
   position: absolute; top: 2px; left: 2px; font-size: 8px; color: var(--text-tertiary);
   font-weight: 500; letter-spacing: 0;
+}
+
+/* Inline month label in month-view day header */
+.m-month-inline {
+  display: block;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 1px;
+  line-height: 1;
 }
 
 /* Team divider in month view */
