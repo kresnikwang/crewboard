@@ -2703,54 +2703,67 @@
       toast(t('schedule.no_edit_permission'), 'error');
       return;
     }
-    
-    // Check if this booking belongs to a continuous span group
-    var isMonth = state.scheduleView === 'month';
-    var days = isMonth
-      ? (function () { var d = []; for (var w = 0; w < 4; w++) for (var dd = 0; dd < 7; dd++) d.push(addDays(state.scheduleWeekStart, w * 7 + dd)); return d; })()
-      : weekDates(state.scheduleWeekStart);
-    var bMap = {};
-    _allBookings.forEach(function (b) {
-      var key = b.resource_id + '_' + b.date;
-      if (!bMap[key]) bMap[key] = [];
-      bMap[key].push(b);
-    });
-    var group = getSpanGroup(id, bMap, days);
-    
-    if (!group || group.length < 2) {
+
+    // Build the full span from _allBookings (not restricted to current view),
+    // mirroring detectSpans logic so cross-week spans work correctly.
+    var resourceId = booking.resource_id;
+    var targetHours = parseFloat(booking.hours);
+    var targetTentative = !!booking.is_tentative;
+    var targetProject = booking.project_id;
+    var matchFn = function (b) {
+      return b.resource_id === resourceId &&
+             b.project_id === targetProject &&
+             parseFloat(b.hours) === targetHours &&
+             !!b.is_tentative === targetTentative;
+    };
+
+    // Walk backward to find span start
+    var spanStart = new Date(booking.date);
+    while (true) {
+      var prevD = new Date(spanStart);
+      prevD.setDate(prevD.getDate() - 1);
+      var prevStr = fmt(prevD);
+      var prevBk = _allBookings.find(function (b) { return b.date === prevStr && matchFn(b); });
+      if (!prevBk) break;
+      if (prevBk.split_after === 1 || prevBk.split_after === true) break;
+      spanStart = prevD;
+    }
+
+    // Walk forward from span start to collect full span
+    var spanBookings = [];
+    var cur = new Date(spanStart);
+    while (true) {
+      var curStr = fmt(cur);
+      var curBk = _allBookings.find(function (b) { return b.date === curStr && matchFn(b); });
+      if (!curBk) break;
+      spanBookings.push(curBk);
+      if (curBk.split_after === 1 || curBk.split_after === true) break;
+      cur.setDate(cur.getDate() + 1);
+    }
+
+    if (spanBookings.length < 2) {
       toast(t('schedule.cannot_split'), 'info');
       return;
     }
-    
-    var clicked = group.find(function (b) { return b.id === id; });
-    var idx = group.indexOf(clicked);
-    
-    // Split into left (including clicked day) and right parts
-    var rightIds = group.slice(idx + 1).map(function (b) { return b.id; });
-    
+
+    var clicked = spanBookings.find(function (b) { return b.id === id; });
+    var idx = spanBookings.indexOf(clicked);
+    var rightIds = spanBookings.slice(idx + 1).map(function (b) { return b.id; });
+
     if (rightIds.length === 0) {
       toast(t('schedule.cannot_split'), 'info');
       return;
     }
-    
-    // Mark the split point: clicked block becomes span-e (end of left group)
-    // Right part starts fresh with span-s, but we need to recalculate the entire structure
-    var leftIds = group.slice(0, idx + 1).map(function (b) { return b.id; });
-    var rightIds = group.slice(idx + 1).map(function (b) { return b.id; });
-    
-    // Persist the split: update clicked booking's split_after flag in database
+
+    // Persist the split: set split_after on the clicked booking
     var clickedId = clicked.id;
     api('/api/bookings/' + clickedId, {
       method: 'PUT',
       body: { split_after: 1 }
     }).then(function () {
-      // Update local cache
       var bk = _allBookings.find(function (b) { return b.id === clickedId; });
       if (bk) bk.split_after = 1;
-      
-      // Re-render schedule to ensure UI consistency
       loadSchedule();
-      
       toast(t('schedule.split_ready'), 'success');
     }).catch(function (err) {
       console.error('Split failed:', err);
