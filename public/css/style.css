@@ -1111,7 +1111,7 @@ a { text-decoration: none; color: inherit; }
 
 /* === MONTH VIEW SCHEDULE === */
 .month-schedule { display: flex; flex-direction: column; height: 100%; }
-.month-scroll { flex: 1; overflow: auto; position: relative; }
+.month-scroll { flex: 1; overflow: auto; position: relative; height: 100%; }
 .month-table { border-collapse: collapse; table-layout: fixed; }
 .month-table tbody tr { content-visibility: auto; contain-intrinsic-size: auto 32px; }
 .month-table th, .month-table td { border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); }
