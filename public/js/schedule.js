@@ -85,8 +85,8 @@
       maxAge: 30000,
       onRevalidate: function (freshData) {
         // Background refresh complete — only re-render if data actually changed
-        var oldSig = _allBookings.length + '|' + _allLeave.length;
-        var newSig = freshData.bookings.length + '|' + freshData.leave.length;
+        var oldSig = _allBookings.reduce(function (s, b) { return s + b.id + ':' + b.hours + ':' + (b.is_tentative ? 1 : 0) + ','; }, '') + '|' + _allLeave.length;
+        var newSig = freshData.bookings.reduce(function (s, b) { return s + b.id + ':' + b.hours + ':' + (b.is_tentative ? 1 : 0) + ','; }, '') + '|' + freshData.leave.length;
         if (oldSig !== newSig) {
           window.loadSchedule();
         }
@@ -250,6 +250,9 @@
         if (!booking) return;
 
         if (!canBookForResource(booking.resource_id)) return;
+
+        // Prevent browser text-selection during drag without blocking the click event
+        e.preventDefault();
 
         // We start a potential move — but only commit if mouse moves > 5px
         var startX = e.clientX;
@@ -569,7 +572,7 @@
         // Check if last booking has split_after flag (persisted split marker)
         var isSplitAfter = last.split_after === 1 || last.split_after === true;
 
-        if (dayDiff <= 3 && !isSplitAfter) {
+        if (dayDiff === 1 && !isSplitAfter) {
           currentGroup.push(b);
         } else {
           groups.push(currentGroup);
@@ -757,18 +760,36 @@
     // ── 3. 视觉状态 ────────────────────────────────────────────────
     blockElement.classList.add('resizing');
 
+    // 在 overlay 创建之前捕获 booking block 的 offset（相对于 td），overlay 之后 getBoundingClientRect 不可靠
+    var _barTop    = blockElement.offsetTop;
+    var _barHeight = blockElement.offsetHeight;
+
     // 全屏透明遮罩，锁定 cursor 并阻止其他事件
     var overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;cursor:col-resize;user-select:none;';
     document.body.appendChild(overlay);
 
-    // 高亮预览：把 originalIndex 到 hoverIndex 之间的格子加 resize-preview 类
+    // 高亮预览：在目标 cell 内插入与 booking 同高的 bar，而非高亮整个 cell
     var previewCells = [];
     var lastClientX = startX; // 跟踪鼠标 X 坐标
+
     function clearPreview() {
-      previewCells.forEach(function (c) { c.classList.remove('resize-preview', 'resize-preview-shrink'); });
+      previewCells.forEach(function (c) {
+        var bar = c.querySelector('.resize-preview-bar');
+        if (bar) bar.parentNode.removeChild(bar);
+      });
       previewCells = [];
     }
+
+    function addBar(cell, isShrink) {
+      var bar = document.createElement('div');
+      bar.className = 'resize-preview-bar ' + (isShrink ? 'shrink' : 'extend');
+      bar.style.top    = _barTop    + 'px';
+      bar.style.height = _barHeight + 'px';
+      cell.appendChild(bar);
+      previewCells.push(cell);
+    }
+
     function applyPreview(hoverIndex, isShrinkIntent) {
       clearPreview();
       var isShrink = hoverIndex < originalIndex || (hoverIndex === originalIndex && isShrinkIntent);
@@ -777,10 +798,7 @@
       if (isShrink && hoverIndex === originalIndex) {
         // 向左缩短但还在同一格子（视图边界），高亮当前格子表示将被删除
         var c = dateMap[dates[originalIndex]];
-        if (c) {
-          c.classList.add('resize-preview', 'resize-preview-shrink');
-          previewCells.push(c);
-        }
+        if (c) addBar(c, true);
       } else {
         // 延长：高亮 originalIndex+1 到 hoverIndex（新增的天）
         // 缩短：高亮 hoverIndex+1 到 originalIndex（将被删除的天）
@@ -788,11 +806,7 @@
         var hi = isShrink ? originalIndex  : hoverIndex;
         for (var i = lo; i <= hi; i++) {
           var c = dateMap[dates[i]];
-          if (c) {
-            c.classList.add('resize-preview');
-            if (isShrink) c.classList.add('resize-preview-shrink');
-            previewCells.push(c);
-          }
+          if (c) addBar(c, isShrink);
         }
       }
     }
@@ -1033,14 +1047,30 @@
 
     // 3. 视觉状态
     blockElement.classList.add('resizing');
+
+    // overlay 之前捕获 offset（overlay 覆盖后 getBoundingClientRect 不可靠）
+    var _barTopL    = blockElement.offsetTop;
+    var _barHeightL = blockElement.offsetHeight;
+
     var overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;cursor:col-resize;user-select:none;';
     document.body.appendChild(overlay);
 
     var previewCells = [];
     function clearPreview() {
-      previewCells.forEach(function (c) { c.classList.remove('resize-preview', 'resize-preview-shrink'); });
+      previewCells.forEach(function (c) {
+        var bar = c.querySelector('.resize-preview-bar');
+        if (bar) bar.parentNode.removeChild(bar);
+      });
       previewCells = [];
+    }
+    function addBarLeft(cell, isShrink) {
+      var bar = document.createElement('div');
+      bar.className = 'resize-preview-bar ' + (isShrink ? 'shrink' : 'extend');
+      bar.style.top    = _barTopL    + 'px';
+      bar.style.height = _barHeightL + 'px';
+      cell.appendChild(bar);
+      previewCells.push(cell);
     }
     // 左侧预览：左拖（延长）高亮新增的天；右拖（缩短）高亮将被删除的天
     function applyPreview(hoverIndex) {
@@ -1051,11 +1081,7 @@
       var hi = isShrink ? hoverIndex - 1 : originalIndex - 1;
       for (var i = lo; i <= hi; i++) {
         var c = dateMap[dates[i]];
-        if (c) {
-          c.classList.add('resize-preview');
-          if (isShrink) c.classList.add('resize-preview-shrink');
-          previewCells.push(c);
-        }
+        if (c) addBarLeft(c, isShrink);
       }
     }
 
@@ -1215,7 +1241,7 @@
         var prevD = new Date(prev.date);
         var curD  = new Date(cur.date);
         var diff  = Math.round((curD - prevD) / 86400000);
-        if (diff <= 3) {
+        if (diff <= 3 && !(prev.split_after === 1 || prev.split_after === true)) {
           currentSeg.push(cur);
         } else {
           if (currentSeg.some(function (b) { return b.id === booking.id; })) {
@@ -2401,9 +2427,10 @@
         var endDateVal   = document.getElementById('bk-date-end').value || startDateVal;
         var origBooking  = _allBookings.find(function (b) { return b.id === id; });
         var origDate     = origBooking ? origBooking.date : startDateVal;
-        var origEndDate  = origBooking ? (origBooking.end_date || origBooking.date) : startDateVal;
 
-        var dateChanged = (startDateVal !== origDate) || (endDateVal !== origEndDate);
+        // origBooking is always a single-day record (no end_date column in DB).
+        // dateChanged if the user moved start OR expanded to a multi-day range.
+        var dateChanged = startDateVal !== origDate || endDateVal !== origDate;
 
         if (!dateChanged) {
           /* simple update — just update this booking */

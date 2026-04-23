@@ -345,14 +345,17 @@ module.exports = function(db) {
     const createdBy = req.user?.id || null;
 
     const insert = db.prepare('INSERT INTO bookings (resource_id, project_id, date, hours, is_tentative, notes, created_by) VALUES (?,?,?,?,?,?,?)');
+    const checkExisting = db.prepare('SELECT id FROM bookings WHERE resource_id=? AND project_id=? AND date=?');
     const batchInsert = db.transaction(() => {
       const d = new Date(startDate);
       const end = new Date(endDate);
       const ids = [];
       while (d <= end) {
         const dateStr = d.toISOString().split('T')[0];
-        const result = insert.run(resource_id, project_id, dateStr, bookHours, tentative, bookNotes, createdBy);
-        ids.push(result.lastInsertRowid);
+        if (!checkExisting.get(resource_id, project_id, dateStr)) {
+          const result = insert.run(resource_id, project_id, dateStr, bookHours, tentative, bookNotes, createdBy);
+          ids.push(result.lastInsertRowid);
+        }
         d.setDate(d.getDate() + 1);
       }
       return ids;
