@@ -133,7 +133,12 @@
       html += '</tbody></table>';
     }
 
-    document.getElementById('schedule-grid').innerHTML = html;
+    var grid = document.getElementById('schedule-grid');
+    grid.innerHTML = html;
+    /* Month view: let .month-scroll be the sole scroll container
+       so that sticky headers work correctly. Week view: .schedule-grid
+       itself scrolls. */
+    grid.style.overflow = isMonth ? 'hidden' : '';
 
     var addBtn = document.getElementById('btn-add-booking');
     if (addBtn) {
