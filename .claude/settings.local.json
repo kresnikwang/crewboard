@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(lsof -ti:3000)",
+      "Bash(xargs kill *)",
+      "Bash(SEED_DEMO=1 node server.js)",
+      "Bash(curl -s http://127.0.0.1:3000/)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(sshpass *)",
+      "Bash(ssh *)"
+    ]
+  }
+}
