@@ -875,7 +875,13 @@
                    b.project_id === booking.project_id &&
                    b.date === d;
           });
-          if (!alreadyBooked) {
+          // 检查目标日期是否有 split_after 标记的 booking（避免跨越分割点）
+          var hasSplitAfter = _allBookings.some(function (b) {
+            return b.resource_id === booking.resource_id &&
+                   b.date === d &&
+                   (b.split_after === 1 || b.split_after === true);
+          });
+          if (!alreadyBooked && !hasSplitAfter) {
             promises.push(api('/api/bookings', {
               method: 'POST',
               body: {
@@ -925,11 +931,14 @@
             return;
           }
         } else {
-          // 正常缩短：删除从 hoverDate 之后到 endDate
+          // 正常缩短：删除从 hoverDate 之后到 endDate，但要检查 split_after
           toDelete = _allBookings.filter(function (b) {
             if (b.resource_id !== booking.resource_id) return false;
             if (b.project_id  !== booking.project_id)  return false;
-            return b.date > hoverDate && b.date <= endDate;
+            if (b.date <= hoverDate || b.date > endDate) return false;
+            // 不要删除有 split_after 标记的 booking（用户手动分割点）
+            if (b.split_after === 1 || b.split_after === true) return false;
+            return true;
           });
         }
 
@@ -1128,7 +1137,13 @@
                    b.project_id  === booking.project_id &&
                    b.date === d;
           });
-          if (!alreadyBooked) {
+          // 检查目标日期是否有 split_after 标记
+          var hasSplitAfter = _allBookings.some(function (b) {
+            return b.resource_id === booking.resource_id &&
+                   b.date === d &&
+                   (b.split_after === 1 || b.split_after === true);
+          });
+          if (!alreadyBooked && !hasSplitAfter) {
             promises.push(api('/api/bookings', {
               method: 'POST',
               body: {
@@ -1163,7 +1178,12 @@
           if (b.resource_id !== booking.resource_id) return false;
           if (b.project_id  !== booking.project_id)  return false;
           // 删除从 startDate（包含）到 hoverDate（不包含）之间的所有 booking
-          return b.date >= startDate && b.date < hoverDate;
+          if (b.date >= startDate && b.date < hoverDate) {
+            // 不要删除有 split_after 标记的 booking（用户手动分割点）
+            if (b.split_after === 1 || b.split_after === true) return false;
+            return true;
+          }
+          return false;
         });
         if (toDelete.length === 0) {
           toast(t('schedule.booking_shortened'), 'info');
@@ -1343,27 +1363,61 @@
         return;
       }
 
+      // Check for conflicts before moving
+      var conflictDates = [];
+      groupSegment.forEach(function (b) {
+        var oldIdx = dates.indexOf(b.date);
+        var newIdx = oldIdx + currentDelta;
+        if (newIdx >= 0 && newIdx < dates.length) {
+          var newDate = dates[newIdx];
+          var hasConflict = _allBookings.some(function (other) {
+            return other.resource_id === b.resource_id &&
+                   other.project_id === b.project_id &&
+                   other.date === newDate &&
+                   other.id !== b.id;
+          });
+          if (hasConflict) conflictDates.push(newDate);
+        }
+      });
+
+      if (conflictDates.length > 0) {
+        toast(t('schedule.move_conflict') + ': ' + conflictDates.slice(0, 3).join(', '), 'error');
+        return;
+      }
+
       // Delete original bookings, then create at new dates
+      var originalBookings = groupSegment.map(function (b) {
+        return {
+          resource_id: b.resource_id,
+          project_id: b.project_id,
+          date: b.date,
+          hours: b.hours,
+          notes: b.notes || '',
+          is_tentative: b.is_tentative ? 1 : 0
+        };
+      });
+
       var deletePromises = groupSegment.map(function (b) {
         return api('/api/bookings/' + b.id, { method: 'DELETE' });
       });
 
       Promise.all(deletePromises)
         .then(function () {
-          var createPromises = groupSegment.map(function (b) {
+          var createPromises = groupSegment.map(function (b, idx) {
             var oldIdx = dates.indexOf(b.date);
             var newIdx = oldIdx + currentDelta;
             if (newIdx < 0 || newIdx >= dates.length) return Promise.resolve();
             var newDate = dates[newIdx];
+            var orig = originalBookings[idx];
             return api('/api/bookings', {
               method: 'POST',
               body: {
-                resource_id:  b.resource_id,
-                project_id:   b.project_id,
+                resource_id:  orig.resource_id,
+                project_id:   orig.project_id,
                 date:         newDate,
-                hours:        b.hours,
-                notes:        b.notes || '',
-                is_tentative: b.is_tentative ? 1 : 0
+                hours:        orig.hours,
+                notes:        orig.notes,
+                is_tentative: orig.is_tentative
               }
             });
           });
@@ -1376,7 +1430,17 @@
         })
         .catch(function (err) {
           toast(t('schedule.move_failed') + (err.message ? ': ' + err.message : ''), 'error');
-          reloadAfterMutation();
+          // Attempt to restore original bookings if move failed
+          console.error('Move failed, attempting to restore original bookings:', originalBookings);
+          var restorePromises = originalBookings.map(function (b) {
+            return api('/api/bookings', {
+              method: 'POST',
+              body: b
+            }).catch(function () { return null; }); // Ignore restore failures
+          });
+          Promise.all(restorePromises).finally(function () {
+            reloadAfterMutation();
+          });
         });
     }
 
@@ -2407,18 +2471,8 @@
       return;
     }
 
-    var resourceIds;
-    if (id) {
-      /* editing single booking — use its resource_id */
-      resourceIds = [parseInt(document.getElementById('bk-resource-selected')
-        ? getSelectedResourceIds()[0]
-        : 0, 10)];
-      resourceIds = getSelectedResourceIds();
-      if (resourceIds.length === 0) { toast(t('schedule.search_resource'), 'error'); return; }
-    } else {
-      resourceIds = getSelectedResourceIds();
-      if (resourceIds.length === 0) { toast(t('schedule.search_resource'), 'error'); return; }
-    }
+    var resourceIds = getSelectedResourceIds();
+    if (resourceIds.length === 0) { toast(t('schedule.search_resource'), 'error'); return; }
 
     try {
       if (id) {
@@ -2464,14 +2518,30 @@
             dCursor.setDate(dCursor.getDate() + 1);
           }
 
+          // Filter out leave dates AND existing booking dates
+          var existingBookingMap = {};
+          _allBookings.forEach(function (b) {
+            if (b.resource_id === resourceIds[0] && b.project_id === projectId) {
+              existingBookingMap[b.date] = true;
+            }
+          });
+
           var validDates = rangeDates.filter(function (d) {
-            return !lMap[resourceIds[0] + '_' + d];
+            return !lMap[resourceIds[0] + '_' + d] && !existingBookingMap[d];
           });
 
           if (validDates.length === 0) {
             toast(t('schedule.all_dates_have_leave'), 'error');
             reloadAfterMutation();
             return;
+          }
+
+          // Warn if some dates were skipped due to existing bookings
+          var skippedDates = rangeDates.filter(function (d) {
+            return !lMap[resourceIds[0] + '_' + d] && existingBookingMap[d];
+          });
+          if (skippedDates.length > 0) {
+            console.log('Skipped ' + skippedDates.length + ' dates with existing bookings:', skippedDates);
           }
 
           /* Group into contiguous segments */

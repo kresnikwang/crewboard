@@ -305,7 +305,10 @@ module.exports = function(db) {
   function canEditBooking(user, booking) {
     if (!user) return false;
     if (user.role === 'admin') return true;
-    if (user.role === 'manager') return true;
+    if (user.role === 'manager') {
+      // Manager can only edit bookings they created
+      return booking.created_by === user.id;
+    }
     return false;
   }
 
@@ -332,10 +335,18 @@ module.exports = function(db) {
 
   router.post('/bookings', (req, res) => {
     const { resource_id, project_id, date, end_date, hours, is_tentative, notes } = req.body;
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
 
     if (!canBookResource(req.user, resource_id)) {
       return res.status(403).json({ error: '您没有创建排程的权限' });
     }
+
+    // Validate resource and project belong to current enterprise
+    const resource = db.prepare('SELECT id FROM resources WHERE id=? AND enterprise_id=?').get(resource_id, entId);
+    if (!resource) return res.status(400).json({ error: '资源不存在或无权访问' });
+    const project = db.prepare('SELECT id FROM projects WHERE id=? AND enterprise_id=?').get(project_id, entId);
+    if (!project) return res.status(400).json({ error: '项目不存在或无权访问' });
 
     const startDate = date;
     const endDate = end_date || date;
@@ -379,7 +390,14 @@ module.exports = function(db) {
 
   router.put('/bookings/:id', (req, res) => {
     const { resource_id, project_id, date, hours, is_tentative, notes, split_after } = req.body;
-    const existing = db.prepare('SELECT * FROM bookings WHERE id=?').get(req.params.id);
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
+
+    const existing = db.prepare(`
+      SELECT b.* FROM bookings b
+      JOIN resources r ON b.resource_id = r.id
+      WHERE b.id=? AND r.enterprise_id=?
+    `).get(req.params.id, entId);
     if (!existing) return res.status(404).json({ error: '预订不存在' });
     if (!canEditBooking(req.user, existing)) {
       return res.status(403).json({ error: '您只能编辑自己创建的排程' });
@@ -410,7 +428,15 @@ module.exports = function(db) {
   });
 
   router.delete('/bookings/:id', (req, res) => {
-    const booking = db.prepare('SELECT b.*, r.name as rname, p.name as pname FROM bookings b JOIN resources r ON b.resource_id=r.id JOIN projects p ON b.project_id=p.id WHERE b.id=?').get(req.params.id);
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
+
+    const booking = db.prepare(`
+      SELECT b.*, r.name as rname, p.name as pname FROM bookings b
+      JOIN resources r ON b.resource_id=r.id
+      JOIN projects p ON b.project_id=p.id
+      WHERE b.id=? AND r.enterprise_id=?
+    `).get(req.params.id, entId);
     if (!booking) return res.status(404).json({ error: '预订不存在' });
 
     if (!canEditBooking(req.user, booking)) {
@@ -469,21 +495,18 @@ module.exports = function(db) {
   // Batch upsert timesheets for a week
   router.post('/timesheets/batch', (req, res) => {
     const { entries } = req.body; // [{resource_id, project_id, date, hours, notes}]
-    const upsert = db.prepare(`
-      INSERT INTO timesheets (resource_id, project_id, date, hours, notes, status)
-      VALUES (?, ?, ?, ?, ?, 'draft')
-      ON CONFLICT(id) DO UPDATE SET hours=excluded.hours, notes=excluded.notes
-    `);
     const insertOrUpdate = db.transaction((items) => {
+      const selectStmt = db.prepare('SELECT id FROM timesheets WHERE resource_id=? AND project_id=? AND date=?');
+      const updateStmt = db.prepare('UPDATE timesheets SET hours=?, notes=? WHERE id=?');
+      const insertStmt = db.prepare('INSERT INTO timesheets (resource_id, project_id, date, hours, notes, status) VALUES (?,?,?,?,?,?)');
+
       for (const e of items) {
         // Check if entry exists
-        const existing = db.prepare('SELECT id FROM timesheets WHERE resource_id=? AND project_id=? AND date=?')
-          .get(e.resource_id, e.project_id, e.date);
+        const existing = selectStmt.get(e.resource_id, e.project_id, e.date);
         if (existing) {
-          db.prepare('UPDATE timesheets SET hours=?, notes=? WHERE id=?').run(e.hours, e.notes || '', existing.id);
+          updateStmt.run(e.hours, e.notes || '', existing.id);
         } else if (e.hours > 0) {
-          db.prepare('INSERT INTO timesheets (resource_id, project_id, date, hours, notes, status) VALUES (?,?,?,?,?,?)')
-            .run(e.resource_id, e.project_id, e.date, e.hours, e.notes || '', 'draft');
+          insertStmt.run(e.resource_id, e.project_id, e.date, e.hours, e.notes || '', 'draft');
         }
       }
     });
@@ -731,8 +754,14 @@ module.exports = function(db) {
       while (d <= end) {
         const dateStr = d.toISOString().split('T')[0];
         const day = d.getDay();
-        // Skip weekends for normal leave types, but allow holidays on any day
-        if (leaveType === 'holiday' || (day !== 0 && day !== 6)) {
+        const holiday = getHoliday(dateStr);
+
+        // 调休上班日（workday）即使是周末也要允许创建休假
+        // 普通周末（非调休上班日）跳过
+        const isWorkday = holiday && holiday.type === 'workday';
+        const isWeekend = day === 0 || day === 6;
+
+        if (leaveType === 'holiday' || isWorkday || !isWeekend) {
           insert.run(resource_id, dateStr, leaveType, leaveNotes);
           count++;
         }
