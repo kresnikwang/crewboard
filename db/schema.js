@@ -243,6 +243,9 @@ function migrate(db) {
   if (!bookingCols.find(c => c.name === 'created_by')) {
     db.exec('ALTER TABLE bookings ADD COLUMN created_by INTEGER DEFAULT NULL');
   }
+  if (!bookingCols.find(c => c.name === 'split_after')) {
+    db.exec('ALTER TABLE bookings ADD COLUMN split_after INTEGER DEFAULT 0');
+  }
   const clientCols3 = db.prepare('PRAGMA table_info(clients)').all();
   if (!clientCols3.find(c => c.name === 'created_by')) {
     db.exec('ALTER TABLE clients ADD COLUMN created_by INTEGER DEFAULT NULL');
