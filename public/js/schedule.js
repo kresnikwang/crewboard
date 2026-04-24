@@ -1643,13 +1643,16 @@
 
   function buildMonthView(days, teams, bMap, lMap, hMap, resources) {
     var totalDays = days.length;
-    var colCount = totalDays + 1; /* +1 for resource name column */
 
-    var html = '<div class="month-scroll"><table class="month-table">';
+    /* --- Build column group (ensures both tables share exact widths) --- */
+    var colgroupHTML = '<colgroup>';
+    colgroupHTML += '<col class="m-res-col">';
+    for (var ci = 0; ci < totalDays; ci++) colgroupHTML += '<col class="m-day-col">';
+    colgroupHTML += '</colgroup>';
 
-    /* --- Single header row: resource + dates (like week view) --- */
-    html += '<thead><tr class="m-day-row">';
-    html += '<th class="m-res-hd">' + t('schedule.resource') + '</th>';
+    /* --- Build header row HTML (shared by header table) --- */
+    var headerRowHTML = '<tr class="m-day-row">';
+    headerRowHTML += '<th class="m-res-hd">' + t('schedule.resource') + '</th>';
     var prevMonth = -1;
     days.forEach(function (d, idx) {
       var cls = [];
@@ -1680,27 +1683,40 @@
         prevMonth = m;
       }
       var dayNum = '<span class="m-day-num">' + d.getDate() + '</span>';
-      html += '<th class="' + cls.join(' ') + '" style="position:relative">' +
+      headerRowHTML += '<th class="' + cls.join(' ') + '" style="position:relative">' +
         weekLabel +
         '<span class="m-day-name">' + DAY_SHORT[d.getDay()] + '</span>' +
         monthLabel + dayNum + holidayDot + '</th>';
     });
-    html += '</tr></thead><tbody>';
+    headerRowHTML += '</tr>';
 
-    /* --- Resource rows --- */
+    /* --- Build body rows --- */
+    var bodyHTML = '';
     Object.keys(teams).forEach(function (teamName) {
       var members = teams[teamName];
-      /* Team divider — sticky first cell + empty day cells */
-      html += '<tr class="m-team-row"><td class="m-res-cell m-team-label">' +
+      /* Team divider */
+      bodyHTML += '<tr class="m-team-row"><td class="m-res-cell m-team-label">' +
         '<span class="team-label">' + teamName + '</span></td>';
-      for (var di = 0; di < totalDays; di++) html += '<td></td>';
-      html += '</tr>';
+      for (var di = 0; di < totalDays; di++) bodyHTML += '<td></td>';
+      bodyHTML += '</tr>';
       members.forEach(function (r) {
-        html += buildMonthResourceRow(r, days, bMap, lMap);
+        bodyHTML += buildMonthResourceRow(r, days, bMap, lMap);
       });
     });
 
-    html += '</tbody></table></div>';
+    /* --- Two-table layout: sticky header + scrollable body --- */
+    var html = '<div class="month-scroll">';
+    /* Sticky header table */
+    html += '<div class="month-header-sticky">';
+    html += '<table class="month-table month-table-header">';
+    html += colgroupHTML;
+    html += '<thead>' + headerRowHTML + '</thead>';
+    html += '</table></div>';
+    /* Body table */
+    html += '<table class="month-table month-table-body">';
+    html += colgroupHTML;
+    html += '<tbody>' + bodyHTML + '</tbody>';
+    html += '</table></div>';
     return html;
   }
 

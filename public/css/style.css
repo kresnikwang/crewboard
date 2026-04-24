@@ -1125,9 +1125,15 @@ a { text-decoration: none; color: inherit; }
 }
 .month-table th.m-res-hd { z-index: 16; }
 
-/* Month view header — single sticky row (consistent with week view) */
+/* Month view header — sticky header div wraps a separate table */
+.month-header-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  background: var(--surface);
+}
+.month-table-header { margin-bottom: -1px; }
 .month-table .m-day-row th {
-  position: sticky; top: 0; z-index: 13;
   background: var(--surface); padding: 6px 0; text-align: center;
   font-size: 10px; font-weight: 600; color: var(--text-secondary);
   text-transform: uppercase; letter-spacing: .3px;
@@ -1161,6 +1167,10 @@ a { text-decoration: none; color: inherit; }
   margin-bottom: 1px;
   line-height: 1;
 }
+
+/* Column widths for month-view tables (keeps header & body aligned) */
+.m-res-col { width: 190px; min-width: 190px; }
+.m-day-col { width: 36px; min-width: 36px; }
 
 /* Team divider in month view */
 .month-table .m-team-row td {
