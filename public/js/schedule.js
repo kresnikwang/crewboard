@@ -1644,10 +1644,18 @@
   function buildMonthView(days, teams, bMap, lMap, hMap, resources) {
     var totalDays = days.length;
 
+    /* --- Column widths (must use inline style on <col> AND explicit
+       table width; otherwise long booking content can stretch a body
+       cell wider than the corresponding header cell, breaking alignment
+       even with table-layout: fixed). --- */
+    var RES_COL_W = 190;
+    var DAY_COL_W = 36;
+    var totalTableW = RES_COL_W + totalDays * DAY_COL_W;
+
     /* --- Build column group (ensures both tables share exact widths) --- */
     var colgroupHTML = '<colgroup>';
-    colgroupHTML += '<col class="m-res-col">';
-    for (var ci = 0; ci < totalDays; ci++) colgroupHTML += '<col class="m-day-col">';
+    colgroupHTML += '<col class="m-res-col" style="width:' + RES_COL_W + 'px">';
+    for (var ci = 0; ci < totalDays; ci++) colgroupHTML += '<col class="m-day-col" style="width:' + DAY_COL_W + 'px">';
     colgroupHTML += '</colgroup>';
 
     /* --- Build header row HTML (shared by header table) --- */
@@ -1705,15 +1713,16 @@
     });
 
     /* --- Two-table layout: sticky header + scrollable body --- */
+    var tblStyle = ' style="width:' + totalTableW + 'px;table-layout:fixed"';
     var html = '<div class="month-scroll">';
     /* Sticky header table */
     html += '<div class="month-header-sticky">';
-    html += '<table class="month-table month-table-header">';
+    html += '<table class="month-table month-table-header"' + tblStyle + '>';
     html += colgroupHTML;
     html += '<thead>' + headerRowHTML + '</thead>';
     html += '</table></div>';
     /* Body table */
-    html += '<table class="month-table month-table-body">';
+    html += '<table class="month-table month-table-body"' + tblStyle + '>';
     html += colgroupHTML;
     html += '<tbody>' + bodyHTML + '</tbody>';
     html += '</table></div>';
