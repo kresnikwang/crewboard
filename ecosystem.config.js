@@ -27,6 +27,26 @@ module.exports = {
       log_date_format: 'YYYY-MM-DD HH:mm:ss',
       error_file: './logs/holiday-update-error.log',
       out_file: './logs/holiday-update.log',
+    },
+    {
+      name: 'crewboard-reminder-timesheet',
+      script: 'scripts/reminder-timesheet.js',
+      cron_restart: '0 15 * * 5',   // 每周五 15:00
+      autorestart: false,
+      watch: false,
+      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+      error_file: './logs/reminder-timesheet-error.log',
+      out_file: './logs/reminder-timesheet.log',
+    },
+    {
+      name: 'crewboard-reminder-schedule',
+      script: 'scripts/reminder-schedule.js',
+      cron_restart: '0 9 * * 1',    // 每周一 09:00
+      autorestart: false,
+      watch: false,
+      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+      error_file: './logs/reminder-schedule-error.log',
+      out_file: './logs/reminder-schedule.log',
     }
   ]
 };
