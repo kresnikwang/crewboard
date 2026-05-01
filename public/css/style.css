@@ -1135,9 +1135,9 @@ a { text-decoration: none; color: inherit; }
 .month-table-header { margin-bottom: -1px; }
 .month-table .m-day-row th {
   background: var(--surface); padding: 6px 0; text-align: center;
-  font-size: 10px; font-weight: 600; color: var(--text-secondary);
+  font-size: 9px; font-weight: 600; color: var(--text-secondary);
   text-transform: uppercase; letter-spacing: .3px;
-  width: 36px; min-width: 36px;
+  width: 42px; min-width: 42px;
   border-bottom: 2px solid var(--border);
 }
 .month-table .m-day-row th.m-res-hd {
@@ -1170,7 +1170,7 @@ a { text-decoration: none; color: inherit; }
 
 /* Column widths for month-view tables (keeps header & body aligned) */
 .m-res-col { width: 190px; min-width: 190px; }
-.m-day-col { width: 36px; min-width: 36px; }
+.m-day-col { width: 42px; min-width: 42px; }
 
 /* Team divider in month view */
 .month-table .m-team-row td {
@@ -1197,7 +1197,7 @@ a { text-decoration: none; color: inherit; }
 /* Day cells in month view */
 .m-day-cell {
   padding: 1px 0; vertical-align: top; height: 54px; position: relative; cursor: pointer;
-  width: 36px; min-width: 36px; overflow: visible;
+  width: 42px; min-width: 42px; overflow: visible;
 }
 .m-day-cell:hover { background: var(--primary-light); }
 .m-day-cell.m-weekend { background: #F3F4F6; }
@@ -1206,7 +1206,7 @@ a { text-decoration: none; color: inherit; }
 
 /* Booking block in month view */
 .m-booking {
-  font-size: 10px; line-height: 1.15; padding: 1px 2px; border-radius: 2px;
+  font-size: 9px; line-height: 1.15; padding: 1px 2px; border-radius: 2px;
   margin-bottom: 1px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
   cursor: grab; position: relative;
   height: 14px; box-sizing: border-box;
