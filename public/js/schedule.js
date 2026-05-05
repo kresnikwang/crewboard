@@ -1856,17 +1856,37 @@
     var todayBtn = document.getElementById('schedule-today');
     var addBtn   = document.getElementById('btn-add-booking');
 
-    var step = function () { return -7; };
+    /* Jump to the Monday of the week containing the 1st of a given month */
+    function monthFirstMonday(year, month) {
+      var first = new Date(year, month, 1);
+      return getMonday(first);
+    }
 
     if (prevBtn) {
       prevBtn.addEventListener('click', function () {
-        state.scheduleWeekStart = addDays(state.scheduleWeekStart, -7);
+        if (state.scheduleView === 'month') {
+          var d = state.scheduleWeekStart;
+          var y = d.getFullYear();
+          var m = d.getMonth() - 1;
+          if (m < 0) { m = 11; y--; }
+          state.scheduleWeekStart = monthFirstMonday(y, m);
+        } else {
+          state.scheduleWeekStart = addDays(state.scheduleWeekStart, -7);
+        }
         window.loadSchedule();
       });
     }
     if (nextBtn) {
       nextBtn.addEventListener('click', function () {
-        state.scheduleWeekStart = addDays(state.scheduleWeekStart, 7);
+        if (state.scheduleView === 'month') {
+          var d = state.scheduleWeekStart;
+          var y = d.getFullYear();
+          var m = d.getMonth() + 1;
+          if (m > 11) { m = 0; y++; }
+          state.scheduleWeekStart = monthFirstMonday(y, m);
+        } else {
+          state.scheduleWeekStart = addDays(state.scheduleWeekStart, 7);
+        }
         window.loadSchedule();
       });
     }
