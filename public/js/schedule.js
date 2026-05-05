@@ -30,7 +30,7 @@
 
   /* ---- view mode: 'week' or 'month' ---- */
   if (!state.scheduleView) state.scheduleView = 'week';
-  var MONTH_WEEKS = 4; /* show 4 weeks in month view */
+  var MONTH_WEEKS = 6; /* show 6 weeks in month view for continuous scroll */
 
   /* --------------------------------------------------
      1. loadSchedule — main render function
@@ -1856,17 +1856,17 @@
     var todayBtn = document.getElementById('schedule-today');
     var addBtn   = document.getElementById('btn-add-booking');
 
-    var step = function () { return state.scheduleView === 'month' ? -(MONTH_WEEKS * 7) : -7; };
+    var step = function () { return -7; };
 
     if (prevBtn) {
       prevBtn.addEventListener('click', function () {
-        state.scheduleWeekStart = addDays(state.scheduleWeekStart, state.scheduleView === 'month' ? -(MONTH_WEEKS * 7) : -7);
+        state.scheduleWeekStart = addDays(state.scheduleWeekStart, -7);
         window.loadSchedule();
       });
     }
     if (nextBtn) {
       nextBtn.addEventListener('click', function () {
-        state.scheduleWeekStart = addDays(state.scheduleWeekStart, state.scheduleView === 'month' ? (MONTH_WEEKS * 7) : 7);
+        state.scheduleWeekStart = addDays(state.scheduleWeekStart, 7);
         window.loadSchedule();
       });
     }
