@@ -81,17 +81,24 @@
        Returns cached data instantly on view/page switches;
        revalidates in background and re-renders if data changed. */
     var _scheduleUrl = '/api/schedule-data?start=' + startStr + '&end=' + endStr;
-    var schedData = await cachedApi(_scheduleUrl, {
-      maxAge: 30000,
-      onRevalidate: function (freshData) {
-        // Background refresh complete — only re-render if data actually changed
-        var oldSig = _allBookings.reduce(function (s, b) { return s + b.id + ':' + b.hours + ':' + (b.is_tentative ? 1 : 0) + ','; }, '') + '|' + _allLeave.length;
-        var newSig = freshData.bookings.reduce(function (s, b) { return s + b.id + ':' + b.hours + ':' + (b.is_tentative ? 1 : 0) + ','; }, '') + '|' + freshData.leave.length;
-        if (oldSig !== newSig) {
-          window.loadSchedule();
+    var schedData;
+    try {
+      schedData = await cachedApi(_scheduleUrl, {
+        maxAge: 30000,
+        onRevalidate: function (freshData) {
+          // Background refresh complete — only re-render if data actually changed
+          var oldSig = _allBookings.reduce(function (s, b) { return s + b.id + ':' + b.hours + ':' + (b.is_tentative ? 1 : 0) + ','; }, '') + '|' + _allLeave.length;
+          var newSig = freshData.bookings.reduce(function (s, b) { return s + b.id + ':' + b.hours + ':' + (b.is_tentative ? 1 : 0) + ','; }, '') + '|' + freshData.leave.length;
+          if (oldSig !== newSig) {
+            window.loadSchedule();
+          }
         }
-      }
-    });
+      });
+    } catch (err) {
+      console.error('[loadSchedule] API error:', err);
+      if (window.showToast) window.showToast('加载排程数据失败: ' + (err.message || '未知错误'), 'error');
+      return;
+    }
 
     var resources = schedData.resources;
     var bookings  = schedData.bookings;
@@ -1892,7 +1899,12 @@
     }
     if (todayBtn) {
       todayBtn.addEventListener('click', function () {
-        state.scheduleWeekStart = getMonday(new Date());
+        if (state.scheduleView === 'month') {
+          var now = new Date();
+          state.scheduleWeekStart = monthFirstMonday(now.getFullYear(), now.getMonth());
+        } else {
+          state.scheduleWeekStart = getMonday(new Date());
+        }
         window.loadSchedule();
       });
     }
