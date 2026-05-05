@@ -65,8 +65,10 @@
       var s = days[0], e = days[days.length - 1];
       var sMonth = s.getMonth() + 1, eMonth = e.getMonth() + 1;
       var sYear = s.getFullYear(), eYear = e.getFullYear();
+      var currentYear = new Date().getFullYear();
       var rangeText;
-      if (sYear !== eYear) {
+      var showYear = (sYear !== currentYear || eYear !== currentYear);
+      if (showYear) {
         rangeText = sYear + t('common.year') + sMonth + t('common.month') + s.getDate() + t('common.day') + ' - ' + eYear + t('common.year') + eMonth + t('common.month') + e.getDate() + t('common.day');
       } else if (sMonth !== eMonth) {
         rangeText = sMonth + t('common.month') + s.getDate() + t('common.day') + ' - ' + eMonth + t('common.month') + e.getDate() + t('common.day');
@@ -1877,12 +1879,26 @@
       return getMonday(first);
     }
 
+    /* Derive the "represented" month for a week-start Monday.
+       When a month's 1st falls on Tue-Sun, its first Monday lands in the
+       previous calendar month (e.g. July's first Monday is June 29).
+       We detect this by checking whether the Sunday of that week has moved
+       into the next month; if so, and the Monday is late in the month (>20),
+       the week represents the next month. */
+    function getRepresentedMonth(d) {
+      var sunday = addDays(d, 6);
+      if ((sunday.getMonth() !== d.getMonth() || sunday.getFullYear() !== d.getFullYear()) && d.getDate() > 20) {
+        return { year: sunday.getFullYear(), month: sunday.getMonth() };
+      }
+      return { year: d.getFullYear(), month: d.getMonth() };
+    }
+
     if (prevBtn) {
       prevBtn.addEventListener('click', function () {
         if (state.scheduleView === 'month') {
-          var d = state.scheduleWeekStart;
-          var y = d.getFullYear();
-          var m = d.getMonth() - 1;
+          var rep = getRepresentedMonth(state.scheduleWeekStart);
+          var y = rep.year;
+          var m = rep.month - 1;
           if (m < 0) { m = 11; y--; }
           state.scheduleWeekStart = monthFirstMonday(y, m);
         } else {
@@ -1894,9 +1910,9 @@
     if (nextBtn) {
       nextBtn.addEventListener('click', function () {
         if (state.scheduleView === 'month') {
-          var d = state.scheduleWeekStart;
-          var y = d.getFullYear();
-          var m = d.getMonth() + 1;
+          var rep = getRepresentedMonth(state.scheduleWeekStart);
+          var y = rep.year;
+          var m = rep.month + 1;
           if (m > 11) { m = 0; y++; }
           state.scheduleWeekStart = monthFirstMonday(y, m);
         } else {
