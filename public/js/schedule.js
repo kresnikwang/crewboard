@@ -36,6 +36,9 @@
      1. loadSchedule — main render function
      -------------------------------------------------- */
   window.loadSchedule = async function loadSchedule() {
+    if (loadSchedule._isLoading) return;
+    loadSchedule._isLoading = true;
+
     if (!state.scheduleWeekStart) {
       state.scheduleWeekStart = getMonday(new Date());
     }
@@ -97,6 +100,7 @@
     } catch (err) {
       console.error('[loadSchedule] API error:', err);
       if (window.showToast) window.showToast('加载排程数据失败: ' + (err.message || '未知错误'), 'error');
+      loadSchedule._isLoading = false;
       return;
     }
 
@@ -294,6 +298,8 @@
         document.addEventListener('mouseup',   onMoveCancel);
       });
     });
+
+    loadSchedule._isLoading = false;
   };
 
   /* --------------------------------------------------
@@ -1485,6 +1491,8 @@
      Drag selection for multiple days (ResourceGuru style)
      -------------------------------------------------- */
   function initDragSelection(container) {
+    if (container._dragSelectionInitialized) return;
+    container._dragSelectionInitialized = true;
     var isDragging = false;
     var didDrag = false;   // true if mouse moved >= 1 cell during drag
     var startCell = null;
