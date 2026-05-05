@@ -1135,9 +1135,9 @@ a { text-decoration: none; color: inherit; }
 .month-table-header { margin-bottom: -1px; }
 .month-table .m-day-row th {
   background: var(--surface); padding: 6px 0; text-align: center;
-  font-size: 9px; font-weight: 600; color: var(--text-secondary);
+  font-size: 8px; font-weight: 600; color: var(--text-secondary);
   text-transform: uppercase; letter-spacing: .3px;
-  width: 42px; min-width: 42px;
+  width: 48px; min-width: 48px;
   border-bottom: 2px solid var(--border);
 }
 .month-table .m-day-row th.m-res-hd {
@@ -1151,7 +1151,7 @@ a { text-decoration: none; color: inherit; }
   display: inline-block; width: 20px; height: 20px; line-height: 20px; text-align: center;
 }
 .month-table .m-day-row th.m-weekend { color: var(--text-tertiary); background: #F3F4F6; }
-.m-day-name { display: block; font-size: 9px; line-height: 1; margin-bottom: 2px; }
+.m-day-name { display: block; font-size: 8px; line-height: 1; margin-bottom: 2px; }
 .m-day-num { display: block; font-size: 11px; line-height: 1; }
 .m-week-label {
   position: absolute; top: 2px; left: 2px; font-size: 8px; color: var(--text-tertiary);
@@ -1161,7 +1161,7 @@ a { text-decoration: none; color: inherit; }
 /* Inline month label in month-view day header */
 .m-month-inline {
   display: block;
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 700;
   color: var(--text);
   margin-bottom: 1px;
@@ -1170,7 +1170,7 @@ a { text-decoration: none; color: inherit; }
 
 /* Column widths for month-view tables (keeps header & body aligned) */
 .m-res-col { width: 190px; min-width: 190px; }
-.m-day-col { width: 42px; min-width: 42px; }
+.m-day-col { width: 48px; min-width: 48px; }
 
 /* Team divider in month view */
 .month-table .m-team-row td {
@@ -1197,7 +1197,7 @@ a { text-decoration: none; color: inherit; }
 /* Day cells in month view */
 .m-day-cell {
   padding: 1px 0; vertical-align: top; height: 54px; position: relative; cursor: pointer;
-  width: 42px; min-width: 42px; overflow: visible;
+  width: 48px; min-width: 48px; overflow: visible;
 }
 .m-day-cell:hover { background: var(--primary-light); }
 .m-day-cell.m-weekend { background: #F3F4F6; }
@@ -1206,7 +1206,7 @@ a { text-decoration: none; color: inherit; }
 
 /* Booking block in month view */
 .m-booking {
-  font-size: 9px; line-height: 1.15; padding: 1px 2px; border-radius: 2px;
+  font-size: 8px; line-height: 1.15; padding: 1px 2px; border-radius: 2px;
   margin-bottom: 1px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
   cursor: grab; position: relative;
   height: 14px; box-sizing: border-box;

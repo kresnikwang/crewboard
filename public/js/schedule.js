@@ -1649,7 +1649,7 @@
        cell wider than the corresponding header cell, breaking alignment
        even with table-layout: fixed). --- */
     var RES_COL_W = 190;
-    var DAY_COL_W = 42;
+    var DAY_COL_W = 48;
     var totalTableW = RES_COL_W + totalDays * DAY_COL_W;
 
     /* --- Build column group (ensures both tables share exact widths) --- */
@@ -1806,18 +1806,20 @@
         var hasBorderLeft = !si || si.cls === 'span-s' || !si.cls;
         var borderStyle = hasBorderLeft ? 'border-left:2px solid ' + projColor + ';' : '';
 
+        var tooltipText = b.hours + 'h ' + b.project_name + (b.client_name ? ' | ' + b.client_name : '') + (b.notes ? '\n' + b.notes : '');
         html += '<div class="m-booking' + spanCls + '" data-booking-id="' + b.id + '"' +
           ' data-resource-id="' + b.resource_id + '"' +
           ' data-date="' + b.date + '"' +
           ' style="background:' + bgColor + ';' + borderStyle + '"' +
-          ' title="' + escAttr(b.hours + 'h ' + b.project_name + (b.client_name ? ' | ' + b.client_name : '')) + '">';
+          ' title="' + escAttr(tooltipText) + '">';
 
         if (hasBorderLeft) {
           html += '<div class="resize-handle-left"></div>';
         }
         if (showText) {
+          var displayName = b.client_name || b.project_name;
           html += '<span class="m-booking-hours">' + b.hours + 'h</span> ' +
-            '<span class="booking-project" title="' + escAttr(b.project_name + (b.client_name ? ' (' + b.client_name + ')' : '')) + '">' + esc(truncate(b.project_name, 25)) + '</span>';
+            '<span class="booking-project">' + esc(truncate(displayName, 18)) + '</span>';
         }
         // Show resize handle for end of span or solo booking (cls is null)
         if (!si || si.cls === 'span-e' || !si.cls) {
