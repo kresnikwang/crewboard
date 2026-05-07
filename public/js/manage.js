@@ -431,9 +431,9 @@ function renderProjectsTable(container) {
   table.className = 'pc-table table table-hover table-sm align-middle';
   table.innerHTML =
     '<thead><tr>' +
+      '<th class="col-code">' + t('manage.project_code') + '</th>' +
       '<th class="col-name">' + t('manage.project_name') + '</th>' +
       '<th class="col-client">' + t('common.client') + '</th>' +
-      '<th class="col-code">' + t('manage.project_code') + '</th>' +
       '<th class="col-dates">' + t('manage.period') + '</th>' +
       '<th class="col-billable">' + t('manage.billing') + '</th>' +
       '<th class="col-actions"></th>' +
@@ -448,6 +448,7 @@ function renderProjectsTable(container) {
       dateRange = (p.start_date || '—') + ' ~ ' + (p.end_date || '—');
     }
     tr.innerHTML =
+      '<td class="col-code">' + escapeHtml(p.code || '') + '</td>' +
       '<td class="col-name">' +
         '<div class="col-name-inner">' +
           '<span class="pc-color-bar" style="background:' + (p.color || '#8B5CF6') + '"></span>' +
@@ -455,7 +456,6 @@ function renderProjectsTable(container) {
         '</div>' +
       '</td>' +
       '<td class="col-client">' + escapeHtml(p.client_name || '') + '</td>' +
-      '<td class="col-code">' + escapeHtml(p.code || '') + '</td>' +
       '<td class="col-dates">' + escapeHtml(dateRange) + '</td>' +
       '<td class="col-billable">' + (p.billable ? 'Yes' : 'No') + '</td>' +
       (canManagePC ? '<td class="col-actions">' +
@@ -821,9 +821,9 @@ function renderArchivedPage(container) {
     html += '<div class="archive-section">' +
       '<h3 class="archive-section-title">' + t('manage.archive_project') + ' (' + archivedProjects.length + ')</h3>' +
       '<table class="pc-table table table-hover table-sm align-middle"><thead><tr>' +
-         '<th class="col-name">' + t('manage.project_name') + '</th>'+
+         '<th class="col-code">' + t('manage.project_code') + '</th>' +
+        '<th class="col-name">' + t('manage.project_name') + '</th>'+
         '<th class="col-client">' + t('common.client') + '</th>' +
-        '<th class="col-code">' + t('manage.project_code') + '</th>' +
         '<th class="col-dates">' + t('manage.period') + '</th>' +
         '<th class="col-actions"></th>' +
       '</tr></thead><tbody>';
@@ -833,13 +833,13 @@ function renderArchivedPage(container) {
         dateRange = (p.start_date || '—') + ' ~ ' + (p.end_date || '—');
       }
       html += '<tr class="pc-row pc-row-archived">' +
+        '<td class="col-code">' + escapeHtml(p.code || '') + '</td>' +
         '<td class="col-name">' +
           '<span class="pc-color-bar" style="background:' + (p.color || '#8B5CF6') + ';opacity:.5"></span>' +
           '<span class="pc-name-text">' + escapeHtml(p.name) + '</span>' +
           '<span class="archive-badge">' + t('common.archive') + '</span>' +
         '</td>' +
         '<td class="col-client">' + escapeHtml(p.client_name || '') + '</td>' +
-        '<td class="col-code">' + escapeHtml(p.code || '') + '</td>' +
         '<td class="col-dates">' + escapeHtml(dateRange) + '</td>' +
         '<td class="col-actions">' +
           '<button class="btn btn-sm btn-outline btn-restore" data-type="project" data-id="' + p.id + '">' + t('common.restore') + '</button>' +
