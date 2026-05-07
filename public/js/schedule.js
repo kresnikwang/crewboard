@@ -1993,7 +1993,8 @@
     projOpts += projects.map(function (p) {
       var sel = (booking && booking.project_id == p.id) ? ' selected' : '';
       var clientLabel = p.client_name ? ' (' + esc(p.client_name) + ')' : '';
-      return '<option value="' + p.id + '"' + sel + '>' + esc(p.name) + clientLabel + '</option>';
+      var codePrefix = p.code ? '[' + esc(p.code) + '] ' : '';
+      return '<option value="' + p.id + '"' + sel + '>' + codePrefix + esc(p.name) + clientLabel + '</option>';
     }).join('');
 
     var body = buildModalTabs(bookingId) +
