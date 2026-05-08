@@ -1990,12 +1990,41 @@
 
     /* project select options grouped by client */
     var projOpts = '<option value="">' + t('schedule.select_project') + '</option>';
-    projOpts += projects.map(function (p) {
-      var sel = (booking && booking.project_id == p.id) ? ' selected' : '';
-      var clientLabel = p.client_name ? ' (' + esc(p.client_name) + ')' : '';
-      var codePrefix = p.code ? '[' + esc(p.code) + '] ' : '';
-      return '<option value="' + p.id + '"' + sel + '>' + codePrefix + esc(p.name) + clientLabel + '</option>';
-    }).join('');
+
+    // group projects by client
+    var groups = {};
+    var noClient = [];
+    projects.forEach(function (p) {
+      if (p.client_name) {
+        if (!groups[p.client_name]) groups[p.client_name] = [];
+        groups[p.client_name].push(p);
+      } else {
+        noClient.push(p);
+      }
+    });
+
+    // sorted client names
+    var clientNames = Object.keys(groups).sort();
+    clientNames.forEach(function (clientName) {
+      projOpts += '<optgroup label="' + esc(clientName) + '">';
+      groups[clientName].forEach(function (p) {
+        var sel = (booking && booking.project_id == p.id) ? ' selected' : '';
+        var codePrefix = p.code ? '[' + esc(p.code) + '] ' : '';
+        projOpts += '<option value="' + p.id + '"' + sel + '>' + codePrefix + esc(p.name) + '</option>';
+      });
+      projOpts += '</optgroup>';
+    });
+
+    // projects without a client (if any)
+    if (noClient.length) {
+      projOpts += '<optgroup label="' + t('schedule.no_client') + '">';
+      noClient.forEach(function (p) {
+        var sel = (booking && booking.project_id == p.id) ? ' selected' : '';
+        var codePrefix = p.code ? '[' + esc(p.code) + '] ' : '';
+        projOpts += '<option value="' + p.id + '"' + sel + '>' + codePrefix + esc(p.name) + '</option>';
+      });
+      projOpts += '</optgroup>';
+    }
 
     var body = buildModalTabs(bookingId) +
       /* ---- BOOKING TAB ---- */
