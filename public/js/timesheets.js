@@ -133,6 +133,28 @@
       return relevantIds[p.id];
     });
 
+    /* ---- backfill projects missing from /api/projects (e.g. archived)
+            using project_name from timesheets / bookings data ---- */
+    var projectNameMap = {};
+    timesheets.forEach(function (ts) {
+      if (ts.project_name) projectNameMap[ts.project_id] = ts.project_name;
+    });
+    bookings.forEach(function (b) {
+      if (b.project_name) projectNameMap[b.project_id] = b.project_name;
+    });
+    Object.keys(relevantIds).forEach(function (pidStr) {
+      var pid = parseInt(pidStr, 10);
+      var hasProject = relevantProjects.some(function (p) { return p.id === pid; });
+      if (!hasProject && projectNameMap[pid]) {
+        relevantProjects.push({
+          id: pid,
+          name: projectNameMap[pid],
+          client_name: '',
+          color: '#8B5CF6'
+        });
+      }
+    });
+
     var gridEl = document.getElementById('timesheet-container');
     if (!gridEl) return;
 
