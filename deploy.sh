@@ -88,10 +88,11 @@ sed -i "s/__VERSION__/${HASH}/g" public/index.html
 echo "  已更新 index.html 中的资源版本号为: ?v=${HASH}"
 grep "?v=" public/index.html | head -3
 
-echo "=== [7/7] 重启服务（固定端口 3000）==="
+echo "=== [7/7] 重启主服务 crewboard（固定端口 3000）==="
 # 使用 startOrReload 确保每次都从 ecosystem.config.js 读取最新配置（含 PORT=3000）
 # 避免 pm2 restart 不重新读取 ecosystem 导致的端口漂移
-pm2 startOrReload ecosystem.config.js --update-env
+# 只 reload crewboard 主服务，不碰定时脚本（避免误触发提醒）
+pm2 startOrReload ecosystem.config.js --only crewboard --update-env
 sleep 2
 pm2 status crewboard
 
