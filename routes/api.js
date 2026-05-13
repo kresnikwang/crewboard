@@ -497,16 +497,16 @@ module.exports = function(db) {
     const { entries } = req.body; // [{resource_id, project_id, date, hours, notes}]
     const insertOrUpdate = db.transaction((items) => {
       const selectStmt = db.prepare('SELECT id FROM timesheets WHERE resource_id=? AND project_id=? AND date=?');
-      const updateStmt = db.prepare('UPDATE timesheets SET hours=?, notes=? WHERE id=?');
+      const updateStmt = db.prepare('UPDATE timesheets SET hours=?, notes=?, status=? WHERE id=?');
       const insertStmt = db.prepare('INSERT INTO timesheets (resource_id, project_id, date, hours, notes, status) VALUES (?,?,?,?,?,?)');
 
       for (const e of items) {
         // Check if entry exists
         const existing = selectStmt.get(e.resource_id, e.project_id, e.date);
         if (existing) {
-          updateStmt.run(e.hours, e.notes || '', existing.id);
+          updateStmt.run(e.hours, e.notes || '', e.status || 'draft', existing.id);
         } else if (e.hours > 0) {
-          insertStmt.run(e.resource_id, e.project_id, e.date, e.hours, e.notes || '', 'draft');
+          insertStmt.run(e.resource_id, e.project_id, e.date, e.hours, e.notes || '', e.status || 'draft');
         }
       }
     });

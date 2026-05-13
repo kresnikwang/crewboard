@@ -298,7 +298,11 @@
     'timesheets.hours_saved': '工时已保存', 'timesheets.save_hours': '保存工时',
     'timesheets.synced_from_schedule': '已从排程同步',
     'timesheets.sync_hint': '蓝色底纹格子为排程同步，可直接修改后保存',
-    'timesheets.no_permission': '无编辑权限'
+    'timesheets.no_permission': '无编辑权限',
+    'timesheets.add_notes': '添加备注',
+    'timesheets.draft_saved': '草稿已自动保存',
+    'timesheets.draft_restored': '已恢复草稿',
+    'timesheets.no_changes': '没有变更需要保存'
   });
   Object.assign(translations.en, {
     'timesheets.title': 'Timesheets', 'timesheets.this_week': 'This Week',
@@ -313,7 +317,11 @@
     'timesheets.hours_saved': 'Hours saved', 'timesheets.save_hours': 'Save Hours',
     'timesheets.synced_from_schedule': 'Auto-synced from schedule',
     'timesheets.sync_hint': 'Blue-tinted cells are auto-synced from schedule, edit freely before saving',
-    'timesheets.no_permission': 'No edit permission'
+    'timesheets.no_permission': 'No edit permission',
+    'timesheets.add_notes': 'Add notes',
+    'timesheets.draft_saved': 'Draft auto-saved',
+    'timesheets.draft_restored': 'Draft restored',
+    'timesheets.no_changes': 'No changes to save'
   });
 
   // --- reports ---

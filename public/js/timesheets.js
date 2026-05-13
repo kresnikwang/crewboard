@@ -1,5 +1,7 @@
 /* ============================================================
-   timesheets.js — Timesheets page module
+   timesheets.js — Timesheets page module (v2)
+   Features: incremental save, per-cell notes, keyboard nav,
+             debounced auto-save, preset hour buttons
    Depends on core.js globals: state, api, fmt, addDays, weekDates,
    shortDay, fmtDate, getMonday, toast
    ============================================================ */
@@ -11,8 +13,11 @@
   var api   = window.api;
   var cachedApi = window.cachedApi;
 
-  /* ---- module-level cache for current week's bookings ---- */
+  /* ---- module-level state ---- */
   var _currentBookings = [];
+  var _initialValues = {};   // { 'pid_date': {hours, notes} } for incremental save
+  var _autoSaveTimer = null;
+  var _presetEl = null;      // preset buttons container
 
   /* --------------------------------------------------
      1. loadTimesheets — main render function
@@ -166,10 +171,15 @@
     /* ---- build maps ---- */
     var tsMap = {};
     var tsSourceMap = {};
+    var notesMap = {};
+    _initialValues = {};
+
     timesheets.forEach(function (ts) {
       var key = ts.project_id + '_' + ts.date;
       tsMap[key] = ts.hours;
       tsSourceMap[key] = ts.source || 'manual';
+      notesMap[key] = ts.notes || '';
+      _initialValues[key] = { hours: String(ts.hours || ''), notes: ts.notes || '' };
     });
 
     var scheduleMap = {};
@@ -178,8 +188,41 @@
       scheduleMap[key] = (scheduleMap[key] || 0) + b.hours;
     });
 
+    /* ---- try restore draft from localStorage ---- */
+    var draftData = null;
+    var draftKey = getDraftKey(rid, startStr);
+    try {
+      var draftRaw = localStorage.getItem(draftKey);
+      if (draftRaw) draftData = JSON.parse(draftRaw);
+    } catch (e) {}
+
     /* ---- render table ---- */
-    gridEl.innerHTML = buildTable(days, relevantProjects, tsMap, tsSourceMap, scheduleMap);
+    gridEl.innerHTML = buildTable(days, relevantProjects, tsMap, tsSourceMap, scheduleMap, notesMap);
+
+    /* ---- apply draft over rendered table ---- */
+    if (draftData && isOwnResource) {
+      var applied = 0;
+      Object.keys(draftData).forEach(function (key) {
+        var parts = key.split('_');
+        var pid = parts[0];
+        var dateStr = parts[1];
+        var inp = document.querySelector('.ts-input[data-project="' + pid + '"][data-date="' + dateStr + '"]');
+        if (inp) {
+          if (draftData[key].hours !== undefined && draftData[key].hours !== '') {
+            inp.value = draftData[key].hours;
+            applied++;
+          }
+          if (draftData[key].notes !== undefined) {
+            inp.dataset.notes = draftData[key].notes;
+            updateNotesIndicator(inp);
+          }
+        }
+      });
+      if (applied > 0) {
+        updateTotals(days, relevantProjects);
+        toast(t('timesheets.draft_restored'), 'info');
+      }
+    }
 
     /* ---- all users can edit and save their own timesheets ---- */
     var isReadOnly = !isOwnResource && !canViewOthers;
@@ -193,7 +236,7 @@
       } else {
         saveBtn.disabled = false;
         saveBtn.onclick = function () {
-          handleSave(days);
+          handleSave(days, false);
         };
       }
     }
@@ -206,15 +249,58 @@
       } else {
         input.addEventListener('input', function () {
           updateTotals(days, relevantProjects);
+          debouncedAutoSave();
+        });
+        input.addEventListener('focus', function () {
+          showPresetButtons(input);
+        });
+        input.addEventListener('blur', function () {
+          hidePresetButtons();
+        });
+        input.addEventListener('keydown', function (e) {
+          handleCellKeydown(e, input, days, relevantProjects);
+        });
+      }
+    });
+
+    /* ---- attach notes handlers ---- */
+    gridEl.querySelectorAll('.ts-notes-btn').forEach(function (btn) {
+      if (isReadOnly) {
+        btn.disabled = true;
+        btn.style.opacity = '0.3';
+      } else {
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var inp = document.querySelector('.ts-input[data-project="' + btn.dataset.project + '"][data-date="' + btn.dataset.date + '"]');
+          openNotesModal(btn.dataset.project, btn.dataset.date, inp ? (inp.dataset.notes || '') : '', function (newNotes) {
+            if (inp) {
+              inp.dataset.notes = newNotes;
+              updateNotesIndicator(inp);
+              debouncedAutoSave();
+            }
+          });
         });
       }
     });
   };
 
+  /* ---- get draft localStorage key ---- */
+  function getDraftKey(resourceId, weekStart) {
+    return 'ts_draft_' + resourceId + '_' + weekStart;
+  }
+
+  /* ---- clear draft ---- */
+  function clearDraft() {
+    var rid = state.tsResourceId;
+    var weekStart = fmt(state.tsWeekStart);
+    var draftKey = getDraftKey(rid, weekStart);
+    localStorage.removeItem(draftKey);
+  }
+
   /* --------------------------------------------------
      Table builder
      -------------------------------------------------- */
-  function buildTable(days, projects, tsMap, tsSourceMap, scheduleMap) {
+  function buildTable(days, projects, tsMap, tsSourceMap, scheduleMap, notesMap) {
     var html = '<table class="ts-table"><thead><tr><th>' + t('timesheets.project') + '</th>';
 
     days.forEach(function (d, idx) {
@@ -250,6 +336,7 @@
         var displayVal = (val !== undefined && val !== null) ? val : '';
         var isWeekend = d.getDay() === 0 || d.getDay() === 6;
         var weekendCls = isWeekend ? ' ts-weekend' : '';
+        var notes = notesMap[key] || '';
 
         /* Variance highlight: if actual differs from scheduled by >20% */
         var varClass = '';
@@ -264,13 +351,23 @@
         /* Synced-from-booking highlight: light tint to indicate auto-filled */
         var syncedClass = (source === 'booking' && displayVal !== '') ? ' ts-input-synced' : '';
 
-        html += '<td class="' + weekendCls.trim() + '"><input type="number" class="ts-input' + varClass + syncedClass + '"' +
+        html += '<td class="' + weekendCls.trim() + '">' +
+          '<div class="ts-cell-wrap">' +
+          '<input type="number" class="ts-input' + varClass + syncedClass + '"' +
           ' data-project="' + p.id + '"' +
           ' data-date="' + dateStr + '"' +
           ' data-source="' + source + '"' +
+          ' data-notes="' + esc(notes) + '"' +
           ' value="' + displayVal + '"' +
           ' placeholder="' + placeholder + '"' +
-          ' min="0" max="24" step="0.5"></td>';
+          ' min="0" max="24" step="0.5">' +
+          '<button type="button" class="ts-notes-btn' + (notes ? ' ts-notes-active' : '') + '"' +
+          ' data-project="' + p.id + '" data-date="' + dateStr + '"' +
+          ' title="' + (notes ? esc(notes) : t('timesheets.add_notes')) + '">' +
+          '<svg width="12" height="12" viewBox="0 0 16 16" fill="none">' +
+          '<path d="M3 3h10v10H3z" stroke="currentColor" stroke-width="1.2"/>' +
+          '<path d="M5 6h6M5 8.5h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>' +
+          '</svg></button></div></td>';
 
         var hours = (displayVal !== '') ? parseFloat(displayVal) : 0;
         rowTotal += hours;
@@ -296,6 +393,233 @@
       '<button class="btn btn-primary" id="ts-save">' + t('timesheets.save_hours') + '</button>' +
       '</div>';
     return html;
+  }
+
+  /* ---- update notes indicator on an input ---- */
+  function updateNotesIndicator(input) {
+    var notes = input.dataset.notes || '';
+    var btn = input.parentElement.querySelector('.ts-notes-btn');
+    if (!btn) return;
+    btn.title = notes || t('timesheets.add_notes');
+    if (notes) {
+      btn.classList.add('ts-notes-active');
+    } else {
+      btn.classList.remove('ts-notes-active');
+    }
+  }
+
+  /* --------------------------------------------------
+     Preset hour buttons (shown on focus)
+     -------------------------------------------------- */
+  function showPresetButtons(input) {
+    hidePresetButtons();
+    var wrap = input.parentElement;
+    var presets = document.createElement('div');
+    presets.className = 'ts-preset-bar';
+    presets.innerHTML = [2, 4, 6, 8].map(function (h) {
+      return '<button type="button" class="ts-preset-btn" data-hours="' + h + '">' + h + 'h</button>';
+    }).join('');
+    wrap.appendChild(presets);
+    _presetEl = presets;
+
+    presets.querySelectorAll('.ts-preset-btn').forEach(function (btn) {
+      btn.addEventListener('mousedown', function (e) {
+        e.preventDefault(); // prevent blur before click
+        input.value = btn.dataset.hours;
+        input.dispatchEvent(new Event('input'));
+        hidePresetButtons();
+        input.focus();
+      });
+    });
+  }
+
+  function hidePresetButtons() {
+    if (_presetEl && _presetEl.parentElement) {
+      _presetEl.parentElement.removeChild(_presetEl);
+    }
+    _presetEl = null;
+  }
+
+  /* --------------------------------------------------
+     Keyboard navigation
+     -------------------------------------------------- */
+  function handleCellKeydown(e, input, days, projects) {
+    var allInputs = Array.from(document.querySelectorAll('.ts-input'));
+    var idx = allInputs.indexOf(input);
+    if (idx < 0) return;
+
+    var colsPerRow = days.length;
+    var target = null;
+    switch (e.key) {
+      case 'ArrowUp':
+        e.preventDefault();
+        target = allInputs[idx - colsPerRow];
+        break;
+      case 'ArrowDown':
+      case 'Enter':
+        e.preventDefault();
+        target = allInputs[idx + colsPerRow];
+        break;
+      case 'ArrowLeft':
+        e.preventDefault();
+        target = allInputs[idx - 1];
+        break;
+      case 'ArrowRight':
+        e.preventDefault();
+        target = allInputs[idx + 1];
+        break;
+    }
+    if (target) {
+      target.focus();
+      /* select all text for quick overwrite */
+      if (typeof target.select === 'function') target.select();
+    }
+  }
+
+  /* --------------------------------------------------
+     Debounced auto-save to localStorage
+     -------------------------------------------------- */
+  function debouncedAutoSave() {
+    if (_autoSaveTimer) clearTimeout(_autoSaveTimer);
+    _autoSaveTimer = setTimeout(function () {
+      saveDraft();
+    }, 1500);
+  }
+
+  function saveDraft() {
+    var rid = state.tsResourceId;
+    var weekStart = fmt(state.tsWeekStart);
+    var draftKey = getDraftKey(rid, weekStart);
+    var draft = {};
+    var hasData = false;
+
+    document.querySelectorAll('.ts-input').forEach(function (input) {
+      var val = input.value.trim();
+      var notes = input.dataset.notes || '';
+      var key = input.dataset.project + '_' + input.dataset.date;
+      var init = _initialValues[key];
+
+      var changed = false;
+      if (init) {
+        if (val !== String(init.hours) && (val !== '' || init.hours !== '')) changed = true;
+        if (notes !== (init.notes || '')) changed = true;
+      } else {
+        if (val !== '' || notes !== '') changed = true;
+      }
+
+      if (changed) {
+        draft[key] = {};
+        if (val !== '') draft[key].hours = val;
+        if (notes !== '') draft[key].notes = notes;
+        hasData = true;
+      }
+    });
+
+    if (hasData) {
+      localStorage.setItem(draftKey, JSON.stringify(draft));
+    } else {
+      localStorage.removeItem(draftKey);
+    }
+  }
+
+  /* --------------------------------------------------
+     Save handler — incremental (only changed cells)
+     -------------------------------------------------- */
+  async function handleSave(days, isAutoSave) {
+    var inputs = document.querySelectorAll('.ts-input');
+    var entries = [];
+    var changedCount = 0;
+
+    inputs.forEach(function (input) {
+      var val = input.value.trim();
+      var notes = input.dataset.notes || '';
+      var key = input.dataset.project + '_' + input.dataset.date;
+      var init = _initialValues[key];
+
+      /* Determine if this cell has changed */
+      var hoursChanged = false;
+      var notesChanged = false;
+
+      if (init) {
+        hoursChanged = val !== String(init.hours) && (val !== '' || init.hours !== '');
+        notesChanged = notes !== (init.notes || '');
+      } else {
+        hoursChanged = val !== '';
+        notesChanged = notes !== '';
+      }
+
+      if (!hoursChanged && !notesChanged) return;
+
+      if (val !== '') {
+        entries.push({
+          project_id:  parseInt(input.dataset.project, 10),
+          date:        input.dataset.date,
+          hours:       parseFloat(val),
+          notes:       notes,
+          resource_id: state.tsResourceId,
+          status:      'draft'
+        });
+        changedCount++;
+      } else if (notesChanged && init) {
+        /* Only notes changed, hours cleared: update to empty hours but keep notes */
+        entries.push({
+          project_id:  parseInt(input.dataset.project, 10),
+          date:        input.dataset.date,
+          hours:       0,
+          notes:       notes,
+          resource_id: state.tsResourceId,
+          status:      'draft'
+        });
+        changedCount++;
+      }
+    });
+
+    if (changedCount === 0) {
+      if (!isAutoSave) toast(t('timesheets.no_changes'), 'info');
+      return;
+    }
+
+    try {
+      await api('/api/timesheets/batch', {
+        method: 'POST',
+        body: { entries: entries }
+      });
+      if (!isAutoSave) {
+        toast(t('timesheets.hours_saved'), 'success');
+      }
+      clearDraft();
+      /* Refresh to update _initialValues */
+      window.loadTimesheets();
+    } catch (err) {
+      toast(err.message || t('common.save_failed'), 'error');
+    }
+  }
+
+  /* --------------------------------------------------
+     Notes modal
+     -------------------------------------------------- */
+  function openNotesModal(projectId, date, currentNotes, onSave) {
+    var modalTitle = document.getElementById('modal-title');
+    var modalBody = document.getElementById('modal-body');
+    var modalFooter = document.getElementById('modal-footer');
+    if (!modalTitle || !modalBody || !modalFooter) return;
+
+    modalTitle.textContent = t('timesheets.add_notes');
+    modalBody.innerHTML = '<div class="form-group"><textarea id="ts-note-text" class="text-input form-control" rows="3" placeholder="' + t('timesheets.add_notes') + '">' + esc(currentNotes) + '</textarea></div>';
+    modalFooter.innerHTML = '<button class="btn btn-outline" data-bs-dismiss="modal">' + t('common.cancel') + '</button>' +
+      '<button class="btn btn-primary" id="ts-note-save">' + t('common.save') + '</button>';
+
+    var bsModal = window.bs && window.bs.Modal && window.bs.Modal.getOrCreateInstance(document.getElementById('modal-overlay'));
+    if (bsModal) bsModal.show();
+
+    var saveBtn = document.getElementById('ts-note-save');
+    if (saveBtn) {
+      saveBtn.onclick = function () {
+        var text = document.getElementById('ts-note-text').value.trim();
+        onSave(text);
+        if (bsModal) bsModal.hide();
+      };
+    }
   }
 
   /* --------------------------------------------------
@@ -327,36 +651,6 @@
     });
     var weekEl = document.getElementById('ts-week-total');
     if (weekEl) weekEl.textContent = weekTotal || 0;
-  }
-
-  /* --------------------------------------------------
-     Save handler — all users can save their own timesheets
-     -------------------------------------------------- */
-  async function handleSave(days) {
-    var inputs = document.querySelectorAll('.ts-input');
-    var entries = [];
-
-    inputs.forEach(function (input) {
-      var val = input.value.trim();
-      if (val === '') return;
-      entries.push({
-        project_id:  parseInt(input.dataset.project, 10),
-        date:        input.dataset.date,
-        hours:       parseFloat(val),
-        resource_id: state.tsResourceId
-      });
-    });
-
-    try {
-      await api('/api/timesheets/batch', {
-        method: 'POST',
-        body: { entries: entries }
-      });
-      toast(t('timesheets.hours_saved'), 'success');
-      window.loadTimesheets();
-    } catch (err) {
-      toast(err.message || t('common.save_failed'), 'error');
-    }
   }
 
   /* --------------------------------------------------

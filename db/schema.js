@@ -298,6 +298,26 @@ function migrate(db) {
     db.exec('ALTER TABLE enterprises ADD COLUMN wecom_department_id INTEGER DEFAULT 1');
   }
   db.exec('UPDATE enterprises SET wecom_department_id = 1 WHERE wecom_department_id IS NULL OR wecom_department_id = 0');
+
+  // Add UNIQUE INDEX on timesheets(resource_id, project_id, date) to prevent duplicates
+  // First deduplicate: keep the row with the highest id for each (resource_id, project_id, date)
+  try {
+    const dupCheck = db.prepare(`
+      SELECT resource_id, project_id, date, COUNT(*) as cnt, MAX(id) as max_id
+      FROM timesheets
+      GROUP BY resource_id, project_id, date
+      HAVING cnt > 1
+    `).all();
+    if (dupCheck.length > 0) {
+      for (const dup of dupCheck) {
+        db.prepare(`
+          DELETE FROM timesheets
+          WHERE resource_id = ? AND project_id = ? AND date = ? AND id != ?
+        `).run(dup.resource_id, dup.project_id, dup.date, dup.max_id);
+      }
+    }
+    db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_timesheets_unique ON timesheets(resource_id, project_id, date)');
+  } catch (_) { /* index may already exist or deduplication failed */ }
 }
 
 function seedDemoData(db) {
