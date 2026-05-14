@@ -433,11 +433,10 @@ a { text-decoration: none; color: inherit; }
 }
 .auth-brand-inner { position: relative; z-index: 1; max-width: 360px; text-align: center; }
 .auth-brand-logo-wrap {
-  width: 140px; height: 140px; margin: 0 auto 28px;
-  background: #fff; border-radius: 50%;
+  width: 180px; height: 180px; margin: 0 auto 20px;
+  background: transparent; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 8px 32px rgba(0,0,0,.25), 0 2px 8px rgba(0,102,255,.15);
-  padding: 16px;
+  padding: 0;
 }
 .auth-brand-logo-wrap img { width: 100%; height: auto; }
 .auth-brand-title {
