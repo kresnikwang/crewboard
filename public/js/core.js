@@ -330,7 +330,7 @@ window.isWeekend = isWeekend;
   var TYPE_MAP = {
     success: { icon: '✓', bg: '#059669', label: 'Success' },
     error:   { icon: '✕', bg: '#DC2626', label: 'Error' },
-    info:    { icon: 'ℹ', bg: '#4F46E5', label: 'Info' }
+    info:    { icon: 'ℹ', bg: '#FF6B35', label: 'Info' }
   };
 
   window.toast = function toast(msg, type) {

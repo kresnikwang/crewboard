@@ -453,7 +453,7 @@ var THEME_OPTIONS = [];
 // Refresh THEME_OPTIONS at render time when t() is available
 function getThemeOptions() {
   return [
-    { id: '',            label: t('theme.default'),     color: '#4F46E5' },
+    { id: '',            label: t('theme.default'),     color: '#FF6B35' },
     { id: 'warm-grey',   label: t('theme.warm_gray'),   color: '#78716C' },
     { id: 'cool-grey',   label: t('theme.cool_gray'),   color: '#6B7280' },
     { id: 'sage',        label: t('theme.sage'),        color: '#6B8E6B' },
