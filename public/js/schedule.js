@@ -619,7 +619,7 @@
     var initial = r.name.charAt(0);
     var html = '<tr>' +
       '<td><div class="resource-cell">' +
-        '<div class="resource-avatar" style="background:' + (r.color || '#FF6B35') + '">' + initial + '</div>' +
+        '<div class="resource-avatar" style="background:' + (r.color || '#3B7DDD') + '">' + initial + '</div>' +
         '<div class="resource-info">' +
           '<div class="resource-name">' + r.name + '</div>' +
           '<div class="resource-role">' + (r.role || '') + '</div>' +
@@ -1773,7 +1773,7 @@
     var initial = r.name.charAt(0);
     var html = '<tr>';
     html += '<td class="m-res-cell"><div class="m-res-inner">' +
-      '<div class="m-res-avatar" style="background:' + (r.color || '#FF6B35') + '">' + initial + '</div>' +
+      '<div class="m-res-avatar" style="background:' + (r.color || '#3B7DDD') + '">' + initial + '</div>' +
       '<div><div class="m-res-name">' + esc(r.name) + '</div>' +
       '<div class="m-res-role">' + esc(r.role || '') + '</div></div>' +
     '</div></td>';
@@ -2216,7 +2216,7 @@
       var r = resources.find(function (x) { return x.id === sid; });
       if (r) {
         chipsHtml += '<span class="ms-chip" data-id="' + r.id + '">' +
-          '<span class="ms-chip-avatar" style="background:' + (r.color || '#FF6B35') + '">' + esc(r.name.charAt(0)) + '</span>' +
+          '<span class="ms-chip-avatar" style="background:' + (r.color || '#3B7DDD') + '">' + esc(r.name.charAt(0)) + '</span>' +
           esc(r.name) +
           '<span class="ms-chip-remove" data-id="' + r.id + '">&times;</span>' +
         '</span>';
@@ -2237,7 +2237,7 @@
         var sel = selIds.indexOf(r.id) >= 0 ? ' selected' : '';
         optionsHtml += '<div class="ms-option' + sel + '" data-id="' + r.id + '">' +
           '<span class="ms-option-check"></span>' +
-          '<span class="ms-option-avatar" style="background:' + (r.color || '#FF6B35') + '">' + esc(r.name.charAt(0)) + '</span>' +
+          '<span class="ms-option-avatar" style="background:' + (r.color || '#3B7DDD') + '">' + esc(r.name.charAt(0)) + '</span>' +
           '<span class="ms-option-info"><span class="ms-option-name">' + esc(r.name) + '</span>' +
           (r.role ? '<span class="ms-option-role">' + esc(r.role) + '</span>' : '') +
           '</span></div>';

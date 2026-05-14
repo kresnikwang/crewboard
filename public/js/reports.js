@@ -285,7 +285,7 @@
         labels: [t('reports.booked_hours'), t('reports.idle')],
         datasets: [{
           data: [booked, free],
-          backgroundColor: ['#FF6B35', '#e5e7eb'],
+          backgroundColor: ['#3B7DDD', '#e5e7eb'],
           borderWidth: 0
         }]
       },
@@ -451,7 +451,7 @@
         labels: labels,
         datasets: [
           { label: t('reports.budget_hours'), data: budgets,   backgroundColor: '#e0e7ff', borderRadius: 4 },
-          { label: t('reports.scheduled_hours'), data: scheduled, backgroundColor: '#FF6B35', borderRadius: 4 }
+          { label: t('reports.scheduled_hours'), data: scheduled, backgroundColor: '#3B7DDD', borderRadius: 4 }
         ]
       },
       options: {

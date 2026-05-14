@@ -592,18 +592,22 @@
 
   // --- theme ---
   Object.assign(translations.zh, {
-    'theme.title': '企业主题色', 'theme.default': '默认', 'theme.midnight': '午夜',
+    'theme.title': '企业主题色', 'theme.default': '品牌蓝', 'theme.midnight': '午夜',
     'theme.cool_gray': '冷灰', 'theme.warm_gray': '暖灰', 'theme.forest': '森林',
-    'theme.ocean': '海洋', 'theme.rose': '玫瑰粉', 'theme.slate': '石板蓝',
-    'theme.terracotta': '陶土', 'theme.lavender': '薰衣草', 'theme.sage': '鼠尾草',
-    'theme.sand': '暖沙', 'theme.teal': '青绿', 'theme.settings_saved': '设置已保存'
+    'theme.ocean': '海洋', 'theme.rose': '玫瑰粉',
+    'theme.lavender': '薰衣草', 'theme.sage': '鼠尾草',
+    'theme.teal': '青绿', 'theme.settings_saved': '设置已保存',
+    'theme.classic_orange': '经典橙', 'theme.sunset': '日落',
+    'theme.golden': '金色', 'theme.coral': '珊瑚'
   });
   Object.assign(translations.en, {
-    'theme.title': 'Enterprise Theme', 'theme.default': 'Default', 'theme.midnight': 'Midnight',
+    'theme.title': 'Enterprise Theme', 'theme.default': 'Brand Blue', 'theme.midnight': 'Midnight',
     'theme.cool_gray': 'Cool Gray', 'theme.warm_gray': 'Warm Gray', 'theme.forest': 'Forest',
-    'theme.ocean': 'Ocean', 'theme.rose': 'Rose', 'theme.slate': 'Slate',
-    'theme.terracotta': 'Terracotta', 'theme.lavender': 'Lavender', 'theme.sage': 'Sage',
-    'theme.sand': 'Warm Sand', 'theme.teal': 'Teal', 'theme.settings_saved': 'Settings saved'
+    'theme.ocean': 'Ocean', 'theme.rose': 'Rose',
+    'theme.lavender': 'Lavender', 'theme.sage': 'Sage',
+    'theme.teal': 'Teal', 'theme.settings_saved': 'Settings saved',
+    'theme.classic_orange': 'Classic Orange', 'theme.sunset': 'Sunset',
+    'theme.golden': 'Golden', 'theme.coral': 'Coral'
   });
 
   // --- webhook ---

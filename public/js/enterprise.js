@@ -453,19 +453,20 @@ var THEME_OPTIONS = [];
 // Refresh THEME_OPTIONS at render time when t() is available
 function getThemeOptions() {
   return [
-    { id: '',            label: t('theme.default'),     color: '#FF6B35' },
-    { id: 'warm-grey',   label: t('theme.warm_gray'),   color: '#78716C' },
-    { id: 'cool-grey',   label: t('theme.cool_gray'),   color: '#6B7280' },
-    { id: 'sage',        label: t('theme.sage'),        color: '#6B8E6B' },
-    { id: 'dusty-rose',  label: t('theme.rose'),        color: '#B07D8E' },
-    { id: 'slate-blue',  label: t('theme.slate'),       color: '#64748B' },
-    { id: 'soft-teal',   label: t('theme.teal'),        color: '#5F9EA0' },
-    { id: 'warm-sand',   label: t('theme.sand'),        color: '#B8A080' },
-    { id: 'lavender',    label: t('theme.lavender'),    color: '#8B7FB5' },
-    { id: 'ocean',       label: t('theme.ocean'),       color: '#4682B4' },
-    { id: 'forest',      label: t('theme.forest'),      color: '#5C8A5C' },
-    { id: 'clay',        label: t('theme.terracotta'),  color: '#C08060' },
-    { id: 'midnight',    label: t('theme.midnight'),    color: '#4A4A8A' },
+    { id: '',                label: t('theme.default'),       color: '#3B7DDD' },
+    { id: 'classic-orange',  label: t('theme.classic_orange'),color: '#F09030' },
+    { id: 'warm-grey',       label: t('theme.warm_gray'),     color: '#78716C' },
+    { id: 'cool-grey',       label: t('theme.cool_gray'),     color: '#6B7280' },
+    { id: 'sage',            label: t('theme.sage'),          color: '#6B8E6B' },
+    { id: 'dusty-rose',      label: t('theme.rose'),          color: '#B07D8E' },
+    { id: 'soft-teal',       label: t('theme.teal'),          color: '#5F9EA0' },
+    { id: 'lavender',        label: t('theme.lavender'),      color: '#8B7FB5' },
+    { id: 'ocean',           label: t('theme.ocean'),         color: '#4682B4' },
+    { id: 'forest',          label: t('theme.forest'),        color: '#5C8A5C' },
+    { id: 'sunset',          label: t('theme.sunset'),        color: '#E86830' },
+    { id: 'midnight',        label: t('theme.midnight'),      color: '#4A4A8A' },
+    { id: 'golden',          label: t('theme.golden'),        color: '#C8A030' },
+    { id: 'coral',           label: t('theme.coral'),         color: '#E07060' },
   ];
 }
 

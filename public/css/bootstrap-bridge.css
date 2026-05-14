@@ -22,42 +22,42 @@
  * ============================================================ */
 :root {
   /* --- 主色系 --- */
-  --bs-primary:           #FF6B35;   /* = --primary */
-  --bs-primary-rgb:       255, 107, 53;
-  --bs-primary-text-emphasis:  #E55A2B;
-  --bs-primary-bg-subtle: #FFF3ED;   /* = --primary-light */
-  --bs-primary-border-subtle: rgba(255, 107, 53, 0.2);
+  --bs-primary:           #3B7DDD;   /* = --primary (品牌蓝) */
+  --bs-primary-rgb:       59, 125, 221;
+  --bs-primary-text-emphasis:  #2E6BC4;
+  --bs-primary-bg-subtle: #EBF2FC;   /* = --primary-light */
+  --bs-primary-border-subtle: rgba(59, 125, 221, 0.2);
 
   /* --- 语义色 --- */
   --bs-success:           #10B981;   /* = --success */
   --bs-success-rgb:       16, 185, 129;
-  --bs-warning:           #F59E0B;   /* = --warning */
-  --bs-warning-rgb:       245, 158, 11;
+  --bs-warning:           #FFC832;   /* = --warning (品牌金黄) */
+  --bs-warning-rgb:       255, 200, 50;
   --bs-danger:            #EF4444;   /* = --danger */
   --bs-danger-rgb:        239, 68, 68;
 
   /* --- 页面背景与表面 --- */
-  --bs-body-bg:           #F8F9FB;   /* = --bg */
-  --bs-body-bg-rgb:       248, 249, 251;
+  --bs-body-bg:           #FEFAF5;   /* = --bg (暖米色) */
+  --bs-body-bg-rgb:       254, 250, 245;
   --bs-secondary-bg:      #FFFFFF;   /* = --surface */
-  --bs-tertiary-bg:       #F8F9FB;
+  --bs-tertiary-bg:       #FEFAF5;
 
   /* --- 文字 --- */
-  --bs-body-color:        #111827;   /* = --text */
-  --bs-body-color-rgb:    17, 24, 39;
+  --bs-body-color:        #1A1A1A;   /* = --text */
+  --bs-body-color-rgb:    26, 26, 26;
   --bs-secondary-color:   #6B7280;   /* = --text-secondary */
   --bs-tertiary-color:    #9CA3AF;   /* = --text-tertiary */
-  --bs-emphasis-color:    #111827;
+  --bs-emphasis-color:    #1A1A1A;
 
   /* --- 边框 --- */
-  --bs-border-color:      #E5E7EB;   /* = --border */
-  --bs-border-color-translucent: rgba(229, 231, 235, 0.5);
+  --bs-border-color:      #E8E0D8;   /* = --border (暖灰) */
+  --bs-border-color-translucent: rgba(232, 224, 216, 0.5);
 
   /* --- 圆角 --- */
-  --bs-border-radius:     8px;       /* = --radius */
+  --bs-border-radius:     10px;      /* = --radius */
   --bs-border-radius-sm:  6px;
-  --bs-border-radius-lg:  10px;
-  --bs-border-radius-xl:  12px;
+  --bs-border-radius-lg:  12px;
+  --bs-border-radius-xl:  16px;
   --bs-border-radius-pill: 50rem;
 
   /* --- 字体 --- */
@@ -66,18 +66,18 @@
   --bs-body-line-height:  1.5;
 
   /* --- 阴影 --- */
-  --bs-box-shadow:        0 1px 3px rgba(0, 0, 0, 0.08);  /* = --shadow */
-  --bs-box-shadow-sm:     0 1px 2px rgba(0, 0, 0, 0.05);
-  --bs-box-shadow-lg:     0 4px 12px rgba(0, 0, 0, 0.10);
+  --bs-box-shadow:        0 2px 8px rgba(30, 58, 110, 0.06);  /* = --shadow */
+  --bs-box-shadow-sm:     0 1px 2px rgba(30, 58, 110, 0.04);
+  --bs-box-shadow-lg:     0 4px 12px rgba(30, 58, 110, 0.10);
 
   /* --- 链接 --- */
-  --bs-link-color:        #FF6B35;
-  --bs-link-color-rgb:    255, 107, 53;
-  --bs-link-hover-color:  #E55A2B;
+  --bs-link-color:        #3B7DDD;
+  --bs-link-color-rgb:    59, 125, 221;
+  --bs-link-hover-color:  #2E6BC4;
 
   /* --- 组件 --- */
   --bs-card-bg:           #FFFFFF;
-  --bs-card-border-color: #E5E7EB;
+  --bs-card-border-color: #E8E0D8;
   --bs-card-border-radius: 8px;
   --bs-card-box-shadow:   0 1px 3px rgba(0, 0, 0, 0.08);
 
@@ -86,9 +86,9 @@
   --bs-modal-box-shadow:  0 20px 60px rgba(0, 0, 0, 0.15);
 
   --bs-input-bg:          #FFFFFF;
-  --bs-input-border-color: #E5E7EB;
-  --bs-input-focus-border-color: #FF6B35;
-  --bs-input-focus-box-shadow: 0 0 0 3px #FFF3ED;
+  --bs-input-border-color: #E8E0D8;
+  --bs-input-focus-border-color: #3B7DDD;
+  --bs-input-focus-box-shadow: 0 0 0 3px #EBF2FC;
 
   --bs-btn-font-family:   'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --bs-btn-font-size:     0.8125rem; /* 13px */
@@ -105,8 +105,8 @@
 body {
   font-size: 14px;
   font-family: var(--font, 'Inter', -apple-system, BlinkMacSystemFont, sans-serif);
-  color: var(--text, #111827);
-  background-color: var(--bg, #F8F9FB);
+  color: var(--text, #1A1A1A);
+  background-color: var(--bg, #FEFAF5);
 }
 
 /* 确保 box-sizing 一致（Reboot 已设置，这里做兜底） */
@@ -153,7 +153,7 @@ body {
 }
 .btn-close:focus {
   outline: 0 !important;
-  box-shadow: 0 0 0 0.25rem rgba(255, 107, 53, 0.25) !important;
+  box-shadow: 0 0 0 0.25rem rgba(59, 125, 221, 0.25) !important;
   opacity: 1 !important;
 }
 .btn-sm {
@@ -167,35 +167,35 @@ body {
   border-radius: 8px;
 }
 .btn-primary {
-  background-color: #FF6B35;
-  border-color: #FF6B35;
+  background-color: #3B7DDD;
+  border-color: #3B7DDD;
   color: #fff;
 }
 .btn-primary:hover,
 .btn-primary:focus {
-  background-color: #E55A2B;
-  border-color: #E55A2B;
+  background-color: #2E6BC4;
+  border-color: #2E6BC4;
 }
 .btn-primary:focus-visible {
-  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.3);
+  box-shadow: 0 0 0 3px rgba(59, 125, 221, 0.3);
 }
 .btn-outline-primary {
-  color: #FF6B35;
-  border-color: #FF6B35;
+  color: #3B7DDD;
+  border-color: #3B7DDD;
 }
 .btn-outline-primary:hover {
-  background-color: #FF6B35;
-  border-color: #FF6B35;
+  background-color: #3B7DDD;
+  border-color: #3B7DDD;
 }
 .btn-outline-secondary {
-  color: var(--text, #111827);
-  border-color: var(--border, #E5E7EB);
+  color: var(--text, #1A1A1A);
+  border-color: var(--border, #E8E0D8);
   background-color: var(--surface, #FFFFFF);
 }
 .btn-outline-secondary:hover {
-  background-color: var(--bg, #F8F9FB);
-  color: var(--text, #111827);
-  border-color: var(--border, #E5E7EB);
+  background-color: var(--bg, #FEFAF5);
+  color: var(--text, #1A1A1A);
+  border-color: var(--border, #E8E0D8);
 }
 
 /* --- 表单控件：对齐 Crewboard 输入框风格 --- */
@@ -203,11 +203,11 @@ body {
 .form-select {
   font-size: 13px;
   font-family: var(--font, 'Inter', -apple-system, BlinkMacSystemFont, sans-serif);
-  border-color: var(--border, #E5E7EB);
+  border-color: var(--border, #E8E0D8);
   border-radius: 6px;
   padding: 7px 10px;
   background-color: var(--surface, #FFFFFF);
-  color: var(--text, #111827);
+  color: var(--text, #1A1A1A);
   transition: border-color 0.15s;
 }
 
@@ -219,8 +219,8 @@ body {
 }
 .form-control:focus,
 .form-select:focus {
-  border-color: #FF6B35;
-  box-shadow: 0 0 0 3px #FFF3ED;
+  border-color: #3B7DDD;
+  box-shadow: 0 0 0 3px #EBF2FC;
   outline: none;
 }
 .form-label {
@@ -237,17 +237,17 @@ body {
 /* --- 表格：对齐 Crewboard 表格风格 --- */
 .table {
   font-size: 13px;
-  color: var(--text, #111827);
+  color: var(--text, #1A1A1A);
   --bs-table-bg: var(--surface, #FFFFFF);
-  --bs-table-striped-bg: var(--bg, #F8F9FB);
-  --bs-table-hover-bg: var(--primary-light, #FFF3ED);
-  --bs-table-border-color: var(--border, #E5E7EB);
+  --bs-table-striped-bg: var(--bg, #FEFAF5);
+  --bs-table-hover-bg: var(--primary-light, #EBF2FC);
+  --bs-table-border-color: var(--border, #E8E0D8);
 }
 .table th {
   font-size: 12px;
   font-weight: 600;
   color: var(--text-secondary, #6B7280);
-  background-color: var(--bg, #F8F9FB);
+  background-color: var(--bg, #FEFAF5);
   border-bottom-width: 2px;
   padding: 10px 14px;
 }
@@ -258,13 +258,13 @@ body {
 
 /* --- Card：对齐 Crewboard 卡片风格 --- */
 .card {
-  border-color: var(--border, #E5E7EB);
+  border-color: var(--border, #E8E0D8);
   border-radius: var(--radius, 8px);
   box-shadow: var(--shadow, 0 1px 3px rgba(0, 0, 0, 0.08));
 }
 .card-header {
-  background-color: var(--bg, #F8F9FB);
-  border-bottom-color: var(--border, #E5E7EB);
+  background-color: var(--bg, #FEFAF5);
+  border-bottom-color: var(--border, #E8E0D8);
   font-size: 14px;
   font-weight: 600;
   padding: 14px 20px;
@@ -281,7 +281,7 @@ body {
   padding: 2px 8px;
 }
 .badge.bg-primary {
-  background-color: #FF6B35 !important;
+  background-color: #3B7DDD !important;
 }
 
 /* --- Alert：对齐 Crewboard 提示风格 --- */
@@ -292,9 +292,9 @@ body {
   padding: 10px 14px;
 }
 .alert-primary {
-  background-color: #FFF3ED;
-  color: #E55A2B;
-  border-left: 3px solid #FF6B35;
+  background-color: #EBF2FC;
+  color: #2E6BC4;
+  border-left: 3px solid #3B7DDD;
 }
 .alert-success {
   background-color: #D1FAE5;
@@ -311,7 +311,7 @@ body {
 
 /* --- Nav / Tabs：对齐 Crewboard 标签页风格 --- */
 .nav-tabs {
-  border-bottom-color: var(--border, #E5E7EB);
+  border-bottom-color: var(--border, #E8E0D8);
 }
 .nav-tabs .nav-link {
   font-size: 14px;
@@ -325,13 +325,13 @@ body {
   transition: all 0.15s;
 }
 .nav-tabs .nav-link:hover {
-  color: var(--text, #111827);
-  border-bottom-color: var(--border, #E5E7EB);
+  color: var(--text, #1A1A1A);
+  border-bottom-color: var(--border, #E8E0D8);
   background: none;
 }
 .nav-tabs .nav-link.active {
-  color: #FF6B35;
-  border-bottom-color: #FF6B35;
+  color: #3B7DDD;
+  border-bottom-color: #3B7DDD;
   font-weight: 600;
   background: none;
 }
@@ -343,7 +343,7 @@ body {
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
 }
 .modal-header {
-  border-bottom-color: var(--border, #E5E7EB);
+  border-bottom-color: var(--border, #E8E0D8);
   padding: 16px 20px;
 }
 .modal-header .modal-title {
@@ -354,7 +354,7 @@ body {
   padding: 20px;
 }
 .modal-footer {
-  border-top-color: var(--border, #E5E7EB);
+  border-top-color: var(--border, #E8E0D8);
   padding: 12px 20px;
 }
 
@@ -370,17 +370,17 @@ body {
   padding: 7px 10px;
   font-size: 13px;
   font-family: var(--font, 'Inter', -apple-system, BlinkMacSystemFont, sans-serif);
-  color: var(--text, #111827);
+  color: var(--text, #1A1A1A);
   background-color: var(--surface, #FFFFFF);
-  border: 1px solid var(--border, #E5E7EB);
+  border: 1px solid var(--border, #E8E0D8);
   border-radius: 6px;
   transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
   outline: none;
   appearance: none;
 }
 .text-input:focus {
-  border-color: #FF6B35;
-  box-shadow: 0 0 0 3px #FFF3ED;
+  border-color: #3B7DDD;
+  box-shadow: 0 0 0 3px #EBF2FC;
 }
 
 /* 下拉/日期输入桥接 */
@@ -390,17 +390,17 @@ body {
   padding: 7px 10px;
   font-size: 13px;
   font-family: var(--font, 'Inter', -apple-system, BlinkMacSystemFont, sans-serif);
-  color: var(--text, #111827);
+  color: var(--text, #1A1A1A);
   background-color: var(--surface, #FFFFFF);
-  border: 1px solid var(--border, #E5E7EB);
+  border: 1px solid var(--border, #E8E0D8);
   border-radius: 6px;
   transition: border-color 0.15s;
   outline: none;
 }
 .select-input:focus,
 .date-input:focus {
-  border-color: #FF6B35;
-  box-shadow: 0 0 0 3px #FFF3ED;
+  border-color: #3B7DDD;
+  box-shadow: 0 0 0 3px #EBF2FC;
 }
 
 /* 表单分组桥接：.form-group 与 Bootstrap .mb-3 对齐 */
@@ -419,11 +419,11 @@ body {
 /* 注意：这里只做视觉补强，不删除 style.css 中的原有定义 */
 .btn-outline {
   background: var(--surface, #FFFFFF);
-  color: var(--text, #111827);
-  border: 1px solid var(--border, #E5E7EB);
+  color: var(--text, #1A1A1A);
+  border: 1px solid var(--border, #E8E0D8);
 }
 .btn-outline:hover {
-  background: var(--bg, #F8F9FB);
+  background: var(--bg, #FEFAF5);
 }
 
 /* section-card 桥接：对齐 Bootstrap .card */
@@ -433,7 +433,7 @@ body {
   padding: 20px;
   box-shadow: var(--shadow, 0 1px 3px rgba(0, 0, 0, 0.08));
   margin-bottom: 20px;
-  border: 1px solid var(--border, #E5E7EB);
+  border: 1px solid var(--border, #E8E0D8);
 }
 
 /* ============================================================
@@ -442,19 +442,19 @@ body {
  * ============================================================ */
 
 /* 文字颜色 */
-.text-primary-custom  { color: #FF6B35 !important; }
+.text-primary-custom  { color: #3B7DDD !important; }
 .text-secondary-custom { color: #6B7280 !important; }
 .text-success-custom  { color: #10B981 !important; }
 .text-danger-custom   { color: #EF4444 !important; }
 .text-warning-custom  { color: #F59E0B !important; }
 
 /* 背景色 */
-.bg-primary-light { background-color: #FFF3ED !important; }
+.bg-primary-light { background-color: #EBF2FC !important; }
 .bg-surface       { background-color: #FFFFFF !important; }
-.bg-app           { background-color: #F8F9FB !important; }
+.bg-app           { background-color: #FEFAF5 !important; }
 
 /* 边框 */
-.border-primary-custom { border-color: #FF6B35 !important; }
+.border-primary-custom { border-color: #3B7DDD !important; }
 
 /* 圆角 */
 .rounded-crewboard { border-radius: 8px !important; }
@@ -525,9 +525,9 @@ body {
   text-align: center;
   margin-top: 12px;
   padding: 8px 12px;
-  background: var(--primary-light, #FFF3ED);
+  background: var(--primary-light, #EBF2FC);
   border-radius: 6px;
-  border: 1px solid rgba(255, 107, 53, 0.12);
+  border: 1px solid rgba(59, 125, 221, 0.12);
   line-height: 1.5;
 }
 
@@ -540,11 +540,11 @@ body {
   margin-top: 8px;
   border-radius: 8px;
   font-weight: 600;
-  box-shadow: 0 1px 2px rgba(255, 107, 53, 0.3);
+  box-shadow: 0 1px 2px rgba(59, 125, 221, 0.3);
   transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
 }
 .btn-block:hover {
-  box-shadow: 0 4px 12px rgba(255, 107, 53, 0.25);
+  box-shadow: 0 4px 12px rgba(59, 125, 221, 0.25);
 }
 .btn-block:active {
   transform: scale(0.99);
@@ -618,7 +618,7 @@ body {
 .res-table.table tbody tr:hover,
 .pc-table.table tbody tr:hover,
 .report-table.table tbody tr:hover {
-  background: rgba(255, 107, 53, 0.04);
+  background: rgba(59, 125, 221, 0.04);
 }
 .drill-table.table {
   font-size: 12px;
@@ -641,7 +641,7 @@ body {
 }
 .select-input.form-select:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.12);
+  box-shadow: 0 0 0 3px rgba(59, 125, 221, 0.12);
 }
 
 /* ---- Bootstrap .form-control inside management forms ---- */
@@ -656,7 +656,7 @@ body {
 }
 .text-input.form-control:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.12);
+  box-shadow: 0 0 0 3px rgba(59, 125, 221, 0.12);
   background-color: var(--surface);
 }
 
@@ -675,7 +675,7 @@ body {
 }
 .date-input.form-control:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.12);
+  box-shadow: 0 0 0 3px rgba(59, 125, 221, 0.12);
 }
 
 /* ---- 报表工具栏内的 form-select 保持行内布局 ---- */
@@ -727,7 +727,7 @@ body {
 }
 .pc-tabs.nav-tabs .pc-tab.nav-link:hover {
   color: var(--primary);
-  background: rgba(255, 107, 53, 0.06);
+  background: rgba(59, 125, 221, 0.06);
 }
 .pc-tabs.nav-tabs .pc-tab.nav-link.active {
   color: var(--primary);
@@ -759,7 +759,7 @@ body {
   border: 1px solid var(--border);
 }
 .report-presets.btn-group .btn-ghost:hover {
-  background: rgba(255, 107, 53, 0.08);
+  background: rgba(59, 125, 221, 0.08);
   color: var(--primary);
   border-color: var(--primary);
 }
@@ -935,7 +935,7 @@ body.modal-open {
 
 .toast.toast-success { background: #059669; }
 .toast.toast-error   { background: #DC2626; }
-.toast.toast-info    { background: #FF6B35; }
+.toast.toast-info    { background: #3B7DDD; }
 
 /* Toast body 内边距 */
 .toast.toast-success .toast-body,
@@ -1042,11 +1042,11 @@ body.modal-open {
   transition: background 0.3s !important;
 }
 .ts-input-synced {
-  background-color: #FFF3ED !important;
-  border-color: #FFB088 !important;
+  background-color: #EBF2FC !important;
+  border-color: #90B8E8 !important;
 }
 .ts-input-synced:focus {
-  background-color: #FFE4D6 !important;
+  background-color: #D8E8F8 !important;
   border-color: var(--primary) !important;
 }
 
@@ -1069,7 +1069,7 @@ body.modal-open {
 .bk-field .form-control:focus,
 .bk-field .form-control-sm:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.12);
+  box-shadow: 0 0 0 3px rgba(59, 125, 221, 0.12);
   background: var(--surface);
 }
 
@@ -1086,7 +1086,7 @@ body.modal-open {
 .bk-field .form-select:focus,
 .bk-field .form-select-sm:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.12);
+  box-shadow: 0 0 0 3px rgba(59, 125, 221, 0.12);
 }
 
 /* bk-date-row 内的日期输入框：保持 flex:1 布局，不被 form-control 的 display:block 破坏 */

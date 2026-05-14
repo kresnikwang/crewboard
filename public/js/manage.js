@@ -57,7 +57,7 @@ window.loadResources = async function loadResources() {
   teamNames.forEach(function (team) {
     html += '<tr class="res-team-divider"><td colspan="' + colCount + '">' + escapeHtml(team) + ' (' + teams[team].length + ')</td></tr>';
     teams[team].forEach(function (r) {
-      var color = r.color || '#FF6B35';
+      var color = r.color || '#3B7DDD';
       var initial = r.name ? r.name.charAt(0) : '?';
 
       // 账号信息直接来自 JOIN 字段
@@ -177,7 +177,7 @@ window.showResourceModal = function showResourceModal(id) {
       '<div class="rg-field-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="10" r="3" fill="currentColor" opacity=".3"/></svg></div>' +
       '<div class="rg-field-body">' +
         '<label class="rg-label">' + t('manage.color_label') + '</label>' +
-        buildColorDropdownHtml(resource && resource.color ? resource.color : '#FF6B35', 'rg-color-value') +
+        buildColorDropdownHtml(resource && resource.color ? resource.color : '#3B7DDD', 'rg-color-value') +
       '</div>' +
     '</div>' +
     /* Role */
@@ -244,7 +244,7 @@ window.saveResource = async function saveResource(id) {
     email: document.getElementById('res-email').value.trim(),
     role: document.getElementById('res-role').value.trim(),
     team: document.getElementById('res-team').value.trim(),
-    color: colorEl ? colorEl.value : '#FF6B35',
+    color: colorEl ? colorEl.value : '#3B7DDD',
     hours_per_day: parseFloat(document.getElementById('res-hours').value) || 8,
   };
   try {
