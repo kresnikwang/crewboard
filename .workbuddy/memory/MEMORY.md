@@ -43,7 +43,13 @@ npm install --production
 6. 验证：`pm2 show crewboard` + `curl http://localhost:3000/`
 
 ## Git 拉取方式（服务器）
-服务器 SSH key 未配置 GitHub，需临时切换 HTTPS remote：
+**推荐：SSH Agent Forwarding**（2026-05-14起可用）
+```bash
+ssh -A root@47.241.10.142
+cd /www/wwwroot/resource.skandstudio.com
+git pull origin main   # 直接走SSH，无需切换remote
+```
+备选：HTTPS token（SSH forwarding 不可用时）
 ```bash
 # 临时用 token 拉取
 git remote set-url origin https://<TOKEN>@github.com/kresnikwang/crewboard.git
@@ -51,7 +57,8 @@ git pull origin main
 # 拉取后恢复 SSH remote
 git remote set-url origin git@github.com:kresnikwang/crewboard.git
 ```
-Token 从 `gh auth token` 获取。
+Token 从 `gh auth token` 获取（需安装 GitHub CLI）。
+Remote 默认为 `git@github.com:kresnikwang/crewboard.git`（SSH），已确认可用。
 
 ## 端口漂移问题（已修复 2026-04-19）
 
