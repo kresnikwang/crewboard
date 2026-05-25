@@ -996,7 +996,8 @@ body.modal-open {
 .schedule-grid .schedule-table tbody,
 .schedule-grid .schedule-table thead {
   /* 恢复 style.css 的精确控制，不受 Bootstrap .table 类影响 */
-  border-collapse: collapse !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
   box-sizing: border-box;
 }
 
