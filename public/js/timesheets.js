@@ -323,9 +323,10 @@
       var codeLabel = p.code ? '<span class="ts-proj-code">' + esc(p.code) + '</span>' : '';
 
       html += '<tr data-project-id="' + p.id + '">' +
-        '<td class="ts-project-cell" style="border-left:3px solid ' + color + '">' +
+        '<td style="border-left:3px solid ' + color + '">' +
+        '<div class="ts-project-cell">' +
         '<span class="ts-color-dot" style="background:' + color + '"></span>' +
-        codeLabel + esc(p.name) + '</td>';
+        codeLabel + esc(p.name) + '</div></td>';
 
       days.forEach(function (d, idx) {
         var dateStr = fmt(d);
