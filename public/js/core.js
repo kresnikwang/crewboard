@@ -648,17 +648,28 @@ function initSidebarUserMenu() {
 async function restoreSession() {
   const token = getToken();
   if (!token) return;
+
+  // Show app immediately if we have a token — avoid login page flash
+  document.getElementById('auth-page').style.display = 'none';
+  document.getElementById('main-app').style.display = 'flex';
+
   try {
     const data = await api('/api/auth/me');
     window.state.user = data.user;
     window.state.enterprise = data.enterprise;
     if (data.user && data.user.must_change_password) {
+      // Show auth page and first-login view
+      document.getElementById('main-app').style.display = 'none';
+      document.getElementById('auth-page').style.display = 'flex';
       showFirstLoginView(data.user);
     } else {
       enterApp();
     }
   } catch (_) {
     clearToken();
+    // Token invalid — show login
+    document.getElementById('main-app').style.display = 'none';
+    document.getElementById('auth-page').style.display = 'flex';
   }
 }
 
@@ -675,6 +686,7 @@ const PAGE_LOADERS = {
 
 window.loadPage = function loadPage(page) {
   window.state.currentPage = page;
+  try { sessionStorage.setItem('crewboard_last_page', page); } catch(_) {}
 
   // Toggle active nav item
   document.querySelectorAll('.nav-item').forEach(item => {
@@ -762,7 +774,9 @@ async function enterApp() {
   if (!user.enterprise_id) {
     window.loadPage('enterprise');
   } else {
-    window.loadPage('schedule');
+    var lastPage = 'schedule';
+    try { lastPage = sessionStorage.getItem('crewboard_last_page') || 'schedule'; } catch(_) {}
+    window.loadPage(lastPage);
   }
 
   // Connect SSE for real-time updates
