@@ -57,6 +57,19 @@
       src: url('/fonts/inter-700.woff2') format('woff2');
     }
   </style>
+  <script>
+    // 防止登录状态下刷新页面时的登录页闪烁
+    (function() {
+      var token = localStorage.getItem('rg_token');
+      var isSpecialHash = window.location.hash.indexOf('#reset-password') === 0 || window.location.hash.indexOf('#register') === 0;
+      if (token && !isSpecialHash) {
+        var style = document.createElement('style');
+        style.id = 'pre-auth-style';
+        style.innerHTML = '#auth-page { display: none !important; } #main-app { display: flex !important; }';
+        document.head.appendChild(style);
+      }
+    })();
+  </script>
 </head>
 <body>
 

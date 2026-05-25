@@ -85,7 +85,7 @@ a { text-decoration: none; color: inherit; }
   text-align: center; letter-spacing: .5px;
 }
 .schedule-table th:first-child { text-align: left; padding-left: 16px; width: 180px; min-width: 180px; position: sticky; left: 0; z-index: 11; }
-.schedule-table th.today { color: var(--primary); position: relative; }
+.schedule-table th.today { color: var(--primary); }
 .schedule-table th.today::after {
   content: ''; position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%);
   width: 4px; height: 4px; border-radius: 50%; background: var(--accent);

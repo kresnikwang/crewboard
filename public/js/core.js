@@ -653,6 +653,10 @@ async function restoreSession() {
   document.getElementById('auth-page').style.display = 'none';
   document.getElementById('main-app').style.display = 'flex';
 
+  // Remove the temporary style tag so standard display rules take effect
+  var preStyle = document.getElementById('pre-auth-style');
+  if (preStyle) preStyle.remove();
+
   try {
     const data = await api('/api/auth/me');
     window.state.user = data.user;
