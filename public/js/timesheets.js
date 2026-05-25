@@ -282,6 +282,18 @@
         });
       }
     });
+
+    /* Keep manual copy button for managers who want to force-copy */
+    var copyBtn = document.getElementById('ts-copy-from-schedule');
+    if (copyBtn) {
+      var permsForCopy = window.state.permissions || {};
+      if (!permsForCopy.book_others) {
+        copyBtn.style.display = 'none';
+      } else {
+        copyBtn.style.display = '';
+        copyBtn.onclick = copyFromSchedule;
+      }
+    }
   };
 
   /* ---- get draft localStorage key ---- */
@@ -661,7 +673,6 @@
     var prevBtn  = document.getElementById('ts-prev');
     var nextBtn  = document.getElementById('ts-next');
     var todayBtn = document.getElementById('ts-today');
-    var copyBtn  = document.getElementById('ts-copy-from-schedule');
 
     if (prevBtn) {
       prevBtn.addEventListener('click', function () {
@@ -680,15 +691,6 @@
         state.tsWeekStart = getMonday(new Date());
         window.loadTimesheets();
       });
-    }
-    /* Keep manual copy button for managers who want to force-copy */
-    if (copyBtn) {
-      var permsForCopy = window.state.permissions || {};
-      if (!permsForCopy.book_others) {
-        copyBtn.style.display = 'none';
-      } else {
-        copyBtn.addEventListener('click', copyFromSchedule);
-      }
     }
   });
 
