@@ -1665,8 +1665,8 @@
        table width; otherwise long booking content can stretch a body
        cell wider than the corresponding header cell, breaking alignment
        even with table-layout: fixed). --- */
-    var RES_COL_W = 190;
-    var DAY_COL_W = 48;
+    var RES_COL_W = 220;
+    var DAY_COL_W = 60;
     var totalTableW = RES_COL_W + totalDays * DAY_COL_W;
 
     /* --- Build column group (ensures both tables share exact widths) --- */

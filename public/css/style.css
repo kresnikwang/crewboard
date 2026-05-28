@@ -81,7 +81,7 @@ a { text-decoration: none; color: inherit; }
 .schedule-table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 900px; table-layout: fixed; }
 .schedule-table th {
   position: sticky; top: 0; z-index: 10; background: var(--surface); border-bottom: 2px solid var(--border);
-  padding: 10px 8px; font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-secondary);
+  padding: 10px 8px; font-size: 14px; font-weight: 600; text-transform: uppercase; color: var(--text-secondary);
   text-align: center; letter-spacing: .5px;
 }
 .schedule-table th:first-child { text-align: left; padding-left: 16px; width: 180px; min-width: 180px; position: sticky; left: 0; z-index: 11; }
@@ -90,7 +90,7 @@ a { text-decoration: none; color: inherit; }
   content: ''; position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%);
   width: 4px; height: 4px; border-radius: 50%; background: var(--accent);
 }
-.schedule-table td { border-bottom: 1px solid var(--border); padding: 0; vertical-align: top; height: 60px; position: relative; }
+.schedule-table td { border-bottom: 1px solid var(--border); padding: 0; vertical-align: top; height: 70px; position: relative; }
 .schedule-table td:first-child {
   position: sticky; left: 0; z-index: 5; background: var(--surface); padding: 8px 12px 8px 16px;
   border-right: 1px solid var(--border);
@@ -98,14 +98,14 @@ a { text-decoration: none; color: inherit; }
 .resource-cell { display: flex; align-items: center; gap: 8px; }
 .resource-avatar {
   width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 600; color: #fff; flex-shrink: 0;
+  font-size: 14px; font-weight: 600; color: #fff; flex-shrink: 0;
 }
 .resource-info { min-width: 0; }
-.resource-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.resource-role { font-size: 11px; color: var(--text-tertiary); }
+.resource-name { font-size: 17px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.resource-role { font-size: 14px; color: var(--text-tertiary); }
 .team-divider td { background: var(--bg); padding: 6px 16px !important; height: auto !important; }
 .team-divider td:first-child { background: var(--bg); }
-.team-label { font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-tertiary); letter-spacing: .5px; }
+.team-label { font-size: 14px; font-weight: 600; text-transform: uppercase; color: var(--text-tertiary); letter-spacing: .5px; }
 
 .booking-cell { padding: 2px 0; min-height: 56px; cursor: pointer; position: relative; user-select: none; overflow: visible; }
 .booking-cell:hover { background: var(--primary-light); }
@@ -113,10 +113,10 @@ a { text-decoration: none; color: inherit; }
 .booking-cell.drag-start { border-top-left-radius: 4px; border-bottom-left-radius: 4px; }
 .booking-cell.drag-end { border-top-right-radius: 4px; border-bottom-right-radius: 4px; }
 .booking-block {
-  padding: 3px 6px 3px 8px; border-radius: 4px; font-size: 7px; margin-bottom: 1px;
+  padding: 4px 6px 4px 8px; border-radius: 4px; font-size: 10px; margin-bottom: 1px;
   cursor: grab; transition: opacity .15s; line-height: 1.3; white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis; position: relative;
-  height: 20px; box-sizing: border-box; color: #374151;
+  height: 24px; box-sizing: border-box; color: #374151;
   margin-left: 2px; margin-right: 2px;
   z-index: 1;
 }
@@ -212,7 +212,7 @@ a { text-decoration: none; color: inherit; }
   color: #fff;
   padding: 4px 10px;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 500;
   white-space: nowrap;
   opacity: 0;
@@ -255,7 +255,7 @@ a { text-decoration: none; color: inherit; }
 .booking-project { font-weight: 400; }
 
 .day-total {
-  position: absolute; bottom: 1px; right: 4px; font-size: 10px; color: var(--text-tertiary); font-weight: 500;
+  position: absolute; bottom: 1px; right: 4px; font-size: 13px; color: var(--text-tertiary); font-weight: 500;
 }
 .day-total.overbooked { color: var(--danger); font-weight: 600; }
 
@@ -1179,7 +1179,7 @@ a { text-decoration: none; color: inherit; }
 .month-table th.m-res-hd,
 .month-table td.m-res-cell {
   position: sticky; left: 0; z-index: 14; background: var(--surface);
-  width: 190px; min-width: 190px; max-width: 190px;
+  width: 220px; min-width: 220px; max-width: 220px;
   border-right: 2px solid var(--border);
 }
 .month-table th.m-res-hd { z-index: 16; }
@@ -1194,15 +1194,15 @@ a { text-decoration: none; color: inherit; }
 .month-table-header { margin-bottom: -1px; }
 .month-table .m-day-row th {
   background: var(--surface); padding: 6px 0; text-align: center;
-  font-size: 8px; font-weight: 600; color: var(--text-secondary);
+  font-size: 11px; font-weight: 600; color: var(--text-secondary);
   text-transform: uppercase; letter-spacing: .3px;
-  width: 48px; min-width: 48px;
+  width: 60px; min-width: 60px;
   border-bottom: 2px solid var(--border);
 }
 .month-table .m-day-row th.m-res-hd {
   z-index: 17; background: var(--surface);
   text-align: left; padding-left: 16px;
-  font-size: 11px; color: var(--text-secondary);
+  font-size: 14px; color: var(--text-secondary);
 }
 .month-table .m-day-row th.m-today { color: var(--accent); }
 .month-table .m-day-row th.m-today .m-day-num {
@@ -1210,17 +1210,17 @@ a { text-decoration: none; color: inherit; }
   display: inline-block; width: 20px; height: 20px; line-height: 20px; text-align: center;
 }
 .month-table .m-day-row th.m-weekend { color: var(--text-tertiary); background: #F3F4F6; }
-.m-day-name { display: block; font-size: 8px; line-height: 1; margin-bottom: 2px; }
-.m-day-num { display: block; font-size: 11px; line-height: 1; }
+.m-day-name { display: block; font-size: 11px; line-height: 1; margin-bottom: 2px; }
+.m-day-num { display: block; font-size: 14px; line-height: 1; }
 .m-week-label {
-  position: absolute; top: 2px; left: 2px; font-size: 8px; color: var(--text-tertiary);
+  position: absolute; top: 2px; left: 2px; font-size: 11px; color: var(--text-tertiary);
   font-weight: 500; letter-spacing: 0;
 }
 
 /* Inline month label in month-view day header */
 .m-month-inline {
   display: block;
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--text);
   margin-bottom: 1px;
@@ -1228,18 +1228,18 @@ a { text-decoration: none; color: inherit; }
 }
 
 /* Column widths for month-view tables (keeps header & body aligned) */
-.m-res-col { width: 190px; min-width: 190px; }
-.m-day-col { width: 48px; min-width: 48px; }
+.m-res-col { width: 220px; min-width: 220px; }
+.m-day-col { width: 60px; min-width: 60px; }
 
 /* Team divider in month view */
 .month-table .m-team-row td {
   background: var(--bg); padding: 5px 8px; height: auto;
-  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  font-size: 14px; font-weight: 600; text-transform: uppercase;
   color: var(--text-tertiary); letter-spacing: .5px;
 }
 .month-table .m-team-row td.m-team-label {
   position: sticky; left: 0; z-index: 14; background: var(--bg);
-  width: 160px; min-width: 160px;
+  width: 190px; min-width: 190px;
 }
 
 /* Resource cell in month view */
@@ -1248,15 +1248,15 @@ a { text-decoration: none; color: inherit; }
 .m-res-avatar {
   width: 28px; height: 28px; border-radius: 50%; display: flex;
   align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 600; color: #fff; flex-shrink: 0;
+  font-size: 14px; font-weight: 600; color: #fff; flex-shrink: 0;
 }
-.m-res-name { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.m-res-role { font-size: 10px; color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m-res-name { font-size: 15px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m-res-role { font-size: 13px; color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Day cells in month view */
 .m-day-cell {
-  padding: 1px 0; vertical-align: top; height: 54px; position: relative; cursor: pointer;
-  width: 48px; min-width: 48px; overflow: visible;
+  padding: 1px 0; vertical-align: top; height: 70px; position: relative; cursor: pointer;
+  width: 60px; min-width: 60px; overflow: visible;
 }
 .m-day-cell:hover { background: var(--primary-light); }
 .m-day-cell.m-weekend { background: #F3F4F6; }
@@ -1265,10 +1265,10 @@ a { text-decoration: none; color: inherit; }
 
 /* Booking block in month view */
 .m-booking {
-  font-size: 8px; line-height: 1.15; padding: 1px 2px; border-radius: 2px;
+  font-size: 11px; line-height: 1.15; padding: 1px 2px; border-radius: 2px;
   margin-bottom: 1px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
   cursor: grab; position: relative;
-  height: 14px; box-sizing: border-box;
+  height: 18px; box-sizing: border-box;
   color: #374151;
   z-index: 1;
 }
@@ -1355,14 +1355,14 @@ a { text-decoration: none; color: inherit; }
 .m-booking .split-handle::after {
   content: '✂️ Split';
   position: absolute;
-  top: -24px;
+  top: -28px;
   left: 50%;
   transform: translateX(-50%);
   background: #1e1b4b;
   color: #fff;
   padding: 3px 8px;
   border-radius: 4px;
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
   opacity: 0;
@@ -1376,7 +1376,7 @@ a { text-decoration: none; color: inherit; }
 
 /* Leave block in month view */
 .m-leave {
-  font-size: 7px; padding: 2px 4px 2px 5px; border-radius: 3px; margin-bottom: 1px;
+  font-size: 10px; padding: 2px 4px 2px 5px; border-radius: 3px; margin-bottom: 1px;
   background: #1F2937 !important; color: #FFFFFF !important; border-left: 2px solid #6B7280 !important;
   display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   cursor: pointer; line-height: 1.4; z-index: 1;
