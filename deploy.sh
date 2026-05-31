@@ -47,7 +47,17 @@ else
     if [ -f "$f" ]; then
       name=$(basename $f .css)
       cleancss "$f" -o "public/css/dist/${name}.min.css" 2>/dev/null
-      orig_size=$(wc -c < "$f")
+      if [ "$f" = "public/css/style.css" ] && grep -q "^@import" "$f"; then
+        orig_size=0
+        for import_file in $(grep "^@import" "$f" | sed -E "s|.*'\\./([^']+)'.*|public/css/\\1|"); do
+          if [ -f "$import_file" ]; then
+            file_size=$(wc -c < "$import_file")
+            orig_size=$((orig_size + file_size))
+          fi
+        done
+      else
+        orig_size=$(wc -c < "$f")
+      fi
       min_size=$(wc -c < "public/css/dist/${name}.min.css")
       reduction=$(( (orig_size - min_size) * 100 / orig_size ))
       echo "  ✓ $name: ${orig_size}B → ${min_size}B (节省 ${reduction}%)"
