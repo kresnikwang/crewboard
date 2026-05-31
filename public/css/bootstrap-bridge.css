@@ -586,6 +586,7 @@ body {
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   background: var(--surface);
+  padding: 0;
 }
 /* card-body 内边距对齐 Crewboard 风格 */
 .summary-card.card .card-body {

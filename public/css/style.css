@@ -3,6 +3,7 @@
 :root {
   --bg: #FEFAF5; --surface: #FFFFFF; --border: #E8E0D8;
   --text: #1A1A1A; --text-secondary: #6B7280; --text-tertiary: #9CA3AF;
+  --text-primary: var(--text); --bg-secondary: #F3F4F6; --hover: #F3F6FA;
   --primary: #3B7DDD; --primary-light: #EBF2FC; --primary-hover: #2E6BC4;
   --secondary: #4DD8C0; --accent: #F09030; --accent-light: #FFF3E8;
   --highlight: #FFC832;
