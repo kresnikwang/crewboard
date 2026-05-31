@@ -1,0 +1,561 @@
+/* === SCHEDULE: custom scheduling grid, booking bars, month view === */
+
+/* === SCHEDULE GRID === */
+.schedule-grid { flex: 1; overflow: auto; padding: 0; min-height: 0; }
+.schedule-table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 900px; table-layout: fixed; }
+.schedule-table th {
+  position: sticky; top: 0; z-index: 10; background: var(--surface); border-bottom: 2px solid var(--border);
+  padding: 10px 8px; font-size: 14px; font-weight: 600; text-transform: uppercase; color: var(--text-secondary);
+  text-align: center; letter-spacing: .5px;
+}
+.schedule-table th:first-child { text-align: left; padding-left: 16px; width: 180px; min-width: 180px; position: sticky; left: 0; z-index: 11; }
+.schedule-table th.today { color: var(--primary); }
+.schedule-table th.today::after {
+  content: ''; position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%);
+  width: 4px; height: 4px; border-radius: 50%; background: var(--accent);
+}
+.schedule-table td { border-bottom: 1px solid var(--border); padding: 0; vertical-align: top; height: 70px; position: relative; }
+.schedule-table td:first-child {
+  position: sticky; left: 0; z-index: 5; background: var(--surface); padding: 8px 12px 8px 16px;
+  border-right: 1px solid var(--border);
+}
+.resource-cell { display: flex; align-items: center; gap: 8px; }
+.resource-avatar {
+  width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 600; color: #fff; flex-shrink: 0;
+}
+.resource-info { min-width: 0; }
+.resource-name { font-size: 17px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.resource-role { font-size: 14px; color: var(--text-tertiary); }
+.team-divider td { background: var(--bg); padding: 6px 16px !important; height: auto !important; }
+.team-divider td:first-child { background: var(--bg); }
+.team-label { font-size: 14px; font-weight: 600; text-transform: uppercase; color: var(--text-tertiary); letter-spacing: .5px; }
+
+.booking-cell { padding: 2px 0; min-height: 56px; cursor: pointer; position: relative; user-select: none; overflow: visible; }
+.booking-cell:hover { background: var(--primary-light); }
+.booking-cell.drag-selecting { background: rgba(59, 125, 221, 0.15); outline: 2px solid var(--primary); outline-offset: -2px; }
+.booking-cell.drag-start { border-top-left-radius: 4px; border-bottom-left-radius: 4px; }
+.booking-cell.drag-end { border-top-right-radius: 4px; border-bottom-right-radius: 4px; }
+.booking-block {
+  padding: 4px 6px 4px 8px; border-radius: 4px; font-size: 10px; margin-bottom: 1px;
+  cursor: grab; transition: opacity .15s; line-height: 1.3; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; position: relative;
+  height: 24px; box-sizing: border-box; color: #374151;
+  margin-left: 2px; margin-right: 2px;
+  z-index: 1;
+}
+.booking-block:hover { z-index: 3; }
+
+/* === Continuous booking bar (span) styles === */
+.booking-block.span-s {
+  border-top-right-radius: 0; border-bottom-right-radius: 0;
+  margin-right: -1px;
+}
+.booking-block.span-m {
+  border-radius: 0;
+  margin-left: -1px; margin-right: -1px;
+  padding-left: 4px;
+}
+.booking-block.span-e {
+  border-top-left-radius: 0; border-bottom-left-radius: 0;
+  margin-left: -1px;
+  padding-left: 4px;
+  border-right: 3px solid rgba(59, 125, 221, 0.6);
+}
+/* Hover highlight for mid/end segments */
+.booking-block.span-m:hover, .booking-block.span-e:hover {
+  outline: 1px dashed var(--primary);
+  outline-offset: -1px;
+  opacity: 1;
+}
+.booking-block .booking-hours { font-weight: 600; color: #374151; }
+.booking-block .booking-project { color: #374151; }
+.booking-block.moving { opacity: 0.4; cursor: grabbing; }
+.booking-block.tentative { opacity: .5; border: 1.5px dashed; }
+/* Resize handles — 默认不可见且不接收鼠标事件，hover 时激活 */
+.booking-block .resize-handle {
+  position: absolute; right: 0; top: 0; bottom: 0; width: 8px; cursor: ew-resize; opacity: 0;
+  pointer-events: none;
+  transition: opacity .15s; background: linear-gradient(90deg, transparent 20%, rgba(59,125,221,0.85) 100%);
+  border-top-right-radius: 4px; border-bottom-right-radius: 4px;
+  z-index: 10;
+}
+.booking-block:hover .resize-handle { opacity: 1; pointer-events: auto; }
+.booking-block.resizing { outline: 2px solid var(--primary); outline-offset: 1px; }
+.booking-block.resizing .resize-handle { opacity: 1; pointer-events: auto; background: var(--primary); }
+.booking-block .resize-handle-left {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 8px; cursor: ew-resize; opacity: 0;
+  pointer-events: none;
+  transition: opacity .15s; background: linear-gradient(270deg, transparent 20%, rgba(59,125,221,0.85) 100%);
+  border-top-left-radius: 4px; border-bottom-left-radius: 4px;
+  z-index: 10;
+}
+.booking-block:hover .resize-handle-left { opacity: 1; pointer-events: auto; }
+.booking-block.resizing .resize-handle-left { opacity: 1; pointer-events: auto; background: var(--primary); }
+
+/* Split handle — appears at the boundary between consecutive booking days */
+.booking-block .split-handle {
+  position: absolute;
+  right: -6px;
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  cursor: col-resize;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.booking-block:hover .split-handle {
+  opacity: 1;
+  pointer-events: auto;
+}
+/* Split handle visual indicator (dashed line) */
+.booking-block .split-handle::before {
+  content: '';
+  display: block;
+  width: 2px;
+  height: 14px;
+  border-left: 2px dashed rgba(59, 125, 221, 0.5);
+  transition: all 0.15s;
+}
+.booking-block .split-handle:hover::before {
+  border-left-color: rgba(59, 125, 221, 0.9);
+  height: 18px;
+}
+/* Split Booking tooltip */
+.booking-block .split-handle::after {
+  content: '✂️ Split Booking';
+  position: absolute;
+  top: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1e1b4b;
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+  z-index: 100;
+}
+.booking-block .split-handle:hover::after {
+  opacity: 1;
+}
+
+/* Move preview highlight — green */
+.booking-cell.move-preview,
+.m-day-cell.move-preview {
+  background: rgba(16, 185, 129, 0.12) !important;
+  outline: 2px solid rgba(16, 185, 129, 0.55);
+  outline-offset: -2px;
+}
+
+/* Resize preview highlight — only the booking-height bar, not the full cell */
+.resize-preview-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-radius: 3px;
+  pointer-events: none;
+  z-index: 5;
+}
+.resize-preview-bar.extend {
+  background: rgba(59, 125, 221, 0.18);
+  outline: 2px solid rgba(59, 125, 221, 0.6);
+  outline-offset: -2px;
+}
+.resize-preview-bar.shrink {
+  background: rgba(239, 68, 68, 0.15);
+  outline: 2px solid rgba(239, 68, 68, 0.5);
+  outline-offset: -2px;
+}
+.booking-hours { font-weight: 600; }
+.booking-project { font-weight: 400; }
+
+.day-total {
+  position: absolute; bottom: 1px; right: 4px; font-size: 13px; color: var(--text-tertiary); font-weight: 500;
+}
+.day-total.overbooked { color: var(--danger); font-weight: 600; }
+
+
+/* Weekend column styling */
+.schedule-table th.weekend, .booking-cell.weekend { background: #F3F4F6; }
+.booking-cell.weekend:has(.booking-block, .leave-block) { background: #fff; }
+
+
+/* === HOLIDAY MARKERS === */
+.holiday-marker {
+  font-size: 10px; padding: 1px 4px; border-radius: 3px; display: inline-block;
+  margin-top: 2px; line-height: 1.2;
+}
+.holiday-marker.holiday { background: #FEE2E2; color: #991B1B; }
+.holiday-marker.workday { background: #FEF3C7; color: #92400E; }
+.schedule-table th .holiday-marker { display: block; margin-top: 2px; }
+
+/* Month view holiday indicators */
+.m-holiday-dot {
+  display: block; width: 5px; height: 5px; border-radius: 50%;
+  background: var(--danger); margin: 2px auto 0;
+}
+.m-makeup-dot {
+  display: block; width: 5px; height: 5px; border-radius: 50%;
+  background: var(--warning); margin: 2px auto 0;
+}
+.month-table .m-day-row th.m-holiday { color: #991B1B; background: #FEF2F2; }
+.month-table .m-day-row th.m-makeup { color: #92400E; background: #FFFBEB; }
+
+
+/* === BOOKING/TIME-OFF MODAL (ResourceGuru-style) === */
+.bk-modal { width: 520px; max-width: 95vw; }
+.bk-tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin: -20px -20px 20px; padding: 0 20px; }
+.bk-tab {
+  padding: 12px 20px; font-size: 14px; font-weight: 500; cursor: pointer;
+  color: var(--text-secondary); border-bottom: 2px solid transparent;
+  margin-bottom: -2px; transition: all .15s; background: none; border-top: none; border-left: none; border-right: none;
+  font-family: var(--font);
+}
+.bk-tab:hover { color: var(--text); }
+.bk-tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+.bk-tab-content { display: none; }
+.bk-tab-content.active { display: block; }
+
+/* Form field with icon */
+.bk-field { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 18px; }
+.bk-field-icon {
+  width: 20px; height: 20px; flex-shrink: 0; margin-top: 8px;
+  color: var(--text-tertiary);
+}
+.bk-field-body { flex: 1; min-width: 0; }
+.bk-field-label { font-size: 11px; font-weight: 500; color: var(--text-secondary); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .3px; }
+
+/* Time mode toggle */
+.bk-time-toggle { display: flex; gap: 0; margin-bottom: 12px; }
+.bk-time-btn {
+  display: flex; align-items: center; gap: 6px; padding: 7px 16px;
+  border: 1px solid var(--border); font-size: 13px; font-weight: 500;
+  cursor: pointer; background: var(--surface); color: var(--text-secondary);
+  font-family: var(--font); transition: all .15s;
+}
+.bk-time-btn:first-child { border-radius: 6px 0 0 6px; }
+.bk-time-btn:last-child { border-radius: 0 6px 6px 0; border-left: none; }
+.bk-time-btn.active { background: var(--primary-light); color: var(--primary); border-color: var(--primary); }
+.bk-time-btn.active + .bk-time-btn { border-left-color: var(--primary); }
+
+/* Inline date range */
+.bk-date-row { display: flex; gap: 10px; align-items: center; }
+.bk-date-row label { font-size: 12px; color: var(--text-secondary); font-weight: 500; white-space: nowrap; }
+.bk-date-row input[type="date"] { flex: 1; min-width: 0; }
+
+/* Hours / Mins row */
+.bk-hours-row { display: flex; gap: 10px; margin-bottom: 12px; }
+.bk-hours-group { display: flex; flex-direction: column; gap: 4px; }
+.bk-hours-group label { font-size: 11px; color: var(--text-secondary); font-weight: 500; }
+.bk-hours-group input { width: 80px; }
+
+/* Total summary */
+.bk-total { font-size: 13px; color: var(--text-secondary); padding: 8px 0; border-top: 1px solid var(--border); margin-top: 4px; }
+
+/* Toggle switch */
+.bk-toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+.bk-toggle-track {
+  width: 36px; height: 20px; border-radius: 10px; background: var(--border);
+  position: relative; transition: background .2s; flex-shrink: 0;
+}
+.bk-toggle-track::after {
+  content: ''; position: absolute; top: 2px; left: 2px;
+  width: 16px; height: 16px; border-radius: 50%; background: #fff;
+  transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.2);
+}
+.bk-toggle input { display: none; }
+.bk-toggle input:checked + .bk-toggle-track { background: var(--primary); }
+.bk-toggle input:checked + .bk-toggle-track::after { transform: translateX(16px); }
+.bk-toggle-label { font-size: 13px; color: var(--text); font-weight: 500; }
+
+/* Separator */
+.bk-separator { height: 1px; background: var(--border); margin: 16px -20px; }
+
+/* Batch edit modal styles */
+.bk-batch-info { background: var(--surface); border-radius: 8px; padding: 12px; margin-bottom: 8px; }
+.bk-batch-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; border-bottom: 1px dashed var(--border); }
+.bk-batch-row:last-child { border-bottom: none; }
+.bk-batch-label { color: var(--text-secondary); min-width: 60px; }
+.bk-batch-value { color: var(--text); font-weight: 500; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bk-batch-days { color: var(--text-secondary); font-size: 12px; margin-left: 8px; }
+.bk-batch-preview { background: var(--surface); border-radius: 8px; padding: 12px; margin-top: 16px; max-height: 160px; overflow-y: auto; }
+.bk-batch-preview-title { font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+.bk-batch-preview-list { display: flex; flex-direction: column; gap: 4px; }
+.bk-batch-preview-item { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 0; }
+.bk-batch-date { color: var(--text-secondary); width: 90px; font-family: monospace; }
+.bk-batch-arrow { color: var(--text-secondary); }
+.bk-batch-new { color: var(--primary); font-weight: 600; }
+
+/* Project/Client select with color indicator */
+.bk-select-wrapper { position: relative; }
+.bk-select-wrapper select { width: 100%; padding-right: 30px; }
+
+/* Leave type pills */
+.bk-leave-types { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.bk-leave-type {
+  padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 500;
+  border: 1px solid var(--border); cursor: pointer; background: var(--surface);
+  color: var(--text-secondary); transition: all .15s; font-family: var(--font);
+}
+.bk-leave-type:hover { border-color: var(--text-tertiary); }
+.bk-leave-type.active { background: #E5E7EB; color: #374151; border-color: #6B7280; }
+.bk-leave-type.sick.active { background: #FFF3E0; color: #B35900; border-color: var(--warning); }
+.bk-leave-type.personal.active { background: #E0F2FE; color: #0369A1; border-color: #0EA5E9; }
+.bk-leave-type.other.active { background: #F3F4F6; color: #4B5563; border-color: #9CA3AF; }
+.bk-leave-type.holiday.active { background: #FEE2E2; color: #991B1B; border-color: #EF4444; }
+
+/* Leave block on schedule — all types use unified black */
+.leave-block { background: #1F2937 !important; color: #FFFFFF !important; border-left: 3px solid #6B7280 !important; font-size: 8.8px; z-index: 1; }
+.leave-block.sick, .leave-block.personal, .leave-block.holiday { background: #1F2937 !important; color: #FFFFFF !important; border-left-color: #6B7280 !important; }
+
+
+/* === VIEW TOGGLE (Week / Month) === */
+.view-toggle {
+  display: flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
+}
+.view-btn {
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 12px; height: 32px; border: none; background: var(--surface);
+  cursor: pointer; color: var(--text-secondary); transition: all .15s;
+  font-size: 13px; font-weight: 500; white-space: nowrap;
+}
+.view-btn:first-child { border-right: 1px solid var(--border); }
+.view-btn:hover { background: var(--bg); color: var(--text); }
+.view-btn.active { background: var(--primary-light); color: var(--primary); }
+
+/* === MONTH VIEW SCHEDULE === */
+.month-schedule { display: flex; flex-direction: column; height: 100%; }
+.month-scroll { flex: 1; overflow: auto; position: relative; height: 100%; }
+.month-table { border-collapse: separate; border-spacing: 0; table-layout: fixed; }
+/* content-visibility removed — caused rendering issues on wide tables */
+.month-table th, .month-table td { border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); }
+
+/* Sticky resource name column */
+.month-table th.m-res-hd,
+.month-table td.m-res-cell {
+  position: sticky; left: 0; z-index: 14; background: var(--surface);
+  width: 220px; min-width: 220px; max-width: 220px;
+  border-right: 2px solid var(--border);
+}
+.month-table th.m-res-hd { z-index: 16; }
+
+/* Month view header — sticky header div wraps a separate table */
+.month-header-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  background: var(--surface);
+}
+.month-table-header { margin-bottom: -1px; }
+.month-table .m-day-row th {
+  background: var(--surface); padding: 6px 0; text-align: center;
+  font-size: 11px; font-weight: 600; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: .3px;
+  width: 60px; min-width: 60px;
+  border-bottom: 2px solid var(--border);
+}
+.month-table .m-day-row th.m-res-hd {
+  z-index: 17; background: var(--surface);
+  text-align: left; padding-left: 16px;
+  font-size: 14px; color: var(--text-secondary);
+}
+.month-table .m-day-row th.m-today { color: var(--accent); }
+.month-table .m-day-row th.m-today .m-day-num {
+  background: var(--accent); color: #fff; border-radius: 50%;
+  display: inline-block; width: 20px; height: 20px; line-height: 20px; text-align: center;
+}
+.month-table .m-day-row th.m-weekend { color: var(--text-tertiary); background: #F3F4F6; }
+.m-day-name { display: block; font-size: 11px; line-height: 1; margin-bottom: 2px; }
+.m-day-num { display: block; font-size: 14px; line-height: 1; }
+.m-week-label {
+  position: absolute; top: 2px; left: 2px; font-size: 11px; color: var(--text-tertiary);
+  font-weight: 500; letter-spacing: 0;
+}
+
+/* Inline month label in month-view day header */
+.m-month-inline {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 1px;
+  line-height: 1;
+}
+
+/* Column widths for month-view tables (keeps header & body aligned) */
+.m-res-col { width: 220px; min-width: 220px; }
+.m-day-col { width: 60px; min-width: 60px; }
+
+/* Team divider in month view */
+.month-table .m-team-row td {
+  background: var(--bg); padding: 5px 8px; height: auto;
+  font-size: 14px; font-weight: 600; text-transform: uppercase;
+  color: var(--text-tertiary); letter-spacing: .5px;
+}
+.month-table .m-team-row td.m-team-label {
+  position: sticky; left: 0; z-index: 14; background: var(--bg);
+  width: 190px; min-width: 190px;
+}
+
+/* Resource cell in month view */
+.m-res-cell { padding: 6px 8px; vertical-align: middle; }
+.m-res-inner { display: flex; align-items: center; gap: 8px; }
+.m-res-avatar {
+  width: 28px; height: 28px; border-radius: 50%; display: flex;
+  align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 600; color: #fff; flex-shrink: 0;
+}
+.m-res-name { font-size: 15px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m-res-role { font-size: 13px; color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Day cells in month view */
+.m-day-cell {
+  padding: 1px 0; vertical-align: top; height: 70px; position: relative; cursor: pointer;
+  width: 60px; min-width: 60px; overflow: visible;
+}
+.m-day-cell:hover { background: var(--primary-light); }
+.m-day-cell.m-weekend { background: #F3F4F6; }
+.m-day-cell.m-weekend:hover { background: #E5E7EB; }
+.m-day-cell.m-weekend:has(.m-booking, .m-leave) { background: #fff; }
+
+/* Booking block in month view */
+.m-booking {
+  font-size: 11px; line-height: 1.15; padding: 1px 2px; border-radius: 2px;
+  margin-bottom: 1px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  cursor: grab; position: relative;
+  height: 18px; box-sizing: border-box;
+  color: #374151;
+  z-index: 1;
+}
+.m-booking:hover { z-index: 3; }
+.m-booking:hover { opacity: .8; }
+.m-booking.moving { opacity: 0.4; cursor: grabbing; }
+.m-booking-hours { font-weight: 600; color: #374151; }
+.m-booking .booking-project { display: inline; }
+
+/* === Month view continuous bar (span) styles === */
+.m-booking.span-s {
+  border-top-right-radius: 0; border-bottom-right-radius: 0;
+  margin-right: -1px;
+}
+.m-booking.span-m {
+  border-radius: 0;
+  margin-left: -1px; margin-right: -1px;
+  padding-left: 2px;
+}
+.m-booking.span-e {
+  border-top-left-radius: 0; border-bottom-left-radius: 0;
+  margin-left: -1px;
+  padding-left: 2px;
+  border-right: 2px solid rgba(59, 125, 221, 0.6);
+}
+.m-booking.span-m:hover, .m-booking.span-e:hover {
+  outline: 1px dashed var(--primary);
+  outline-offset: -1px;
+  opacity: 1;
+}
+
+/* Resize handle for month view booking blocks */
+.m-booking .resize-handle {
+  position: absolute; right: 0; top: 0; bottom: 0; width: 6px; cursor: ew-resize; opacity: 0;
+  pointer-events: none;
+  transition: opacity .15s; background: linear-gradient(90deg, transparent 20%, rgba(59,125,221,0.85) 100%);
+  border-top-right-radius: 2px; border-bottom-right-radius: 2px;
+  z-index: 10;
+}
+.m-booking:hover .resize-handle { opacity: 1; pointer-events: auto; }
+.m-booking.resizing { outline: 2px solid var(--primary); outline-offset: 1px; }
+.m-booking.resizing .resize-handle { opacity: 1; pointer-events: auto; background: var(--primary); }
+.m-booking .resize-handle-left {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 6px; cursor: ew-resize; opacity: 0;
+  pointer-events: none;
+  transition: opacity .15s; background: linear-gradient(270deg, transparent 20%, rgba(59,125,221,0.85) 100%);
+  border-top-left-radius: 2px; border-bottom-left-radius: 2px;
+  z-index: 10;
+}
+.m-booking:hover .resize-handle-left { opacity: 1; pointer-events: auto; }
+.m-booking.resizing .resize-handle-left { opacity: 1; pointer-events: auto; background: var(--primary); }
+
+/* Split handle for month view */
+.m-booking .split-handle {
+  position: absolute;
+  right: -4px;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.m-booking:hover .split-handle {
+  opacity: 1;
+  pointer-events: auto;
+}
+.m-booking .split-handle::before {
+  content: '';
+  display: block;
+  width: 2px;
+  height: 12px;
+  border-left: 2px dashed rgba(59, 125, 221, 0.5);
+  transition: all 0.15s;
+}
+.m-booking .split-handle:hover::before {
+  border-left-color: rgba(59, 125, 221, 0.9);
+  height: 14px;
+}
+.m-booking .split-handle::after {
+  content: '✂️ Split';
+  position: absolute;
+  top: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1e1b4b;
+  color: #fff;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+  z-index: 100;
+}
+.m-booking .split-handle:hover::after {
+  opacity: 1;
+}
+
+/* Leave block in month view */
+.m-leave {
+  font-size: 10px; padding: 2px 4px 2px 5px; border-radius: 3px; margin-bottom: 1px;
+  background: #1F2937 !important; color: #FFFFFF !important; border-left: 2px solid #6B7280 !important;
+  display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  cursor: pointer; line-height: 1.4; z-index: 1;
+}
+/* All leave types unified black — same as .leave-block */
+.m-leave.sick, .m-leave.personal, .m-leave.holiday { background: #1F2937 !important; color: #FFFFFF !important; border-left-color: #6B7280 !important; }
+
+/* Utilization bar at bottom of cell */
+.m-util-bar {
+  position: absolute; bottom: 0; left: 1px; right: 1px; height: 3px;
+  border-radius: 1.5px; background: var(--border);
+}
+.m-util-fill {
+  height: 100%; border-radius: 1.5px; transition: width .2s;
+}
+.m-util-fill.green { background: var(--success); }
+.m-util-fill.yellow { background: var(--warning); }
+.m-util-fill.red { background: var(--danger); }

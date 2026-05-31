@@ -1,0 +1,223 @@
+/* === COMPONENTS: shared controls, pickers, modal form primitives === */
+
+/* === BUTTONS === */
+.btn:not(.btn-close) {
+  display: inline-flex; align-items: center; gap: 4px; padding: 7px 14px; border-radius: 6px;
+  font-size: 13px; font-weight: 500; border: none; cursor: pointer; transition: all .15s;
+  font-family: var(--font); white-space: nowrap;
+}
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-hover); }
+.btn-outline { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+.btn-outline:hover { background: var(--bg); }
+.btn-danger { background: #FEE2E2; color: var(--danger); }
+.btn-danger:hover { background: #FECACA; }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+
+/* === INPUTS === */
+.select-input, .date-input, .text-input {
+  padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px;
+  font-size: 13px; font-family: var(--font); background: var(--surface); color: var(--text);
+  outline: none; transition: border-color .15s;
+}
+.select-input:focus, .date-input:focus, .text-input:focus { border-color: var(--primary); }
+.text-input { width: 100%; }
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-bottom: 4px; }
+.form-row { display: flex; gap: 12px; }
+.form-row .form-group { flex: 1; }
+
+
+/* === MODAL ===
+   Removed in Phase 9 — fully replaced by Bootstrap Modal + bootstrap-bridge.css Phase 5
+   Bootstrap handles: .modal.fade, .modal-dialog, .modal-content, .modal-header,
+   .modal-body, .modal-footer, .btn-close, backdrop, ESC key, focus trap.
+*/
+
+
+/* Color dot for project */
+.color-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #9CA3AF; }
+
+
+/* --- Language Switch (shared pill toggle) --- */
+.lang-switch {
+  display: flex; gap: 4px; background: var(--bg-secondary, #f3f4f6); border-radius: 8px; padding: 3px;
+}
+.lang-switch .lang-btn {
+  border: none; background: transparent; padding: 5px 14px; font-size: 13px;
+  border-radius: 6px; cursor: pointer; color: var(--text-secondary, #6b7280);
+  font-weight: 400; transition: all .2s ease; line-height: 1.4;
+}
+.lang-switch .lang-btn.active {
+  background: #fff; color: var(--text-primary, #1f2937); font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+}
+.lang-switch .lang-btn:hover:not(.active) {
+  color: var(--text-primary, #374151);
+}
+
+/* Auth page: positioned top-right */
+.auth-lang-switch {
+  position: absolute; top: 20px; right: 24px; z-index: 10;
+}
+
+/* Sidebar: dark background adaptation */
+.sidebar .lang-switch {
+  background: rgba(255,255,255,.08); margin: 0 16px 8px;
+}
+.sidebar .lang-switch .lang-btn {
+  color: rgba(255,255,255,.5); font-size: 12px; padding: 4px 0; flex: 1;
+}
+.sidebar .lang-switch .lang-btn.active {
+  background: rgba(255,255,255,.15); color: #fff; box-shadow: none;
+}
+.sidebar .lang-switch .lang-btn:hover:not(.active) {
+  color: rgba(255,255,255,.75);
+}
+
+.auth-footer {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border);
+  font-size: 11px; color: var(--text-tertiary);
+}
+.auth-footer-dot {
+  width: 3px; height: 3px; border-radius: 50%; background: var(--text-tertiary);
+}
+
+
+/* === TOAST NOTIFICATION ===
+   Removed in Phase 9 — fully replaced by Bootstrap Toast + bootstrap-bridge.css Phase 6
+   Bootstrap handles: .toast, .toast-container, autohide, aria-live, animations.
+   New toast() function in core.js uses window.bootstrap.Toast API.
+*/
+
+
+/* Multi-select resource picker */
+.ms-picker { position: relative; }
+.ms-selected {
+  display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 8px;
+  border: 1px solid var(--border); border-radius: 6px; min-height: 36px;
+  cursor: pointer; background: var(--surface); align-items: center;
+}
+.ms-selected:focus-within { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(59,125,221,.15); }
+.ms-chip {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px 2px 4px;
+  background: var(--primary-light); color: var(--primary); border-radius: 12px;
+  font-size: 12px; font-weight: 500; white-space: nowrap;
+}
+.ms-chip-avatar {
+  width: 18px; height: 18px; border-radius: 50%; display: flex;
+  align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 600; color: #fff; flex-shrink: 0;
+}
+.ms-chip-remove {
+  cursor: pointer; font-size: 14px; line-height: 1; color: var(--primary);
+  opacity: .6; margin-left: 2px;
+}
+.ms-chip-remove:hover { opacity: 1; }
+.ms-placeholder { color: var(--text-tertiary); font-size: 13px; }
+.ms-search {
+  border: none; outline: none; font-size: 13px; flex: 1; min-width: 60px;
+  background: transparent; font-family: var(--font); padding: 2px 0;
+}
+.ms-dropdown {
+  display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 100;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+  margin-top: 4px; max-height: 220px; overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(0,0,0,.12);
+}
+.ms-dropdown.open { display: block; }
+.ms-option {
+  display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+  cursor: pointer; font-size: 13px; transition: background .1s;
+}
+.ms-option:hover { background: var(--bg); }
+.ms-option.selected { background: var(--primary-light); }
+.ms-option-avatar {
+  width: 24px; height: 24px; border-radius: 50%; display: flex;
+  align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 600; color: #fff; flex-shrink: 0;
+}
+.ms-option-info { flex: 1; min-width: 0; }
+.ms-option-name { font-weight: 500; }
+.ms-option-role { font-size: 11px; color: var(--text-tertiary); }
+.ms-option-check { width: 18px; height: 18px; border: 1.5px solid var(--border); border-radius: 3px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.ms-option.selected .ms-option-check { background: var(--primary); border-color: var(--primary); }
+.ms-option.selected .ms-option-check::after { content: '✓'; color: #fff; font-size: 11px; font-weight: 700; }
+.ms-team-label { padding: 6px 12px; font-size: 10px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: .5px; }
+
+
+/* Delete button in modal footer */
+.bk-footer-left { margin-right: auto; }
+
+/* Wider modal override */
+.modal.bk-modal { width: 520px; }
+
+
+/* === ResourceGuru-style Modal Form === */
+.modal.rg-modal { width: 540px; }
+.rg-form { padding: 0; }
+.rg-field {
+  display: flex; gap: 14px; padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+.rg-field:first-child { padding-top: 0; }
+.rg-field:last-child { border-bottom: none; }
+.rg-field-icon {
+  width: 20px; flex-shrink: 0; margin-top: 10px; color: var(--text-tertiary);
+}
+.rg-field-body { flex: 1; min-width: 0; }
+.rg-field-label {
+  font-size: 11px; font-weight: 500; color: var(--text-secondary); margin-bottom: 6px;
+  text-transform: uppercase; letter-spacing: .3px;
+}
+.rg-input {
+  width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 6px;
+  font-size: 13px; font-family: var(--font); background: var(--surface); color: var(--text);
+  outline: none; transition: border-color .15s;
+}
+.rg-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+.rg-input-lg { font-size: 15px; padding: 10px 14px; font-weight: 500; }
+.rg-select {
+  width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 6px;
+  font-size: 13px; font-family: var(--font); background: var(--surface); color: var(--text);
+  outline: none; cursor: pointer; appearance: auto;
+}
+.rg-select:focus { border-color: var(--primary); }
+.rg-textarea {
+  width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 6px;
+  font-size: 13px; font-family: var(--font); background: var(--surface); color: var(--text);
+  outline: none; resize: vertical; min-height: 60px; transition: border-color .15s;
+}
+.rg-textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+.rg-date-row { display: flex; align-items: center; gap: 8px; }
+.rg-date-sep { color: var(--text-tertiary); font-size: 13px; }
+.rg-input-date { flex: 1; min-width: 0; }
+
+/* Color picker dropdown */
+.rg-color-picker { position: relative; display: inline-block; }
+.rg-color-btn {
+  display: flex; align-items: center; gap: 8px; padding: 6px 12px;
+  border: 1px solid var(--border); border-radius: 6px; background: var(--surface);
+  cursor: pointer; font-family: var(--font); transition: border-color .15s;
+}
+.rg-color-btn:hover { border-color: var(--text-tertiary); }
+.rg-color-dot { width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0; }
+.rg-color-dropdown {
+  display: none; position: absolute; top: 100%; left: 0; margin-top: 4px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.12); z-index: 50;
+  flex-wrap: wrap; gap: 6px; width: 200px;
+}
+.rg-color-dropdown.open { display: flex; }
+.rg-color-option {
+  width: 24px; height: 24px; border-radius: 50%; cursor: pointer;
+  border: 2px solid transparent; transition: all .15s; flex-shrink: 0;
+}
+.rg-color-option:hover { transform: scale(1.15); }
+.rg-color-option.active { border-color: var(--text); box-shadow: 0 0 0 2px var(--surface); }

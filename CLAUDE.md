@@ -46,7 +46,12 @@ crewboard/
 ├── public/
 │   ├── index.html          # SPA 入口（含 __VERSION__ 占位符）
 │   ├── css/
-│   │   ├── style.css       # 主样式（覆盖 Bootstrap）
+│   │   ├── style.css       # 样式入口（按顺序 @import 模块）
+│   │   ├── base.css        # reset、设计变量、基础元素
+│   │   ├── layout.css      # 应用外壳、侧边栏、页面框架
+│   │   ├── components.css  # 通用按钮、输入、弹窗表单等组件
+│   │   ├── schedule.css    # 排程表格、booking 条、月视图
+│   │   ├── pages.css       # 登录、报表、管理、企业、账号页面
 │   │   └── bootstrap-bridge.css  # 设计令牌映射桥接层
 │   ├── js/
 │   │   ├── core.js         # 核心：Auth、API、SSE、i18n 基础
@@ -166,7 +171,7 @@ cd /www/wwwroot/resource.skandstudio.com && bash deploy.sh
 - SQLite 单进程写入，PM2 用 `fork` 模式（不用 cluster）
 - 前端是原生 JS SPA（无构建步骤），修改 `public/` 下文件直接生效
 - `index.html` 中的 `__VERSION__` 是占位符，不要手动替换——由 `deploy.sh` 自动注入
-- CSS 自定义样式必须在 Bootstrap 之后加载（`style.css` 在 `bootstrap.min.css` 之后）
+- CSS 自定义样式必须在 Bootstrap 之后加载；`style.css` 是源入口，部署时由 `cleancss` 内联 `base/layout/components/schedule/pages` 后生成 `dist/style.min.css`
 - `bootstrap-bridge.css` 是设计令牌桥接层，处理 Bootstrap 变量与业务样式的映射
 - 节假日数据由 `scripts/update-holidays.js` 管理，PM2 每年 12 月 15 日自动运行
 - 企微消息通知配置在企业设置中（`wecom_corp_id`, `wecom_agent_id`, `wecom_secret`）
