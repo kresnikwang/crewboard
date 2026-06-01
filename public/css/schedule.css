@@ -107,56 +107,65 @@
   opacity: 0;
   pointer-events: none;
   z-index: 20;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background-image: radial-gradient(circle, #1e1b4b 25%, transparent 25%);
+  background-size: 2px 4px;
+  background-position: center;
+  background-repeat: repeat-y;
+  transition: opacity 0.15s;
 }
 .booking-block:hover .split-handle {
-  opacity: 1;
+  opacity: 0.5;
   pointer-events: auto;
 }
-/* Split handle visual indicator (scissors button) */
+.booking-block .split-handle:hover {
+  opacity: 1;
+}
+
+/* Split handle visual indicator (tooltip arrow pointing down) */
 .booking-block .split-handle::before {
   content: '';
-  display: block;
-  width: 16px;
-  height: 16px;
-  background-color: var(--surface);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233B7DDD' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='6' cy='6' r='3'%3E%3C/circle%3E%3Ccircle cx='6' cy='18' r='3'%3E%3C/circle%3E%3Cline x1='9.8' y1='8.2' x2='21' y2='19'%3E%3C/line%3E%3Cline x1='9.8' y1='15.8' x2='21' y2='5'%3E%3C/line%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 10px 10px;
-  border: 1px solid var(--primary);
-  border-radius: 50%;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
-  transition: all 0.15s;
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translate(-50%, 0);
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid #1e1b4b;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s, transform 0.15s;
+  z-index: 100;
 }
 .booking-block .split-handle:hover::before {
-  background-color: var(--primary);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23FFFFFF' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='6' cy='6' r='3'%3E%3C/circle%3E%3Ccircle cx='6' cy='18' r='3'%3E%3C/circle%3E%3Cline x1='9.8' y1='8.2' x2='21' y2='19'%3E%3C/line%3E%3Cline x1='9.8' y1='15.8' x2='21' y2='5'%3E%3C/line%3E%3C/svg%3E");
-  transform: scale(1.15);
+  opacity: 1;
+  transform: translate(-50%, -2px);
 }
-/* Split Booking tooltip */
+
+/* Split Booking tooltip box */
 .booking-block .split-handle::after {
   content: '✂️ Split Booking';
   position: absolute;
-  top: -30px;
+  bottom: 100%;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translate(-50%, -6px);
   background: #1e1b4b;
   color: #fff;
-  padding: 4px 10px;
+  padding: 5px 10px;
   border-radius: 4px;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.15s;
+  transition: opacity 0.15s, transform 0.15s;
   z-index: 100;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
 .booking-block .split-handle:hover::after {
   opacity: 1;
+  transform: translate(-50%, -8px);
 }
 
 /* Move preview highlight — green */
@@ -507,54 +516,61 @@
   opacity: 0;
   pointer-events: none;
   z-index: 20;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background-image: radial-gradient(circle, #1e1b4b 25%, transparent 25%);
+  background-size: 2px 4px;
+  background-position: center;
+  background-repeat: repeat-y;
+  transition: opacity 0.15s;
 }
 .m-booking:hover .split-handle {
-  opacity: 1;
+  opacity: 0.5;
   pointer-events: auto;
+}
+.m-booking .split-handle:hover {
+  opacity: 1;
 }
 .m-booking .split-handle::before {
   content: '';
-  display: block;
-  width: 14px;
-  height: 14px;
-  background-color: var(--surface);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233B7DDD' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='6' cy='6' r='3'%3E%3C/circle%3E%3Ccircle cx='6' cy='18' r='3'%3E%3C/circle%3E%3Cline x1='9.8' y1='8.2' x2='21' y2='19'%3E%3C/line%3E%3Cline x1='9.8' y1='15.8' x2='21' y2='5'%3E%3C/line%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 8px 8px;
-  border: 1px solid var(--primary);
-  border-radius: 50%;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
-  transition: all 0.15s;
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translate(-50%, 0);
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid #1e1b4b;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s, transform 0.15s;
+  z-index: 100;
 }
 .m-booking .split-handle:hover::before {
-  background-color: var(--primary);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23FFFFFF' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='6' cy='6' r='3'%3E%3C/circle%3E%3Ccircle cx='6' cy='18' r='3'%3E%3C/circle%3E%3Cline x1='9.8' y1='8.2' x2='21' y2='19'%3E%3C/line%3E%3Cline x1='9.8' y1='15.8' x2='21' y2='5'%3E%3C/line%3E%3C/svg%3E");
-  transform: scale(1.15);
+  opacity: 1;
+  transform: translate(-50%, -2px);
 }
 .m-booking .split-handle::after {
   content: '✂️ Split';
   position: absolute;
-  top: -28px;
+  bottom: 100%;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translate(-50%, -5px);
   background: #1e1b4b;
   color: #fff;
   padding: 3px 8px;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 500;
   white-space: nowrap;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.15s;
+  transition: opacity 0.15s, transform 0.15s;
   z-index: 100;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
 }
 .m-booking .split-handle:hover::after {
   opacity: 1;
+  transform: translate(-50%, -7px);
 }
 
 /* Leave block in month view */
