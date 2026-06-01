@@ -695,7 +695,7 @@
         }
         // Show split handle for span-start and span-middle (split point between days)
         if (si && (si.cls === 'span-s' || si.cls === 'span-m')) {
-          html += '<div class="split-handle" data-booking-id="' + b.id + '" title="Split Booking"></div>';
+          html += '<div class="split-handle" data-booking-id="' + b.id + '"></div>';
         }
         html += '</div>';
       });
@@ -1847,7 +1847,7 @@
         }
         // Show split handle for span-start and span-middle (split point between days)
         if (si && (si.cls === 'span-s' || si.cls === 'span-m')) {
-          html += '<div class="split-handle" data-booking-id="' + b.id + '" title="Split Booking"></div>';
+          html += '<div class="split-handle" data-booking-id="' + b.id + '"></div>';
         }
         html += '</div>';
       });
@@ -2969,7 +2969,6 @@
           var splitHandle = document.createElement('div');
           splitHandle.className = 'split-handle';
           splitHandle.dataset.bookingId = id;
-          splitHandle.title = 'Split Booking';
           splitHandle.addEventListener('click', function (e) {
             e.stopPropagation();
             e.preventDefault();
