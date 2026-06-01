@@ -196,7 +196,15 @@
   outline-offset: -2px;
 }
 .booking-hours { font-weight: 600; }
-.booking-project { font-weight: 400; }
+.booking-project {
+  font-weight: 400;
+  display: inline-block;
+  vertical-align: middle;
+  max-width: calc(100% - 28px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .day-total {
   position: absolute; bottom: 1px; right: 4px; font-size: 12px; color: var(--text-tertiary); font-weight: 500;
@@ -460,7 +468,14 @@
 .m-booking:hover { opacity: .8; }
 .m-booking.moving { opacity: 0.4; cursor: grabbing; }
 .m-booking-hours { font-weight: 600; color: #374151; }
-.m-booking .booking-project { display: inline; }
+.m-booking .booking-project {
+  display: inline-block;
+  vertical-align: middle;
+  max-width: calc(100% - 28px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* === Month view continuous bar (span) styles === */
 .m-booking.span-s {
