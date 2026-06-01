@@ -104,8 +104,8 @@
   bottom: 0;
   width: 12px;
   cursor: pointer;
-  opacity: 0.35;
-  pointer-events: none;
+  opacity: 0; /* Hidden by default */
+  pointer-events: none; /* Inactive by default */
   z-index: 20;
   background-image: linear-gradient(to bottom, #1e1b4b 50%, transparent 50%);
   background-size: 4px 8px;
@@ -114,11 +114,10 @@
   transition: opacity 0.15s;
 }
 .booking-block:hover .split-handle {
-  opacity: 0.95;
-  pointer-events: auto;
+  pointer-events: auto; /* Active pointer events when block is hovered */
 }
 .booking-block .split-handle:hover {
-  opacity: 1;
+  opacity: 1; /* Show vertical line only when hovering directly on split handle */
 }
 
 /* Scissors icon at the top pointing downwards */
@@ -139,10 +138,8 @@
   transition: opacity 0.15s, transform 0.15s;
   z-index: 100;
 }
-.booking-block:hover .split-handle::before {
-  opacity: 1;
-}
 .booking-block .split-handle:hover::before {
+  opacity: 1; /* Show scissors only when hovering directly on split handle */
   transform: translateX(-50%) rotate(90deg) scale(1.15);
 }
 
@@ -516,8 +513,8 @@
   bottom: 0;
   width: 10px;
   cursor: pointer;
-  opacity: 0.35;
-  pointer-events: none;
+  opacity: 0; /* Hidden by default */
+  pointer-events: none; /* Inactive by default */
   z-index: 20;
   background-image: linear-gradient(to bottom, #1e1b4b 50%, transparent 50%);
   background-size: 4px 8px;
@@ -526,11 +523,10 @@
   transition: opacity 0.15s;
 }
 .m-booking:hover .split-handle {
-  opacity: 0.95;
-  pointer-events: auto;
+  pointer-events: auto; /* Active pointer events when block is hovered */
 }
 .m-booking .split-handle:hover {
-  opacity: 1;
+  opacity: 1; /* Show vertical line only when hovering directly on split handle */
 }
 .m-booking .split-handle::before {
   content: '';
@@ -549,10 +545,8 @@
   transition: opacity 0.15s, transform 0.15s;
   z-index: 100;
 }
-.m-booking:hover .split-handle::before {
-  opacity: 1;
-}
 .m-booking .split-handle:hover::before {
+  opacity: 1; /* Show scissors only when hovering directly on split handle */
   transform: translateX(-50%) rotate(90deg) scale(1.15);
 }
 .m-booking .split-handle::after {
