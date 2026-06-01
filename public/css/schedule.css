@@ -47,7 +47,7 @@
   margin-left: 2px; margin-right: 2px;
   z-index: 1;
 }
-.booking-block:hover { z-index: 3; }
+.booking-block:hover { z-index: 3; overflow: visible; }
 
 /* === Continuous booking bar (span) styles === */
 .booking-block.span-s {
@@ -104,11 +104,11 @@
   bottom: 0;
   width: 12px;
   cursor: pointer;
-  opacity: 0;
+  opacity: 0.35;
   pointer-events: none;
   z-index: 20;
-  background-image: linear-gradient(to bottom, #1e1b4b 60%, transparent 60%);
-  background-size: 3px 6px;
+  background-image: linear-gradient(to bottom, #1e1b4b 50%, transparent 50%);
+  background-size: 4px 8px;
   background-position: center;
   background-repeat: repeat-y;
   transition: opacity 0.15s;
@@ -125,7 +125,7 @@
 .booking-block .split-handle::before {
   content: '';
   position: absolute;
-  top: -8px;
+  top: -16px;
   left: 50%;
   transform: translateX(-50%) rotate(90deg);
   width: 14px;
@@ -152,7 +152,7 @@
   position: absolute;
   bottom: 100%;
   left: 50%;
-  transform: translate(-50%, -10px);
+  transform: translate(-50%, -24px);
   background: #1e1b4b;
   color: #fff;
   padding: 5px 10px;
@@ -168,7 +168,7 @@
 }
 .booking-block .split-handle:hover::after {
   opacity: 1;
-  transform: translate(-50%, -12px);
+  transform: translate(-50%, -26px);
 }
 
 /* Move preview highlight — green */
@@ -459,7 +459,7 @@
   color: #374151;
   z-index: 1;
 }
-.m-booking:hover { z-index: 3; }
+.m-booking:hover { z-index: 3; overflow: visible; }
 .m-booking:hover { opacity: .8; }
 .m-booking.moving { opacity: 0.4; cursor: grabbing; }
 .m-booking-hours { font-weight: 600; color: #374151; }
@@ -516,11 +516,11 @@
   bottom: 0;
   width: 10px;
   cursor: pointer;
-  opacity: 0;
+  opacity: 0.35;
   pointer-events: none;
   z-index: 20;
-  background-image: linear-gradient(to bottom, #1e1b4b 60%, transparent 60%);
-  background-size: 3px 6px;
+  background-image: linear-gradient(to bottom, #1e1b4b 50%, transparent 50%);
+  background-size: 4px 8px;
   background-position: center;
   background-repeat: repeat-y;
   transition: opacity 0.15s;
@@ -535,7 +535,7 @@
 .m-booking .split-handle::before {
   content: '';
   position: absolute;
-  top: -7px;
+  top: -14px;
   left: 50%;
   transform: translateX(-50%) rotate(90deg);
   width: 12px;
@@ -560,7 +560,7 @@
   position: absolute;
   bottom: 100%;
   left: 50%;
-  transform: translate(-50%, -8px);
+  transform: translate(-50%, -20px);
   background: #1e1b4b;
   color: #fff;
   padding: 3px 8px;
@@ -576,7 +576,7 @@
 }
 .m-booking .split-handle:hover::after {
   opacity: 1;
-  transform: translate(-50%, -10px);
+  transform: translate(-50%, -22px);
 }
 
 /* Leave block in month view */
