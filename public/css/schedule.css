@@ -108,39 +108,42 @@
   pointer-events: none;
   z-index: 20;
   background-image: linear-gradient(to bottom, #1e1b4b 60%, transparent 60%);
-  background-size: 2px 5px;
+  background-size: 3px 6px;
   background-position: center;
   background-repeat: repeat-y;
   transition: opacity 0.15s;
 }
 .booking-block:hover .split-handle {
-  opacity: 0.85;
+  opacity: 0.95;
   pointer-events: auto;
 }
 .booking-block .split-handle:hover {
   opacity: 1;
 }
 
-/* Split handle visual indicator (tooltip arrow pointing down) */
+/* Scissors icon at the top pointing downwards */
 .booking-block .split-handle::before {
   content: '';
   position: absolute;
-  bottom: 100%;
+  top: -8px;
   left: 50%;
-  transform: translate(-50%, 0);
-  width: 0;
-  height: 0;
-  border-left: 5px solid transparent;
-  border-right: 5px solid transparent;
-  border-top: 6px solid #1e1b4b;
+  transform: translateX(-50%) rotate(90deg);
+  width: 14px;
+  height: 14px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231e1b4b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='6' cy='6' r='3'%3E%3C/circle%3E%3Ccircle cx='6' cy='18' r='3'%3E%3C/circle%3E%3Cline x1='9.8' y1='8.2' x2='21' y2='19'%3E%3C/line%3E%3Cline x1='9.8' y1='15.8' x2='21' y2='5'%3E%3C/line%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s, transform 0.15s;
   z-index: 100;
 }
-.booking-block .split-handle:hover::before {
+.booking-block:hover .split-handle::before {
   opacity: 1;
-  transform: translate(-50%, -2px);
+}
+.booking-block .split-handle:hover::before {
+  transform: translateX(-50%) rotate(90deg) scale(1.15);
 }
 
 /* Split Booking tooltip box */
@@ -149,7 +152,7 @@
   position: absolute;
   bottom: 100%;
   left: 50%;
-  transform: translate(-50%, -6px);
+  transform: translate(-50%, -10px);
   background: #1e1b4b;
   color: #fff;
   padding: 5px 10px;
@@ -165,7 +168,7 @@
 }
 .booking-block .split-handle:hover::after {
   opacity: 1;
-  transform: translate(-50%, -8px);
+  transform: translate(-50%, -12px);
 }
 
 /* Move preview highlight — green */
@@ -517,13 +520,13 @@
   pointer-events: none;
   z-index: 20;
   background-image: linear-gradient(to bottom, #1e1b4b 60%, transparent 60%);
-  background-size: 2px 5px;
+  background-size: 3px 6px;
   background-position: center;
   background-repeat: repeat-y;
   transition: opacity 0.15s;
 }
 .m-booking:hover .split-handle {
-  opacity: 0.85;
+  opacity: 0.95;
   pointer-events: auto;
 }
 .m-booking .split-handle:hover {
@@ -532,29 +535,32 @@
 .m-booking .split-handle::before {
   content: '';
   position: absolute;
-  bottom: 100%;
+  top: -7px;
   left: 50%;
-  transform: translate(-50%, 0);
-  width: 0;
-  height: 0;
-  border-left: 4px solid transparent;
-  border-right: 4px solid transparent;
-  border-top: 5px solid #1e1b4b;
+  transform: translateX(-50%) rotate(90deg);
+  width: 12px;
+  height: 12px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231e1b4b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='6' cy='6' r='3'%3E%3C/circle%3E%3Ccircle cx='6' cy='18' r='3'%3E%3C/circle%3E%3Cline x1='9.8' y1='8.2' x2='21' y2='19'%3E%3C/line%3E%3Cline x1='9.8' y1='15.8' x2='21' y2='5'%3E%3C/line%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s, transform 0.15s;
   z-index: 100;
 }
-.m-booking .split-handle:hover::before {
+.m-booking:hover .split-handle::before {
   opacity: 1;
-  transform: translate(-50%, -2px);
+}
+.m-booking .split-handle:hover::before {
+  transform: translateX(-50%) rotate(90deg) scale(1.15);
 }
 .m-booking .split-handle::after {
   content: '✂️ Split';
   position: absolute;
   bottom: 100%;
   left: 50%;
-  transform: translate(-50%, -5px);
+  transform: translate(-50%, -8px);
   background: #1e1b4b;
   color: #fff;
   padding: 3px 8px;
@@ -570,7 +576,7 @@
 }
 .m-booking .split-handle:hover::after {
   opacity: 1;
-  transform: translate(-50%, -7px);
+  transform: translate(-50%, -10px);
 }
 
 /* Leave block in month view */
