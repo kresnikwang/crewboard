@@ -1627,8 +1627,11 @@
       }
 
       var rid       = parseInt(startCell.dataset.resource, 10);
-      var startDate = startCell.dataset.date;
-      var endDate   = endCell.dataset.date;
+      var startDate = selectedCells[0].dataset.date;
+      var endDate   = selectedCells[selectedCells.length - 1].dataset.date;
+      if (startDate > endDate) {
+        var tmp = startDate; startDate = endDate; endDate = tmp;
+      }
 
       // Keep highlight visible until modal is closed (cleared by closeModal)
       isDragging = false;

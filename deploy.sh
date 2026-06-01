@@ -10,8 +10,26 @@ DEPLOY_DIR="/www/wwwroot/resource.skandstudio.com"
 echo "=== [1/7] 备份数据库 ==="
 cd "$DEPLOY_DIR"
 BACKUP_FILE="db/resource-guru-backup-$(date +%Y%m%d_%H%M%S).db"
-cp db/resource-guru.db "$BACKUP_FILE"
-echo "  数据库备份至: $BACKUP_FILE"
+
+# 优化 1：使用 sqlite3 .backup 保护 WAL 模式下的数据库完整性，若无 sqlite3 则使用 cp
+if command -v sqlite3 &> /dev/null; then
+  sqlite3 db/resource-guru.db ".backup '$BACKUP_FILE'"
+  echo "  使用 sqlite3 .backup 备份数据库成功"
+else
+  cp db/resource-guru.db "$BACKUP_FILE"
+  echo "  ⚠️ sqlite3 命令不存在，回退使用 cp 拷贝备份"
+fi
+
+# 优化 2：GZIP 压缩备份以节省磁盘空间
+if [ -f "$BACKUP_FILE" ]; then
+  gzip "$BACKUP_FILE"
+  BACKUP_FILE="${BACKUP_FILE}.gz"
+  echo "  数据库备份压缩至: $BACKUP_FILE"
+fi
+
+# 优化 3：清理 30 天之前的旧备份，防止磁盘占满
+echo "=== [1.5/7] 清理 30 天以前的旧数据库备份 ==="
+find db/ -name "resource-guru-backup-*" -mtime +30 -type f -print -delete || true
 
 echo "=== [2/7] 暂存本地改动（版本号注入等）==="
 # index.html 在上次部署时被注入了版本号，git pull 前需要先 stash
