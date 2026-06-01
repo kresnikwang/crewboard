@@ -107,14 +107,14 @@
   opacity: 0;
   pointer-events: none;
   z-index: 20;
-  background-image: radial-gradient(circle, #1e1b4b 25%, transparent 25%);
-  background-size: 2px 4px;
+  background-image: linear-gradient(to bottom, #1e1b4b 60%, transparent 60%);
+  background-size: 2px 5px;
   background-position: center;
   background-repeat: repeat-y;
   transition: opacity 0.15s;
 }
 .booking-block:hover .split-handle {
-  opacity: 0.5;
+  opacity: 0.85;
   pointer-events: auto;
 }
 .booking-block .split-handle:hover {
@@ -516,14 +516,14 @@
   opacity: 0;
   pointer-events: none;
   z-index: 20;
-  background-image: radial-gradient(circle, #1e1b4b 25%, transparent 25%);
-  background-size: 2px 4px;
+  background-image: linear-gradient(to bottom, #1e1b4b 60%, transparent 60%);
+  background-size: 2px 5px;
   background-position: center;
   background-repeat: repeat-y;
   transition: opacity 0.15s;
 }
 .m-booking:hover .split-handle {
-  opacity: 0.5;
+  opacity: 0.85;
   pointer-events: auto;
 }
 .m-booking .split-handle:hover {
