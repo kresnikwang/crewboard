@@ -1991,43 +1991,7 @@
     if (booking && booking.resource_id) preSelectedIds = [booking.resource_id];
     else if (!booking && resourceId) preSelectedIds = [resourceId];
 
-    /* project select options grouped by client */
-    var projOpts = '<option value="">' + t('schedule.select_project') + '</option>';
-
-    // group projects by client
-    var groups = {};
-    var noClient = [];
-    projects.forEach(function (p) {
-      if (p.client_name) {
-        if (!groups[p.client_name]) groups[p.client_name] = [];
-        groups[p.client_name].push(p);
-      } else {
-        noClient.push(p);
-      }
-    });
-
-    // sorted client names
-    var clientNames = Object.keys(groups).sort();
-    clientNames.forEach(function (clientName) {
-      projOpts += '<optgroup label="' + esc(clientName) + '">';
-      groups[clientName].forEach(function (p) {
-        var sel = (booking && booking.project_id == p.id) ? ' selected' : '';
-        var codePrefix = p.code ? '[' + esc(p.code) + '] ' : '';
-        projOpts += '<option value="' + p.id + '"' + sel + '>' + codePrefix + esc(p.name) + '</option>';
-      });
-      projOpts += '</optgroup>';
-    });
-
-    // projects without a client (if any)
-    if (noClient.length) {
-      projOpts += '<optgroup label="' + t('schedule.no_client') + '">';
-      noClient.forEach(function (p) {
-        var sel = (booking && booking.project_id == p.id) ? ' selected' : '';
-        var codePrefix = p.code ? '[' + esc(p.code) + '] ' : '';
-        projOpts += '<option value="' + p.id + '"' + sel + '>' + codePrefix + esc(p.name) + '</option>';
-      });
-      projOpts += '</optgroup>';
-    }
+    var selectedProjectId = booking ? booking.project_id : null;
 
     var body = buildModalTabs(bookingId) +
       /* ---- BOOKING TAB ---- */
@@ -2035,7 +1999,7 @@
         buildResourceField(resources, null, preSelectedIds) +
         buildTimeFields(dateVal, endDateVal, hoursVal, bookingId) +
         '<div class="bk-separator"></div>' +
-        buildProjectField(projOpts) +
+        buildProjectField(projects, selectedProjectId) +
         buildTentativeField(tentChecked) +
         '<div class="bk-separator"></div>' +
         buildNotesField(notesVal) +
@@ -2071,6 +2035,7 @@
     /* Init multi-select pickers */
     initMultiSelect(null);
     initMultiSelect('to');
+    initProjectSelect(selectedProjectId);
 
     /* Init tab switching */
     initModalTabs(bookingId);
@@ -2388,15 +2353,144 @@
     '</div>';
   }
 
-  /* ---- Project/Client field ---- */
-  function buildProjectField(projOpts) {
+  /* ---- Project/Client searchable single-select ---- */
+  function buildProjectOption(p, clientName, selectedProjectId) {
+    var sel = (selectedProjectId && selectedProjectId == p.id) ? ' selected' : '';
+    var codePrefix = p.code ? '[' + esc(p.code) + '] ' : '';
+    var color = p.color || p.client_color || '#3B7DDD';
+    var searchText = (p.name + ' ' + (p.code || '') + ' ' + (clientName || p.client_name || '')).toLowerCase();
+    return '<div class="ms-option' + sel + '" data-id="' + p.id + '" data-search="' + escAttr(searchText) + '">' +
+      '<span class="ms-option-check"></span>' +
+      '<span class="ms-option-avatar" style="background:' + color + '">' + esc(p.name.charAt(0)) + '</span>' +
+      '<span class="ms-option-info"><span class="ms-option-name">' + codePrefix + esc(p.name) + '</span>' +
+      (clientName || p.client_name ? '<span class="ms-option-role">' + esc(clientName || p.client_name) + '</span>' : '') +
+      '</span></div>';
+  }
+
+  function buildProjectField(projects, selectedProjectId) {
+    var groups = {};
+    var noClient = [];
+    projects.forEach(function (p) {
+      if (p.client_name) {
+        if (!groups[p.client_name]) groups[p.client_name] = [];
+        groups[p.client_name].push(p);
+      } else {
+        noClient.push(p);
+      }
+    });
+
+    var selectedProject = selectedProjectId
+      ? projects.find(function (p) { return p.id == selectedProjectId; })
+      : null;
+    var labelHtml;
+    if (selectedProject) {
+      var codePrefix = selectedProject.code ? '[' + esc(selectedProject.code) + '] ' : '';
+      labelHtml = '<span class="pp-selected" id="bk-project-label">' + codePrefix + esc(selectedProject.name) + '</span>';
+    } else {
+      labelHtml = '<span class="ms-placeholder" id="bk-project-label">' + t('schedule.select_project') + '</span>';
+    }
+
+    var optionsHtml = '';
+    Object.keys(groups).sort().forEach(function (clientName) {
+      optionsHtml += '<div class="ms-team-label">' + esc(clientName) + '</div>';
+      groups[clientName].forEach(function (p) {
+        optionsHtml += buildProjectOption(p, clientName, selectedProjectId);
+      });
+    });
+    if (noClient.length) {
+      optionsHtml += '<div class="ms-team-label">' + t('schedule.no_client') + '</div>';
+      noClient.forEach(function (p) {
+        optionsHtml += buildProjectOption(p, '', selectedProjectId);
+      });
+    }
+
     return '<div class="bk-field">' +
       '<svg class="bk-field-icon" viewBox="0 0 20 20" fill="none"><path d="M2 5a2 2 0 012-2h4l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V5z" stroke="currentColor" stroke-width="1.5"/></svg>' +
       '<div class="bk-field-body">' +
         '<div class="bk-field-label">' + t('schedule.project_client') + '</div>' +
-        '<select id="bk-project" class="text-input form-select form-select-sm">' + projOpts + '</select>' +
+        '<div class="ms-picker" id="bk-project-picker">' +
+          '<div class="ms-selected" id="bk-project-selected">' +
+            labelHtml +
+            '<input class="ms-search" id="bk-project-search" placeholder="' + t('schedule.search_project') + '" autocomplete="off">' +
+          '</div>' +
+          '<div class="ms-dropdown" id="bk-project-dropdown">' + optionsHtml + '</div>' +
+          '<input type="hidden" id="bk-project" value="' + (selectedProjectId || '') + '">' +
+        '</div>' +
       '</div>' +
     '</div>';
+  }
+
+  function initProjectSelect(selectedProjectId) {
+    var picker = document.getElementById('bk-project-picker');
+    if (!picker) return;
+
+    var selectedArea = document.getElementById('bk-project-selected');
+    var dropdown = document.getElementById('bk-project-dropdown');
+    var searchInput = document.getElementById('bk-project-search');
+    var hiddenInput = document.getElementById('bk-project');
+    var labelEl = document.getElementById('bk-project-label');
+
+    function filterProjectOptions(q) {
+      dropdown.querySelectorAll('.ms-option').forEach(function (opt) {
+        var search = opt.dataset.search || '';
+        var name = opt.querySelector('.ms-option-name').textContent.toLowerCase();
+        var match = !q || search.indexOf(q) >= 0 || name.indexOf(q) >= 0;
+        opt.style.display = match ? '' : 'none';
+      });
+      dropdown.querySelectorAll('.ms-team-label').forEach(function (lbl) {
+        var next = lbl.nextElementSibling;
+        var anyVisible = false;
+        while (next && !next.classList.contains('ms-team-label')) {
+          if (next.style.display !== 'none') anyVisible = true;
+          next = next.nextElementSibling;
+        }
+        lbl.style.display = anyVisible ? '' : 'none';
+      });
+    }
+
+    selectedArea.addEventListener('click', function (e) {
+      if (e.target === searchInput) return;
+      dropdown.classList.toggle('open');
+      if (dropdown.classList.contains('open')) searchInput.focus();
+    });
+
+    searchInput.addEventListener('click', function (e) {
+      e.stopPropagation();
+      dropdown.classList.add('open');
+    });
+
+    dropdown.addEventListener('click', function (e) {
+      var opt = e.target.closest('.ms-option');
+      if (!opt || opt.style.display === 'none') return;
+      var pid = parseInt(opt.dataset.id, 10);
+
+      dropdown.querySelectorAll('.ms-option.selected').forEach(function (o) {
+        o.classList.remove('selected');
+      });
+      opt.classList.add('selected');
+      hiddenInput.value = pid;
+
+      var nameEl = opt.querySelector('.ms-option-name');
+      if (labelEl) {
+        labelEl.className = 'pp-selected';
+        labelEl.textContent = nameEl.textContent;
+      }
+
+      searchInput.value = '';
+      filterProjectOptions('');
+      dropdown.classList.remove('open');
+    });
+
+    searchInput.addEventListener('input', function () {
+      filterProjectOptions(searchInput.value.toLowerCase());
+      if (!dropdown.classList.contains('open')) dropdown.classList.add('open');
+    });
+
+    document.addEventListener('click', function (e) {
+      if (!picker.contains(e.target)) dropdown.classList.remove('open');
+    });
+
+    if (selectedProjectId) hiddenInput.value = selectedProjectId;
   }
 
   /* ---- Tentative toggle ---- */
