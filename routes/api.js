@@ -210,7 +210,18 @@ module.exports = function(db) {
     if (userRole !== 'admin' && userRole !== 'manager') return res.status(403).json({ error: '仅经理及以上可编辑项目' });
     if (userRole === 'manager') {
       const proj = db.prepare('SELECT created_by FROM projects WHERE id=?').get(req.params.id);
-      if (proj && proj.created_by !== req.user.id) return res.status(403).json({ error: '经理只能编辑自己创建的项目' });
+      let isAllowed = proj && proj.created_by === req.user.id;
+      if (!isAllowed && req.user.managed_project_ids) {
+        try {
+          const managedIds = JSON.parse(req.user.managed_project_ids);
+          if (Array.isArray(managedIds) && managedIds.includes(Number(req.params.id))) {
+            isAllowed = true;
+          }
+        } catch (e) {
+          console.error('[projects-update] Error parsing managed_project_ids:', e);
+        }
+      }
+      if (!isAllowed) return res.status(403).json({ error: '经理只能编辑自己创建或分配给自己的项目' });
     }
     db.prepare('UPDATE projects SET name=?, client_id=?, color=?, code=?, start_date=?, end_date=?, budget_hours=?, hourly_rate=?, billable=?, details=? WHERE id=?')
       .run(name, client_id, color, code || '', start_date, end_date, budget_hours, hourly_rate, billable != null ? (billable ? 1 : 0) : 1, details || '', req.params.id);
@@ -239,6 +250,70 @@ module.exports = function(db) {
     sseBroadcast(req.user?.enterprise_id, 'project-change', { action: 'delete' }, req.user?.id);
   });
 
+  // === PROJECT SCOPES ===
+  // GET /api/projects/:id/scopes - Get all scopes for a project
+  router.get('/projects/:id/scopes', (req, res) => {
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.status(401).json({ error: '请先登录并创建或加入企业' });
+    const scopes = db.prepare('SELECT * FROM project_scopes WHERE project_id = ? AND enterprise_id = ? ORDER BY name')
+      .all(req.params.id, entId);
+    res.json(scopes);
+  });
+
+  // POST /api/projects/:id/scopes - Create a scope for a project
+  router.post('/projects/:id/scopes', (req, res) => {
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.status(401).json({ error: '请先登录并创建或加入企业' });
+    if (req.user.role !== 'admin' && req.user.role !== 'manager') {
+      return res.status(403).json({ error: '仅经理及以上权限可添加工作范围' });
+    }
+    const { name, description } = req.body;
+    if (!name) return res.status(400).json({ error: '范围名称不能为空' });
+
+    const result = db.prepare('INSERT INTO project_scopes (project_id, name, description, enterprise_id) VALUES (?, ?, ?, ?)')
+      .run(req.params.id, name, description || '', entId);
+    res.json({ id: result.lastInsertRowid });
+    sseBroadcast(entId, 'project-change', { action: 'update-scopes', project_id: +req.params.id }, req.user.id);
+  });
+
+  // PUT /api/project-scopes/:id - Edit a project scope
+  router.put('/project-scopes/:id', (req, res) => {
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.status(401).json({ error: '请先登录并创建或加入企业' });
+    if (req.user.role !== 'admin' && req.user.role !== 'manager') {
+      return res.status(403).json({ error: '仅经理及以上权限可编辑工作范围' });
+    }
+    const scope = db.prepare('SELECT * FROM project_scopes WHERE id = ? AND enterprise_id = ?').get(req.params.id, entId);
+    if (!scope) return res.status(404).json({ error: '工作范围不存在' });
+
+    const { name, description } = req.body;
+    if (!name) return res.status(400).json({ error: '范围名称不能为空' });
+
+    db.prepare('UPDATE project_scopes SET name = ?, description = ? WHERE id = ?')
+      .run(name, description || '', req.params.id);
+    res.json({ ok: true });
+    sseBroadcast(entId, 'project-change', { action: 'update-scopes', project_id: scope.project_id }, req.user.id);
+  });
+
+  // DELETE /api/project-scopes/:id - Delete a project scope
+  router.delete('/project-scopes/:id', (req, res) => {
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.status(401).json({ error: '请先登录并创建或加入企业' });
+    if (req.user.role !== 'admin' && req.user.role !== 'manager') {
+      return res.status(403).json({ error: '仅经理及以上权限可删除工作范围' });
+    }
+    const scope = db.prepare('SELECT * FROM project_scopes WHERE id = ? AND enterprise_id = ?').get(req.params.id, entId);
+    if (!scope) return res.status(404).json({ error: '工作范围不存在' });
+
+    // Set referencing bookings and timesheets to NULL first
+    db.prepare('UPDATE bookings SET project_scope_id = NULL WHERE project_scope_id = ?').run(req.params.id);
+    db.prepare('UPDATE timesheets SET project_scope_id = NULL WHERE project_scope_id = ?').run(req.params.id);
+
+    db.prepare('DELETE FROM project_scopes WHERE id = ?').run(req.params.id);
+    res.json({ ok: true });
+    sseBroadcast(entId, 'project-change', { action: 'update-scopes', project_id: scope.project_id }, req.user.id);
+  });
+
   // === SCHEDULE DATA AGGREGATION (performance optimization) ===
   // Returns resources + bookings + leave + holidays in a single request
   router.get('/schedule-data', (req, res) => {
@@ -256,12 +331,13 @@ module.exports = function(db) {
     const bookings = db.prepare(`
       SELECT b.*, r.name as resource_name, r.color as resource_color, r.team,
              p.name as project_name, COALESCE(c.color, p.color) as project_color, c.name as client_name,
-             u.name as created_by_name
+             u.name as created_by_name, ps.name as scope_name
       FROM bookings b
       JOIN resources r ON b.resource_id = r.id
       JOIN projects p ON b.project_id = p.id
       LEFT JOIN clients c ON p.client_id = c.id
       LEFT JOIN users u ON b.created_by = u.id
+      LEFT JOIN project_scopes ps ON b.project_scope_id = ps.id
       WHERE r.enterprise_id = ? AND b.date >= ? AND b.date <= ?
       ORDER BY r.name, b.date
     `).all(entId, start, end);
@@ -306,8 +382,18 @@ module.exports = function(db) {
     if (!user) return false;
     if (user.role === 'admin') return true;
     if (user.role === 'manager') {
-      // Manager can only edit bookings they created
-      return booking.created_by === user.id;
+      // Manager can edit bookings they created OR bookings on projects they manage
+      if (booking.created_by === user.id) return true;
+      if (user.managed_project_ids) {
+        try {
+          const managedIds = JSON.parse(user.managed_project_ids);
+          if (Array.isArray(managedIds) && managedIds.includes(Number(booking.project_id))) {
+            return true;
+          }
+        } catch (e) {
+          console.error('[canEditBooking] Error parsing managed_project_ids:', e);
+        }
+      }
     }
     return false;
   }
@@ -317,12 +403,13 @@ module.exports = function(db) {
     let sql = `
       SELECT b.*, r.name as resource_name, r.color as resource_color, r.team,
              p.name as project_name, COALESCE(c.color, p.color) as project_color, c.name as client_name,
-             u.name as created_by_name
+             u.name as created_by_name, ps.name as scope_name
       FROM bookings b
       JOIN resources r ON b.resource_id = r.id
       JOIN projects p ON b.project_id = p.id
       LEFT JOIN clients c ON p.client_id = c.id
       LEFT JOIN users u ON b.created_by = u.id
+      LEFT JOIN project_scopes ps ON b.project_scope_id = ps.id
       WHERE 1=1
     `;
     const params = [];
@@ -335,7 +422,7 @@ module.exports = function(db) {
 
   router.post('/bookings', (req, res) => {
     console.log('[DEBUG-POST-BOOKING] Received body:', req.body, 'user:', req.user?.id);
-    const { resource_id, project_id, date, end_date, hours, is_tentative, notes } = req.body;
+    const { resource_id, project_id, project_scope_id, date, end_date, hours, is_tentative, notes } = req.body;
     const entId = req.user?.enterprise_id;
     if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
 
@@ -355,17 +442,18 @@ module.exports = function(db) {
     const tentative = is_tentative ? 1 : 0;
     const bookNotes = notes || '';
     const createdBy = req.user?.id || null;
+    const scopeId = project_scope_id || null;
 
-    const insert = db.prepare('INSERT INTO bookings (resource_id, project_id, date, hours, is_tentative, notes, created_by) VALUES (?,?,?,?,?,?,?)');
-    const checkExisting = db.prepare('SELECT id FROM bookings WHERE resource_id=? AND project_id=? AND date=?');
+    const insert = db.prepare('INSERT INTO bookings (resource_id, project_id, project_scope_id, date, hours, is_tentative, notes, created_by) VALUES (?,?,?,?,?,?,?,?)');
+    const checkExisting = db.prepare('SELECT id FROM bookings WHERE resource_id=? AND project_id=? AND date=? AND (project_scope_id = ? OR (project_scope_id IS NULL AND ? IS NULL))');
     const batchInsert = db.transaction(() => {
       const d = new Date(startDate);
       const end = new Date(endDate);
       const ids = [];
       while (d <= end) {
         const dateStr = d.toISOString().split('T')[0];
-        if (!checkExisting.get(resource_id, project_id, dateStr)) {
-          const result = insert.run(resource_id, project_id, dateStr, bookHours, tentative, bookNotes, createdBy);
+        if (!checkExisting.get(resource_id, project_id, dateStr, scopeId, scopeId)) {
+          const result = insert.run(resource_id, project_id, scopeId, dateStr, bookHours, tentative, bookNotes, createdBy);
           ids.push(result.lastInsertRowid);
         }
         d.setDate(d.getDate() + 1);
@@ -376,7 +464,7 @@ module.exports = function(db) {
     const ids = batchInsert();
 
     if (ids.length === 0) {
-      return res.status(400).json({ error: '所选日期已存在该项目的排程，无需重复创建' });
+      return res.status(400).json({ error: '所选日期已存在该工作范围的排程，无需重复创建' });
     }
 
     // Webhook notification
@@ -394,7 +482,7 @@ module.exports = function(db) {
   });
 
   router.put('/bookings/:id', (req, res) => {
-    const { resource_id, project_id, date, hours, is_tentative, notes, split_after } = req.body;
+    const { resource_id, project_id, project_scope_id, date, hours, is_tentative, notes, split_after } = req.body;
     const entId = req.user?.enterprise_id;
     if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
 
@@ -418,8 +506,8 @@ module.exports = function(db) {
       return;
     }
 
-    db.prepare('UPDATE bookings SET resource_id=?, project_id=?, date=?, hours=?, is_tentative=?, notes=? WHERE id=?')
-      .run(resource_id, project_id, date, hours, is_tentative ? 1 : 0, notes || '', req.params.id);
+    db.prepare('UPDATE bookings SET resource_id=?, project_id=?, project_scope_id=?, date=?, hours=?, is_tentative=?, notes=? WHERE id=?')
+      .run(resource_id, project_id, project_scope_id || null, date, hours, is_tentative ? 1 : 0, notes || '', req.params.id);
 
     const r = db.prepare('SELECT name FROM resources WHERE id=?').get(resource_id);
     const p = db.prepare('SELECT name FROM projects WHERE id=?').get(project_id);
@@ -462,11 +550,12 @@ module.exports = function(db) {
   router.get('/timesheets', (req, res) => {
     const { start, end, resource_id, status } = req.query;
     let sql = `
-      SELECT t.*, r.name as resource_name, p.name as project_name, COALESCE(c.color, p.color) as project_color
+      SELECT t.*, r.name as resource_name, p.name as project_name, COALESCE(c.color, p.color) as project_color, ps.name as scope_name
       FROM timesheets t
       JOIN resources r ON t.resource_id = r.id
       JOIN projects p ON t.project_id = p.id
       LEFT JOIN clients c ON p.client_id = c.id
+      LEFT JOIN project_scopes ps ON t.project_scope_id = ps.id
       WHERE 1=1
     `;
     const params = [];
@@ -479,16 +568,16 @@ module.exports = function(db) {
   });
 
   router.post('/timesheets', (req, res) => {
-    const { resource_id, project_id, date, hours, notes, status } = req.body;
-    const result = db.prepare('INSERT INTO timesheets (resource_id, project_id, date, hours, notes, status) VALUES (?,?,?,?,?,?)')
-      .run(resource_id, project_id, date, hours, notes || '', status || 'draft');
+    const { resource_id, project_id, project_scope_id, date, hours, notes, status } = req.body;
+    const result = db.prepare('INSERT INTO timesheets (resource_id, project_id, project_scope_id, date, hours, notes, status) VALUES (?,?,?,?,?,?,?)')
+      .run(resource_id, project_id, project_scope_id || null, date, hours, notes || '', status || 'draft');
     res.json({ id: result.lastInsertRowid });
   });
 
   router.put('/timesheets/:id', (req, res) => {
-    const { hours, notes, status } = req.body;
-    db.prepare('UPDATE timesheets SET hours=?, notes=?, status=? WHERE id=?')
-      .run(hours, notes, status, req.params.id);
+    const { hours, notes, status, project_scope_id } = req.body;
+    db.prepare('UPDATE timesheets SET hours=?, notes=?, status=?, project_scope_id=? WHERE id=?')
+      .run(hours, notes, status, project_scope_id || null, req.params.id);
     res.json({ ok: true });
   });
 
@@ -499,19 +588,20 @@ module.exports = function(db) {
 
   // Batch upsert timesheets for a week
   router.post('/timesheets/batch', (req, res) => {
-    const { entries } = req.body; // [{resource_id, project_id, date, hours, notes}]
+    const { entries } = req.body; // [{resource_id, project_id, project_scope_id, date, hours, notes}]
     const insertOrUpdate = db.transaction((items) => {
-      const selectStmt = db.prepare('SELECT id FROM timesheets WHERE resource_id=? AND project_id=? AND date=?');
+      const selectStmt = db.prepare('SELECT id FROM timesheets WHERE resource_id=? AND project_id=? AND date=? AND (project_scope_id = ? OR (project_scope_id IS NULL AND ? IS NULL))');
       const updateStmt = db.prepare('UPDATE timesheets SET hours=?, notes=?, status=? WHERE id=?');
-      const insertStmt = db.prepare('INSERT INTO timesheets (resource_id, project_id, date, hours, notes, status) VALUES (?,?,?,?,?,?)');
+      const insertStmt = db.prepare('INSERT INTO timesheets (resource_id, project_id, project_scope_id, date, hours, notes, status) VALUES (?,?,?,?,?,?,?)');
 
       for (const e of items) {
+        const scopeId = e.project_scope_id || null;
         // Check if entry exists
-        const existing = selectStmt.get(e.resource_id, e.project_id, e.date);
+        const existing = selectStmt.get(e.resource_id, e.project_id, e.date, scopeId, scopeId);
         if (existing) {
           updateStmt.run(e.hours, e.notes || '', e.status || 'draft', existing.id);
         } else if (e.hours > 0) {
-          insertStmt.run(e.resource_id, e.project_id, e.date, e.hours, e.notes || '', e.status || 'draft');
+          insertStmt.run(e.resource_id, e.project_id, scopeId, e.date, e.hours, e.notes || '', e.status || 'draft');
         }
       }
     });
@@ -529,12 +619,12 @@ module.exports = function(db) {
       return res.status(400).json({ error: 'resource_id, start, end required' });
     }
 
-    // 1. Aggregate bookings for this resource in the week (group by project+date)
+    // 1. Aggregate bookings for this resource in the week (group by project+scope+date)
     const bookings = db.prepare(`
-      SELECT project_id, date, SUM(hours) as hours
+      SELECT project_id, project_scope_id, date, SUM(hours) as hours
       FROM bookings
       WHERE resource_id = ? AND date >= ? AND date <= ?
-      GROUP BY project_id, date
+      GROUP BY project_id, project_scope_id, date
     `).all(resource_id, start, end);
 
     if (!bookings.length) {
@@ -543,30 +633,34 @@ module.exports = function(db) {
 
     // 2. Get existing timesheet entries for this resource/week
     const existing = db.prepare(`
-      SELECT project_id, date, hours, source
+      SELECT project_id, project_scope_id, date, hours, source
       FROM timesheets
       WHERE resource_id = ? AND date >= ? AND date <= ?
     `).all(resource_id, start, end);
 
-    // Build a set of already-filled cells (project_id + date)
+    // Build a set of already-filled cells (project_id + scope_id + date)
     const filledKeys = new Set();
-    existing.forEach(e => filledKeys.add(e.project_id + '_' + e.date));
+    existing.forEach(e => {
+      const scopePart = e.project_scope_id ? e.project_scope_id : 'null';
+      filledKeys.add(e.project_id + '_' + scopePart + '_' + e.date);
+    });
 
     // 3. Insert only empty cells from bookings
     let synced = 0;
     let skipped = 0;
     const insertStmt = db.prepare(
-      `INSERT INTO timesheets (resource_id, project_id, date, hours, notes, status, source)
-       VALUES (?, ?, ?, ?, '', 'draft', 'booking')`
+      `INSERT INTO timesheets (resource_id, project_id, project_scope_id, date, hours, notes, status, source)
+       VALUES (?, ?, ?, ?, ?, '', 'draft', 'booking')`
     );
 
     const syncTx = db.transaction(() => {
       for (const b of bookings) {
-        const key = b.project_id + '_' + b.date;
+        const scopePart = b.project_scope_id ? b.project_scope_id : 'null';
+        const key = b.project_id + '_' + scopePart + '_' + b.date;
         if (filledKeys.has(key)) {
           skipped++;
         } else {
-          insertStmt.run(resource_id, b.project_id, b.date, b.hours);
+          insertStmt.run(resource_id, b.project_id, b.project_scope_id || null, b.date, b.hours);
           synced++;
         }
       }
@@ -575,10 +669,11 @@ module.exports = function(db) {
 
     // 4. Return the full updated timesheet entries for the week
     const updated = db.prepare(`
-      SELECT t.*, p.name as project_name, COALESCE(c.color, p.color) as project_color
+      SELECT t.*, p.name as project_name, COALESCE(c.color, p.color) as project_color, ps.name as scope_name
       FROM timesheets t
       JOIN projects p ON t.project_id = p.id
       LEFT JOIN clients c ON p.client_id = c.id
+      LEFT JOIN project_scopes ps ON t.project_scope_id = ps.id
       WHERE t.resource_id = ? AND t.date >= ? AND t.date <= ?
       ORDER BY t.date
     `).all(resource_id, start, end);
@@ -646,12 +741,25 @@ module.exports = function(db) {
 
     /* basic users: no reports access */
     if (req.user?.role === 'basic') return res.status(403).json({ error: '您没有查看报表的权限' });
-    /* manager: only show projects they created */
+    /* manager: show projects they created OR are assigned to manage */
     let projectFilter = '';
     let extraParams = [];
     if (req.user?.role === 'manager') {
-      projectFilter = ' AND p.created_by = ?';
-      extraParams = [req.user.id];
+      let managedIds = [];
+      if (req.user.managed_project_ids) {
+        try {
+          managedIds = JSON.parse(req.user.managed_project_ids);
+        } catch (e) {
+          console.error('[reports-projects] Error parsing managed_project_ids:', e);
+        }
+      }
+      if (Array.isArray(managedIds) && managedIds.length > 0) {
+        projectFilter = ` AND (p.created_by = ? OR p.id IN (${managedIds.map(() => '?').join(',')}))`;
+        extraParams = [req.user.id, ...managedIds];
+      } else {
+        projectFilter = ' AND p.created_by = ?';
+        extraParams = [req.user.id];
+      }
     }
 
     const sql = `
@@ -709,6 +817,25 @@ module.exports = function(db) {
     const { project_id, start, end } = req.query;
     const entId = req.user?.enterprise_id;
     if (!entId || !project_id) return res.json([]);
+
+    // Check manager permission
+    if (req.user?.role === 'manager') {
+      const proj = db.prepare('SELECT id, created_by FROM projects WHERE id = ? AND enterprise_id = ?').get(project_id, entId);
+      if (!proj) return res.status(404).json({ error: '项目未找到' });
+      let isAllowed = proj.created_by === req.user.id;
+      if (!isAllowed && req.user.managed_project_ids) {
+        try {
+          const managedIds = JSON.parse(req.user.managed_project_ids);
+          if (Array.isArray(managedIds) && managedIds.includes(Number(project_id))) {
+            isAllowed = true;
+          }
+        } catch (e) {
+          console.error('[project-drill-permission] Error parsing managed_project_ids:', e);
+        }
+      }
+      if (!isAllowed) return res.status(403).json({ error: '没有权限查看该项目的报表' });
+    }
+
     const sql = `
       SELECT r.id, r.name, r.role, r.team, r.color,
         COALESCE(SUM(b.hours), 0) as booked_hours,
@@ -719,6 +846,69 @@ module.exports = function(db) {
       GROUP BY r.id ORDER BY booked_hours DESC
     `;
     res.json(db.prepare(sql).all(project_id, start, end, project_id, start, end, entId));
+  });
+
+  // === DRILL-DOWN: project -> scopes ===
+  router.get('/reports/project-scope-drill', (req, res) => {
+    const { project_id, start, end } = req.query;
+    const entId = req.user?.enterprise_id;
+    if (!entId || !project_id) return res.json([]);
+
+    // Check manager permission
+    if (req.user?.role === 'manager') {
+      const proj = db.prepare('SELECT id, created_by FROM projects WHERE id = ? AND enterprise_id = ?').get(project_id, entId);
+      if (!proj) return res.status(404).json({ error: '项目未找到' });
+      let isAllowed = proj.created_by === req.user.id;
+      if (!isAllowed && req.user.managed_project_ids) {
+        try {
+          const managedIds = JSON.parse(req.user.managed_project_ids);
+          if (Array.isArray(managedIds) && managedIds.includes(Number(project_id))) {
+            isAllowed = true;
+          }
+        } catch (e) {
+          console.error('[project-scope-drill-permission] Error parsing managed_project_ids:', e);
+        }
+      }
+      if (!isAllowed) return res.status(403).json({ error: '没有权限查看该项目的报表' });
+    }
+
+    const sql = `
+      SELECT 
+        s.id as scope_id,
+        s.name as scope_name,
+        COALESCE(b.booked_hours, 0) as booked_hours,
+        COALESCE(t.actual_hours, 0) as actual_hours
+      FROM project_scopes s
+      LEFT JOIN (
+        SELECT project_scope_id, SUM(hours) as booked_hours
+        FROM bookings
+        WHERE project_id = ? AND date >= ? AND date <= ?
+        GROUP BY project_scope_id
+      ) b ON s.id = b.project_scope_id
+      LEFT JOIN (
+        SELECT project_scope_id, SUM(hours) as actual_hours
+        FROM timesheets
+        WHERE project_id = ? AND date >= ? AND date <= ?
+        GROUP BY project_scope_id
+      ) t ON s.id = t.project_scope_id
+      WHERE s.project_id = ?
+
+      UNION ALL
+
+      SELECT 
+        NULL as scope_id,
+        '未指定/其他' as scope_name,
+        COALESCE((SELECT SUM(hours) FROM bookings WHERE project_id = ? AND project_scope_id IS NULL AND date >= ? AND date <= ?), 0) as booked_hours,
+        COALESCE((SELECT SUM(hours) FROM timesheets WHERE project_id = ? AND project_scope_id IS NULL AND date >= ? AND date <= ?), 0) as actual_hours
+    `;
+    const params = [
+      project_id, start, end,
+      project_id, start, end,
+      project_id,
+      project_id, start, end,
+      project_id, start, end
+    ];
+    res.json(db.prepare(sql).all(...params));
   });
 
   // === LEAVE ===
@@ -1070,21 +1260,44 @@ module.exports = function(db) {
     const { start, end } = req.query;
     if (!start || !end) return res.status(400).json({ error: '缺少日期参数' });
 
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.status(400).json({ error: '缺少企业信息' });
+
+    /* manager: show projects they created OR are assigned to manage */
+    let projectFilter = '';
+    let extraParams = [];
+    if (req.user?.role === 'manager') {
+      let managedIds = [];
+      if (req.user.managed_project_ids) {
+        try {
+          managedIds = JSON.parse(req.user.managed_project_ids);
+        } catch (e) {
+          console.error('[export-projects] Error parsing managed_project_ids:', e);
+        }
+      }
+      if (Array.isArray(managedIds) && managedIds.length > 0) {
+        projectFilter = ` AND (p.created_by = ? OR p.id IN (${managedIds.map(() => '?').join(',')}))`;
+        extraParams = [req.user.id, ...managedIds];
+      } else {
+        projectFilter = ' AND p.created_by = ?';
+        extraParams = [req.user.id];
+      }
+    }
+
     const sql = `
-      SELECT p.name, p.budget_hours, p.hourly_rate, c.name as client_name,
+      SELECT p.id, p.name, p.budget_hours, p.hourly_rate, c.name as client_name,
         COALESCE(SUM(b.hours), 0) as booked_hours,
         (SELECT COALESCE(SUM(t.hours),0) FROM timesheets t WHERE t.project_id = p.id AND t.date >= ? AND t.date <= ?) as actual_hours
       FROM projects p
       LEFT JOIN clients c ON p.client_id = c.id
       LEFT JOIN bookings b ON p.id = b.project_id AND b.date >= ? AND b.date <= ?
-      WHERE p.is_active = 1 AND p.enterprise_id = ?
+      WHERE p.is_active = 1 AND p.enterprise_id = ?${projectFilter}
       GROUP BY p.id ORDER BY p.name
     `;
-    const entId = req.user?.enterprise_id;
-    if (!entId) return res.status(400).json({ error: '缺少企业信息' });
-    const rows = db.prepare(sql).all(start, end, start, end, entId);
+    const rows = db.prepare(sql).all(start, end, start, end, entId, ...extraParams);
 
     const wb = new ExcelJS.Workbook();
+    wb.creator = 'CrewBoard';
     const ws = wb.addWorksheet('项目报表');
 
     ws.columns = [
@@ -1117,6 +1330,58 @@ module.exports = function(db) {
     ws.getColumn('budget_amount').numFmt = '¥#,##0.00';
     ws.getColumn('actual_amount').numFmt = '¥#,##0.00';
     ws.getColumn('progress').numFmt = '0%';
+
+    // Add Work Scopes sheet
+    const ws2 = wb.addWorksheet('工作内容(Scope)明细');
+    ws2.columns = [
+      { header: '项目', key: 'project_name', width: 20 },
+      { header: '工作内容(Scope)', key: 'scope_name', width: 25 },
+      { header: '已排工时(h)', key: 'booked', width: 14 },
+      { header: '实际工时(h)', key: 'actual', width: 14 },
+    ];
+
+    ws2.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+    ws2.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F46E5' } };
+
+    const scopeSql = `
+      SELECT 
+        p.name as project_name,
+        COALESCE(ps.name, '未指定/其他') as scope_name,
+        COALESCE(b.booked_hours, 0) as booked_hours,
+        COALESCE(t.actual_hours, 0) as actual_hours
+      FROM projects p
+      LEFT JOIN (
+        SELECT id, project_id, name FROM project_scopes
+        UNION ALL
+        SELECT NULL as id, id as project_id, '未指定/其他' as name FROM projects
+      ) ps ON p.id = ps.project_id
+      LEFT JOIN (
+        SELECT project_id, project_scope_id, SUM(hours) as booked_hours
+        FROM bookings
+        WHERE date >= ? AND date <= ?
+        GROUP BY project_id, project_scope_id
+      ) b ON p.id = b.project_id AND (ps.id = b.project_scope_id OR (ps.id IS NULL AND b.project_scope_id IS NULL))
+      LEFT JOIN (
+        SELECT project_id, project_scope_id, SUM(hours) as actual_hours
+        FROM timesheets
+        WHERE date >= ? AND date <= ?
+        GROUP BY project_id, project_scope_id
+      ) t ON p.id = t.project_id AND (ps.id = t.project_scope_id OR (ps.id IS NULL AND t.project_scope_id IS NULL))
+      WHERE p.is_active = 1 AND p.enterprise_id = ?${projectFilter}
+      GROUP BY p.id, ps.id
+      HAVING booked_hours > 0 OR actual_hours > 0
+      ORDER BY p.name, scope_name
+    `;
+    const scopeRows = db.prepare(scopeSql).all(start, end, start, end, entId, ...extraParams);
+
+    scopeRows.forEach(sr => {
+      ws2.addRow({
+        project_name: sr.project_name,
+        scope_name: sr.scope_name,
+        booked: sr.booked_hours,
+        actual: sr.actual_hours
+      });
+    });
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename=projects_${start}_${end}.xlsx`);

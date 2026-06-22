@@ -105,10 +105,12 @@
     if (isOwnResource && bookings.length > 0) {
       var tsKeys = new Set();
       timesheets.forEach(function (ts) {
-        tsKeys.add(ts.project_id + '_' + ts.date);
+        var scopePart = ts.project_scope_id ? ts.project_scope_id : 'null';
+        tsKeys.add(ts.project_id + '_' + scopePart + '_' + ts.date);
       });
       var hasUnsynced = bookings.some(function (b) {
-        return !tsKeys.has(b.project_id + '_' + b.date);
+        var scopePart = b.project_scope_id ? b.project_scope_id : 'null';
+        return !tsKeys.has(b.project_id + '_' + scopePart + '_' + b.date);
       });
 
       if (hasUnsynced) {
@@ -129,41 +131,66 @@
       }
     }
 
-    /* ---- find relevant projects ---- */
-    var relevantIds = {};
-    timesheets.forEach(function (ts) { relevantIds[ts.project_id] = true; });
-    bookings.forEach(function (b) { relevantIds[b.project_id] = true; });
+    /* ---- find relevant rows (project + scope combinations) ---- */
+    var relevantKeys = new Set();
+    var projectMap = {};
+    projects.forEach(function (p) { projectMap[p.id] = p; });
 
-    var relevantProjects = projects.filter(function (p) {
-      return relevantIds[p.id];
+    timesheets.forEach(function (ts) {
+      var scopeId = ts.project_scope_id || 0;
+      relevantKeys.add(ts.project_id + '_' + scopeId);
+    });
+    bookings.forEach(function (b) {
+      var scopeId = b.project_scope_id || 0;
+      relevantKeys.add(b.project_id + '_' + scopeId);
     });
 
-    /* ---- backfill projects missing from /api/projects (e.g. archived)
-            using project_name from timesheets / bookings data ---- */
     var projectNameMap = {};
+    var scopeNameMap = {};
     timesheets.forEach(function (ts) {
       if (ts.project_name) projectNameMap[ts.project_id] = ts.project_name;
+      if (ts.scope_name) scopeNameMap[ts.project_id + '_' + (ts.project_scope_id || 0)] = ts.scope_name;
     });
     bookings.forEach(function (b) {
       if (b.project_name) projectNameMap[b.project_id] = b.project_name;
+      if (b.scope_name) scopeNameMap[b.project_id + '_' + (b.project_scope_id || 0)] = b.scope_name;
     });
-    Object.keys(relevantIds).forEach(function (pidStr) {
-      var pid = parseInt(pidStr, 10);
-      var hasProject = relevantProjects.some(function (p) { return p.id === pid; });
-      if (!hasProject && projectNameMap[pid]) {
-        relevantProjects.push({
-          id: pid,
-          name: projectNameMap[pid],
-          client_name: '',
-          color: '#8B5CF6'
-        });
-      }
+
+    var relevantRows = [];
+    relevantKeys.forEach(function (key) {
+      var parts = key.split('_');
+      var pid = parseInt(parts[0], 10);
+      var scopeId = parseInt(parts[1], 10);
+      var p = projectMap[pid];
+      
+      var name = p ? p.name : (projectNameMap[pid] || '未知项目');
+      var clientName = p ? p.client_name : '';
+      var color = p ? (p.client_color || p.color) : '#8B5CF6';
+      var code = p ? p.code : '';
+      var scopeName = scopeNameMap[key] || '';
+
+      relevantRows.push({
+        project_id: pid,
+        project_scope_id: scopeId || null,
+        name: name,
+        scope_name: scopeName,
+        client_name: clientName,
+        color: color,
+        code: code
+      });
+    });
+
+    // Sort rows by project name, then scope name
+    relevantRows.sort(function (a, b) {
+      var nameCompare = a.name.localeCompare(b.name);
+      if (nameCompare !== 0) return nameCompare;
+      return (a.scope_name || '').localeCompare(b.scope_name || '');
     });
 
     var gridEl = document.getElementById('timesheet-container');
     if (!gridEl) return;
 
-    if (!relevantProjects.length) {
+    if (!relevantRows.length) {
       gridEl.innerHTML = '<div class="empty-message">' + t('timesheets.no_records') + '</div>';
       return;
     }
@@ -175,7 +202,8 @@
     _initialValues = {};
 
     timesheets.forEach(function (ts) {
-      var key = ts.project_id + '_' + ts.date;
+      var scopePart = ts.project_scope_id ? ts.project_scope_id : '0';
+      var key = ts.project_id + '_' + scopePart + '_' + ts.date;
       tsMap[key] = ts.hours;
       tsSourceMap[key] = ts.source || 'manual';
       notesMap[key] = ts.notes || '';
@@ -184,7 +212,8 @@
 
     var scheduleMap = {};
     bookings.forEach(function (b) {
-      var key = b.project_id + '_' + b.date;
+      var scopePart = b.project_scope_id ? b.project_scope_id : '0';
+      var key = b.project_id + '_' + scopePart + '_' + b.date;
       scheduleMap[key] = (scheduleMap[key] || 0) + b.hours;
     });
 
@@ -197,7 +226,7 @@
     } catch (e) {}
 
     /* ---- render table ---- */
-    gridEl.innerHTML = buildTable(days, relevantProjects, tsMap, tsSourceMap, scheduleMap, notesMap);
+    gridEl.innerHTML = buildTable(days, relevantRows, tsMap, tsSourceMap, scheduleMap, notesMap);
 
     /* ---- apply draft over rendered table ---- */
     if (draftData && isOwnResource) {
@@ -205,8 +234,10 @@
       Object.keys(draftData).forEach(function (key) {
         var parts = key.split('_');
         var pid = parts[0];
-        var dateStr = parts[1];
-        var inp = document.querySelector('.ts-input[data-project="' + pid + '"][data-date="' + dateStr + '"]');
+        var scopeId = parts[1];
+        var dateStr = parts[2];
+        var selector = '.ts-input[data-project="' + pid + '"][data-project-scope="' + (scopeId === '0' || scopeId === 'null' ? '' : scopeId) + '"][data-date="' + dateStr + '"]';
+        var inp = document.querySelector(selector);
         if (inp) {
           if (draftData[key].hours !== undefined && draftData[key].hours !== '') {
             inp.value = draftData[key].hours;
@@ -219,7 +250,7 @@
         }
       });
       if (applied > 0) {
-        updateTotals(days, relevantProjects);
+        updateTotals(days, relevantRows);
         toast(t('timesheets.draft_restored'), 'info');
       }
     }
@@ -248,7 +279,7 @@
         input.style.cursor = 'default';
       } else {
         input.addEventListener('input', function () {
-          updateTotals(days, relevantProjects);
+          updateTotals(days, relevantRows);
           debouncedAutoSave();
         });
         input.addEventListener('focus', function () {
@@ -258,7 +289,7 @@
           hidePresetButtons();
         });
         input.addEventListener('keydown', function (e) {
-          handleCellKeydown(e, input, days, relevantProjects);
+          handleCellKeydown(e, input, days, relevantRows);
         });
       }
     });
@@ -271,7 +302,8 @@
       } else {
         btn.addEventListener('click', function (e) {
           e.stopPropagation();
-          var inp = document.querySelector('.ts-input[data-project="' + btn.dataset.project + '"][data-date="' + btn.dataset.date + '"]');
+          var scopeId = btn.dataset.projectScope || '';
+          var inp = document.querySelector('.ts-input[data-project="' + btn.dataset.project + '"][data-project-scope="' + scopeId + '"][data-date="' + btn.dataset.date + '"]');
           openNotesModal(btn.dataset.project, btn.dataset.date, inp ? (inp.dataset.notes || '') : '', function (newNotes) {
             if (inp) {
               inp.dataset.notes = newNotes;
@@ -312,7 +344,7 @@
   /* --------------------------------------------------
      Table builder
      -------------------------------------------------- */
-  function buildTable(days, projects, tsMap, tsSourceMap, scheduleMap, notesMap) {
+  function buildTable(days, rows, tsMap, tsSourceMap, scheduleMap, notesMap) {
     var html = '<table class="ts-table"><thead><tr><th>' + t('timesheets.project') + '</th>';
 
     days.forEach(function (d, idx) {
@@ -329,20 +361,23 @@
     var weekTotal = 0;
 
     /* ---- project rows ---- */
-    projects.forEach(function (p) {
+    rows.forEach(function (r) {
       var rowTotal = 0;
-      var color = p.client_color || p.color || '#6366F1';
-      var codeLabel = p.code ? '<span class="ts-proj-code">' + esc(p.code) + '</span>' : '';
+      var color = r.color || '#6366F1';
+      var codeLabel = r.code ? '<span class="ts-proj-code">' + esc(r.code) + '</span>' : '';
+      var scopeLabel = r.scope_name ? '<span class="ts-scope-label" style="font-size:11px; background:#e0e7ff; color:#4f46e5; padding:1px 4px; border-radius:3px; margin-left:6px; font-weight:500; display:inline-block; vertical-align:middle;">' + esc(r.scope_name) + '</span>' : '';
 
-      html += '<tr data-project-id="' + p.id + '">' +
+      var rowId = r.project_id + '-' + (r.project_scope_id || 0);
+
+      html += '<tr data-project-id="' + r.project_id + '" data-project-scope-id="' + (r.project_scope_id || '') + '">' +
         '<td style="border-left:3px solid ' + color + '">' +
-        '<div class="ts-project-cell">' +
+        '<div class="ts-project-cell" style="display:flex; align-items:center; flex-wrap:wrap; gap:4px;">' +
         '<span class="ts-color-dot" style="background:' + color + '"></span>' +
-        codeLabel + esc(p.name) + '</div></td>';
+        codeLabel + esc(r.name) + scopeLabel + '</div></td>';
 
       days.forEach(function (d, idx) {
         var dateStr = fmt(d);
-        var key = p.id + '_' + dateStr;
+        var key = r.project_id + '_' + (r.project_scope_id || 0) + '_' + dateStr;
         var val = tsMap[key];
         var source = tsSourceMap[key] || 'manual';
         var placeholder = scheduleMap[key] || '';
@@ -367,7 +402,8 @@
         html += '<td class="' + weekendCls.trim() + '">' +
           '<div class="ts-cell-wrap">' +
           '<input type="number" class="ts-input' + varClass + syncedClass + '"' +
-          ' data-project="' + p.id + '"' +
+          ' data-project="' + r.project_id + '"' +
+          ' data-project-scope="' + (r.project_scope_id || '') + '"' +
           ' data-date="' + dateStr + '"' +
           ' data-source="' + source + '"' +
           ' data-notes="' + esc(notes) + '"' +
@@ -375,7 +411,7 @@
           ' placeholder="' + placeholder + '"' +
           ' min="0" max="24" step="0.5">' +
           '<button type="button" class="ts-notes-btn' + (notes ? ' ts-notes-active' : '') + '"' +
-          ' data-project="' + p.id + '" data-date="' + dateStr + '"' +
+          ' data-project="' + r.project_id + '" data-project-scope="' + (r.project_scope_id || '') + '" data-date="' + dateStr + '"' +
           ' title="' + (notes ? esc(notes) : t('timesheets.add_notes')) + '">' +
           '<svg width="12" height="12" viewBox="0 0 16 16" fill="none">' +
           '<path d="M3 3h10v10H3z" stroke="currentColor" stroke-width="1.2"/>' +
@@ -388,7 +424,7 @@
       });
 
       weekTotal += rowTotal;
-      html += '<td class="ts-row-total" id="ts-row-total-' + p.id + '">' + rowTotal + '</td></tr>';
+      html += '<td class="ts-row-total" id="ts-row-total-' + rowId + '">' + rowTotal + '</td></tr>';
     });
 
     /* ---- totals row ---- */
@@ -509,7 +545,9 @@
     document.querySelectorAll('.ts-input').forEach(function (input) {
       var val = input.value.trim();
       var notes = input.dataset.notes || '';
-      var key = input.dataset.project + '_' + input.dataset.date;
+      var scopeId = input.dataset.projectScope || '';
+      var scopePart = scopeId ? scopeId : '0';
+      var key = input.dataset.project + '_' + scopePart + '_' + input.dataset.date;
       var init = _initialValues[key];
 
       var changed = false;
@@ -546,7 +584,9 @@
     inputs.forEach(function (input) {
       var val = input.value.trim();
       var notes = input.dataset.notes || '';
-      var key = input.dataset.project + '_' + input.dataset.date;
+      var scopeId = input.dataset.projectScope || '';
+      var scopePart = scopeId ? scopeId : '0';
+      var key = input.dataset.project + '_' + scopePart + '_' + input.dataset.date;
       var init = _initialValues[key];
 
       /* Determine if this cell has changed */
@@ -563,9 +603,12 @@
 
       if (!hoursChanged && !notesChanged) return;
 
+      var scopeNum = input.dataset.projectScope ? parseInt(input.dataset.projectScope, 10) : null;
+
       if (val !== '') {
         entries.push({
           project_id:  parseInt(input.dataset.project, 10),
+          project_scope_id: scopeNum,
           date:        input.dataset.date,
           hours:       parseFloat(val),
           notes:       notes,
@@ -577,6 +620,7 @@
         /* Only notes changed, hours cleared: update to empty hours but keep notes */
         entries.push({
           project_id:  parseInt(input.dataset.project, 10),
+          project_scope_id: scopeNum,
           date:        input.dataset.date,
           hours:       0,
           notes:       notes,
@@ -638,15 +682,16 @@
   /* --------------------------------------------------
      Live totals updater (called on input change)
      -------------------------------------------------- */
-  function updateTotals(days, projects) {
+  function updateTotals(days, rows) {
     var dayTotals = days.map(function () { return 0; });
     var weekTotal = 0;
 
-    projects.forEach(function (p) {
+    rows.forEach(function (r) {
       var rowTotal = 0;
       days.forEach(function (d, idx) {
+        var scopeId = r.project_scope_id || '';
         var input = document.querySelector(
-          '.ts-input[data-project="' + p.id + '"][data-date="' + fmt(d) + '"]'
+          '.ts-input[data-project="' + r.project_id + '"][data-project-scope="' + scopeId + '"][data-date="' + fmt(d) + '"]'
         );
         if (!input) return;
         var val = parseFloat(input.value) || 0;
@@ -654,7 +699,7 @@
         dayTotals[idx] += val;
       });
       weekTotal += rowTotal;
-      var rowTotalEl = document.getElementById('ts-row-total-' + p.id);
+      var rowTotalEl = document.getElementById('ts-row-total-' + r.project_id + '-' + (r.project_scope_id || 0));
       if (rowTotalEl) rowTotalEl.textContent = rowTotal || 0;
     });
 

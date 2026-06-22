@@ -349,7 +349,9 @@
     'reports.idle': '空闲', 'reports.no_member_data': '该时段无成员数据',
     'reports.no_project_data': '该时段无项目数据',
     'reports.select_range': '请选择日期范围', 'reports.exporting': '正在导出...',
-    'reports.click_member': '点击查看成员贡献', 'reports.click_detail': '点击查看详情'
+    'reports.click_member': '点击查看成员贡献', 'reports.click_detail': '点击查看详情',
+    'reports.member_hours_breakdown': '按成员工时拆分', 'reports.scope_hours_breakdown': '按工作内容(Scope)工时拆分',
+    'reports.work_scope': '工作内容(Scope)', 'reports.no_scope_data': '该时段无工作内容数据'
   });
   Object.assign(translations.en, {
     'reports.title': 'Reports', 'reports.utilization': 'Utilization Report',
@@ -373,7 +375,9 @@
     'reports.idle': 'Idle', 'reports.no_member_data': 'No member data for this period',
     'reports.no_project_data': 'No project data for this period',
     'reports.select_range': 'Please select date range', 'reports.exporting': 'Exporting...',
-    'reports.click_member': 'Click to view member contribution', 'reports.click_detail': 'Click for details'
+    'reports.click_member': 'Click to view member contribution', 'reports.click_detail': 'Click for details',
+    'reports.member_hours_breakdown': 'Member Hours Breakdown', 'reports.scope_hours_breakdown': 'Scope Hours Breakdown',
+    'reports.work_scope': 'Work Scope', 'reports.no_scope_data': 'No scope data for this period'
   });
 
   // --- manage resources ---

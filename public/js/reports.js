@@ -397,7 +397,6 @@
       });
   }
 
-  /* ---- Drill-down: project -> members ---- */
   function toggleProjectDrill(row, projectId, start, end) {
     var existingDrill = row.nextElementSibling;
     if (existingDrill && existingDrill.classList.contains('drill-row')) {
@@ -411,33 +410,68 @@
     drillRow.innerHTML = '<td colspan="8"><div class="drill-loading">' + t('common.loading') + '</div></td>';
     row.after(drillRow);
 
-    api('/api/reports/project-drill?project_id=' + projectId +
-        '&start=' + encodeURIComponent(start) + '&end=' + encodeURIComponent(end))
-      .then(function (items) {
-        if (!items.length) {
-          drillRow.querySelector('td').innerHTML = '<div class="drill-empty">' + t('reports.no_member_data') + '</div>';
-          return;
-        }
-        var html = '<div class="drill-content"><table class="drill-table table table-sm">' +
-          '<thead><tr><th>' + t('reports.member') + '</th><th>' + t('reports.role') + '</th><th>' + t('reports.team') + '</th><th>' + t('reports.booked_hours') + '</th><th>' + t('reports.actual_hours') + '</th></tr></thead><tbody>';
-        items.forEach(function (m) {
+    Promise.all([
+      api('/api/reports/project-drill?project_id=' + projectId + '&start=' + encodeURIComponent(start) + '&end=' + encodeURIComponent(end)),
+      api('/api/reports/project-scope-drill?project_id=' + projectId + '&start=' + encodeURIComponent(start) + '&end=' + encodeURIComponent(end))
+    ])
+    .then(function (results) {
+      var members = results[0] || [];
+      var scopes = results[1] || [];
+
+      if (!members.length && !scopes.length) {
+        drillRow.querySelector('td').innerHTML = '<div class="drill-empty">' + t('reports.no_member_data') + '</div>';
+        return;
+      }
+
+      var html = '<div class="drill-content row g-3">';
+      
+      // Column 1: Member breakdown
+      html += '<div class="col-12 col-md-6">';
+      html += '<h6 class="fw-semibold mb-2 fs-7 text-secondary">' + t('reports.member_hours_breakdown') + '</h6>';
+      if (members.length > 0) {
+        html += '<table class="drill-table table table-sm table-hover align-middle">' +
+          '<thead><tr><th>' + t('reports.member') + '</th><th>' + t('reports.role') + '</th><th>' + t('reports.booked_hours') + '</th><th>' + t('reports.actual_hours') + '</th></tr></thead><tbody>';
+        members.forEach(function (m) {
           html += '<tr>' +
             '<td><span class="report-color-dot" style="background:' + (m.color || '#6366F1') + '"></span>' + esc(m.name) + '</td>' +
             '<td>' + esc(m.role || '') + '</td>' +
-            '<td>' + esc(m.team || '') + '</td>' +
             '<td>' + (m.booked_hours || 0) + 'h</td>' +
             '<td>' + (m.actual_hours || 0) + 'h</td>' +
             '</tr>';
         });
-        html += '</tbody></table></div>';
-        drillRow.querySelector('td').innerHTML = html;
-      })
-      .catch(function () {
-        drillRow.querySelector('td').innerHTML = '<div class="drill-empty">' + t('common.load_failed') + '</div>';
-      });
-  }
+        html += '</tbody></table>';
+      } else {
+        html += '<div class="text-muted small py-2">' + t('reports.no_member_data') + '</div>';
+      }
+      html += '</div>';
 
-  /* ---- Chart: project budget bar (top 10) ---- */
+      // Column 2: Scope breakdown
+      html += '<div class="col-12 col-md-6">';
+      html += '<h6 class="fw-semibold mb-2 fs-7 text-secondary">' + t('reports.scope_hours_breakdown') + '</h6>';
+      if (scopes.length > 0) {
+        html += '<table class="drill-table table table-sm table-hover align-middle">' +
+          '<thead><tr><th>' + t('reports.work_scope') + '</th><th>' + t('reports.booked_hours') + '</th><th>' + t('reports.actual_hours') + '</th></tr></thead><tbody>';
+        scopes.forEach(function (s) {
+          html += '<tr>' +
+            '<td>' + esc(s.scope_name) + '</td>' +
+            '<td>' + (s.booked_hours || 0) + 'h</td>' +
+            '<td>' + (s.actual_hours || 0) + 'h</td>' +
+            '</tr>';
+        });
+        html += '</tbody></table>';
+      } else {
+        html += '<div class="text-muted small py-2">' + t('reports.no_scope_data') + '</div>';
+      }
+      html += '</div>';
+
+      html += '</div>';
+      drillRow.querySelector('td').innerHTML = html;
+    })
+    .catch(function (err) {
+      console.error(err);
+      drillRow.querySelector('td').innerHTML = '<div class="drill-empty">' + t('common.load_failed') + '</div>';
+    });
+  }
   function drawProjectBudgetChart(rows) {
     var canvas = document.getElementById('chart-proj-budget');
     if (!canvas || !window.Chart) return;

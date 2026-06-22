@@ -617,6 +617,72 @@ window.deleteClient = async function deleteClient(id) {
   catch (err) { toast(t('common.delete_failed') + ': ' + err.message, 'error'); }
 };
 
+// --------------- Project Scopes Helper ---------------
+window.loadProjectScopes = async function loadProjectScopes(projectId) {
+  const container = document.getElementById('scopes-list-container');
+  if (!container) return;
+  container.innerHTML = '<div class="text-muted text-center py-2" style="font-size: 13px;">加载中...</div>';
+  try {
+    const scopes = await api('/api/projects/' + projectId + '/scopes');
+    if (!scopes.length) {
+      container.innerHTML = '<div class="text-muted text-center py-2" style="font-size: 13px;">暂无工作范围，请在下方添加</div>';
+      return;
+    }
+    let html = '<table class="table table-sm align-middle" style="font-size: 13px; margin-bottom: 0; width: 100%;"><tbody>';
+    scopes.forEach(function (s) {
+      html += '<tr data-scope-id="' + s.id + '">' +
+        '<td style="width:75%;"><input type="text" class="form-control form-control-sm scope-name-input text-input" value="' + escapeAttr(s.name) + '" style="border:none; background:transparent; font-size:13px; padding:2px 4px; margin:0; width:100%;"></td>' +
+        '<td class="text-end" style="width:25%; text-align:right;">' +
+          '<button class="btn btn-link btn-sm text-primary btn-save-scope-inline" style="padding:0; margin-right:8px; display:none; background:none; border:none; vertical-align:middle;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg></button>' +
+          '<button class="btn btn-link btn-sm text-danger btn-delete-scope-inline" style="padding:0; background:none; border:none; vertical-align:middle;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></button>' +
+        '</td>' +
+      '</tr>';
+    });
+    html += '</tbody></table>';
+    container.innerHTML = html;
+
+    // Bind event listeners for inline scope editing/deleting
+    container.querySelectorAll('tr[data-scope-id]').forEach(function (row) {
+      const scopeId = parseInt(row.dataset.scopeId, 10);
+      const input = row.querySelector('.scope-name-input');
+      const saveBtn = row.querySelector('.btn-save-scope-inline');
+      const deleteBtn = row.querySelector('.btn-delete-scope-inline');
+
+      input.addEventListener('input', function () {
+        saveBtn.style.display = '';
+      });
+
+      saveBtn.addEventListener('click', async function () {
+        const newName = input.value.trim();
+        if (!newName) { toast('名称不能为空', 'error'); return; }
+        try {
+          await api('/api/project-scopes/' + scopeId, {
+            method: 'PUT',
+            body: { name: newName }
+          });
+          toast('修改成功');
+          saveBtn.style.display = 'none';
+        } catch (err) {
+          toast('保存失败: ' + err.message, 'error');
+        }
+      });
+
+      deleteBtn.addEventListener('click', async function () {
+        if (!confirm('确定删除此工作范围吗？相关排班和工时将失去关联。')) return;
+        try {
+          await api('/api/project-scopes/' + scopeId, { method: 'DELETE' });
+          toast('删除成功');
+          loadProjectScopes(projectId);
+        } catch (err) {
+          toast('删除失败: ' + err.message, 'error');
+        }
+      });
+    });
+  } catch (err) {
+    container.innerHTML = '<div class="text-danger text-center py-2" style="font-size: 13px;">加载失败: ' + err.message + '</div>';
+  }
+};
+
 // --------------- Project Modal (ResourceGuru style) ---------------
 window.showProjectModal = async function showProjectModal(id) {
   if (!state.clients || !state.clients.length) {
@@ -676,6 +742,21 @@ window.showProjectModal = async function showProjectModal(id) {
       '</div>' +
     '</div>';
 
+  if (isEdit) {
+    body += '<div class="rg-separator"></div>' +
+      '<div class="rg-field-title" style="margin-top:15px; font-weight:600; font-size:14px; color:var(--text-primary)">' +
+        '工作范围 (Work Scopes)' +
+      '</div>' +
+      '<div class="scopes-manager" style="margin-top:10px;">' +
+        '<div id="scopes-list-container" style="max-height: 150px; overflow-y: auto; margin-bottom: 10px; border: 1px solid var(--border-color); border-radius: 4px; padding: 5px;">' +
+        '</div>' +
+        '<div class="input-group input-group-sm mb-1" style="display:flex; gap:8px;">' +
+          '<input type="text" id="new-scope-name" class="form-control text-input form-control-sm rg-input" placeholder="新增工作范围名称，如：前端开发" style="flex:1; margin:0; padding:6px 12px; font-size:13px;">' +
+          '<button class="btn btn-outline-secondary btn-sm" type="button" id="btn-add-scope" style="border: 1px solid var(--border-color); padding:6px 12px; border-radius:4px; font-size:13px;">添加</button>' +
+        '</div>' +
+      '</div>';
+  }
+
   var footer = '';
   if (isEdit) {
     footer = '<div class="bk-footer-left">' +
@@ -699,6 +780,27 @@ window.showProjectModal = async function showProjectModal(id) {
     document.getElementById('btn-delete-proj-modal').addEventListener('click', function () {
       closeModal();
       deleteProject(id);
+    });
+
+    // Load existing scopes
+    loadProjectScopes(id);
+
+    // Bind add scope button
+    document.getElementById('btn-add-scope').addEventListener('click', async function () {
+      const input = document.getElementById('new-scope-name');
+      const name = input.value.trim();
+      if (!name) { toast('请输入工作范围名称', 'error'); return; }
+      try {
+        await api('/api/projects/' + id + '/scopes', {
+          method: 'POST',
+          body: { name: name }
+        });
+        toast('添加成功');
+        input.value = '';
+        loadProjectScopes(id);
+      } catch (err) {
+        toast('添加失败: ' + err.message, 'error');
+      }
     });
   }
 };

@@ -318,6 +318,34 @@ function migrate(db) {
     }
     db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_timesheets_unique ON timesheets(resource_id, project_id, date)');
   } catch (_) { /* index may already exist or deduplication failed */ }
+
+  // Create project_scopes table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS project_scopes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      enterprise_id INTEGER REFERENCES enterprises(id),
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+  `);
+  try {
+    db.exec('CREATE INDEX IF NOT EXISTS idx_project_scopes_project ON project_scopes(project_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_project_scopes_enterprise ON project_scopes(enterprise_id)');
+  } catch (_) {}
+
+  // Add project_scope_id column to bookings table
+  const bookingColsScope = db.prepare('PRAGMA table_info(bookings)').all();
+  if (!bookingColsScope.find(c => c.name === 'project_scope_id')) {
+    db.exec('ALTER TABLE bookings ADD COLUMN project_scope_id INTEGER REFERENCES project_scopes(id) ON DELETE SET NULL');
+  }
+
+  // Add project_scope_id column to timesheets table
+  const tsColsScope = db.prepare('PRAGMA table_info(timesheets)').all();
+  if (!tsColsScope.find(c => c.name === 'project_scope_id')) {
+    db.exec('ALTER TABLE timesheets ADD COLUMN project_scope_id INTEGER REFERENCES project_scopes(id) ON DELETE SET NULL');
+  }
 }
 
 function seedDemoData(db) {

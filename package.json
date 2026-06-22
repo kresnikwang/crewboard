@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "NODE_ENV=production node server.js",
-    "dev": "node server.js",
+    "build": "npx terser public/js/i18n.js -c -m -o public/js/dist/i18n.min.js && npx terser public/js/core.js -c -m -o public/js/dist/core.min.js && npx terser public/js/schedule.js -c -m -o public/js/dist/schedule.min.js && npx terser public/js/timesheets.js -c -m -o public/js/dist/timesheets.min.js && npx terser public/js/reports.js -c -m -o public/js/dist/reports.min.js && npx terser public/js/manage.js -c -m -o public/js/dist/manage.min.js && npx terser public/js/enterprise.js -c -m -o public/js/dist/enterprise.min.js",
+    "dev": "npm run build && node server.js",
     "pm2:start": "pm2 start ecosystem.config.js",
     "pm2:stop": "pm2 stop crewboard",
     "pm2:restart": "pm2 restart crewboard",

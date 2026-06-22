@@ -677,21 +677,29 @@
         var hasBorderLeft = !si || si.cls === 'span-s' || !si.cls;
         var borderStyle = hasBorderLeft ? 'border-left:3px solid ' + projColor + ';' : '';
 
+        var tooltipLines = [
+          '项目: ' + b.project_name + (b.client_name ? ' (' + b.client_name + ')' : ''),
+          b.scope_name ? '工作范围: ' + b.scope_name : null,
+          '工时: ' + b.hours + 'h',
+          b.created_by_name ? '预订人: ' + b.created_by_name : null,
+          b.notes ? '备注: ' + b.notes : null
+        ].filter(Boolean).join('\n');
+
         html += '<div class="booking-block' + tentCls + spanCls + '"' +
           ' style="background:' + bgColor + ';' + borderStyle + '"' +
           ' data-booking-id="' + b.id + '"' +
           ' data-resource-id="' + b.resource_id + '"' +
           ' data-date="' + b.date + '"' +
           ' onclick="window.editBooking(' + b.id + ')"' +
-          ' title="' + escAttr(b.project_name) + ' - ' + b.hours + 'h' +
-            (b.notes ? '\n' + escAttr(b.notes) : '') + '">';
+          ' title="' + escAttr(tooltipLines) + '">';
 
         if (hasBorderLeft) {
           html += '<div class="resize-handle-left"></div>';
         }
         if (showText) {
+          var displayProj = b.project_name + (b.scope_name ? ' - ' + b.scope_name : '');
           html += '<span class="booking-hours">' + b.hours + 'h</span> ' +
-            '<span class="booking-project" title="' + escAttr(b.project_name + (b.client_name ? ' (' + b.client_name + ')' : '')) + '">' + esc(truncate(b.project_name, 25)) + '</span>';
+            '<span class="booking-project" title="' + escAttr(displayProj + (b.client_name ? ' (' + b.client_name + ')' : '')) + '">' + esc(truncate(displayProj, 25)) + '</span>';
         }
         // Show resize handle for end of span or solo booking (cls is null)
         if (!si || si.cls === 'span-e' || !si.cls) {
@@ -1830,7 +1838,13 @@
         var hasBorderLeft = !si || si.cls === 'span-s' || !si.cls;
         var borderStyle = hasBorderLeft ? 'border-left:2px solid ' + projColor + ';' : '';
 
-        var tooltipText = b.hours + 'h ' + b.project_name + (b.client_name ? ' | ' + b.client_name : '') + (b.notes ? '\n' + b.notes : '');
+        var tooltipText = [
+          '项目: ' + b.project_name + (b.client_name ? ' (' + b.client_name + ')' : ''),
+          b.scope_name ? '工作范围: ' + b.scope_name : null,
+          '工时: ' + b.hours + 'h',
+          b.created_by_name ? '预订人: ' + b.created_by_name : null,
+          b.notes ? '备注: ' + b.notes : null
+        ].filter(Boolean).join('\n');
         html += '<div class="m-booking' + spanCls + '" data-booking-id="' + b.id + '"' +
           ' data-resource-id="' + b.resource_id + '"' +
           ' data-date="' + b.date + '"' +
@@ -1842,8 +1856,9 @@
         }
         if (showText) {
           var displayName = b.client_name || b.project_name;
+          var displayProj = displayName + (b.scope_name ? ' - ' + b.scope_name : '');
           html += '<span class="m-booking-hours">' + b.hours + 'h</span> ' +
-            '<span class="booking-project">' + esc(truncate(displayName, 18)) + '</span>';
+            '<span class="booking-project">' + esc(truncate(displayProj, 18)) + '</span>';
         }
         // Show resize handle for end of span or solo booking (cls is null)
         if (!si || si.cls === 'span-e' || !si.cls) {
@@ -2004,6 +2019,7 @@
         buildTimeFields(dateVal, endDateVal, hoursVal, bookingId) +
         '<div class="bk-separator"></div>' +
         buildProjectField(projects, selectedProjectId) +
+        buildScopeField(booking ? booking.project_scope_id : null) +
         buildTentativeField(tentChecked) +
         '<div class="bk-separator"></div>' +
         buildNotesField(notesVal) +
@@ -2040,6 +2056,9 @@
     initMultiSelect(null);
     initMultiSelect('to');
     initProjectSelect(selectedProjectId);
+
+    // Asynchronously populate booking scope field
+    updateBookingScopes(selectedProjectId, booking ? booking.project_scope_id : null);
 
     /* Init tab switching */
     initModalTabs(bookingId);
@@ -2424,6 +2443,49 @@
     '</div>';
   }
 
+  function buildScopeField(selectedScopeId) {
+    return '<div class="bk-field" id="bk-scope-container" style="display:none;">' +
+      '<svg class="bk-field-icon" viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M7 8h6M7 12h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' +
+      '<div class="bk-field-body">' +
+        '<div class="bk-field-label">工作范围 (Work Scope)</div>' +
+        '<select id="bk-scope" class="rg-select text-input form-control form-control-sm">' +
+          '<option value="">-- 无特定工作范围 --</option>' +
+        '</select>' +
+      '</div>' +
+    '</div>';
+  }
+
+  async function updateBookingScopes(projectId, selectedScopeId) {
+    var container = document.getElementById('bk-scope-container');
+    var select = document.getElementById('bk-scope');
+    if (!container || !select) return;
+
+    if (!projectId) {
+      container.style.display = 'none';
+      select.innerHTML = '<option value="">-- 无特定工作范围 --</option>';
+      return;
+    }
+
+    try {
+      var scopes = await api('/api/projects/' + projectId + '/scopes');
+      if (scopes && scopes.length > 0) {
+        var html = '<option value="">-- 无特定工作范围 --</option>';
+        scopes.forEach(function (s) {
+          var sel = s.id == selectedScopeId ? ' selected' : '';
+          html += '<option value="' + s.id + '"' + sel + '>' + esc(s.name) + '</option>';
+        });
+        select.innerHTML = html;
+        container.style.display = '';
+      } else {
+        container.style.display = 'none';
+        select.innerHTML = '<option value="">-- 无特定工作范围 --</option>';
+      }
+    } catch (e) {
+      console.error('Failed to load scopes for project ' + projectId, e);
+      container.style.display = 'none';
+    }
+  }
+
   function initProjectSelect(selectedProjectId) {
     var picker = document.getElementById('bk-project-picker');
     if (!picker) return;
@@ -2473,6 +2535,9 @@
       });
       opt.classList.add('selected');
       hiddenInput.value = pid;
+
+      // Load scopes dynamically
+      updateBookingScopes(pid, null);
 
       var nameEl = opt.querySelector('.ms-option-name');
       if (labelEl) {
@@ -2683,6 +2748,9 @@
     var resourceIds = getSelectedResourceIds();
     if (resourceIds.length === 0) { toast(t('schedule.search_resource'), 'error'); return; }
 
+    var scopeSelect = document.getElementById('bk-scope');
+    var projectScopeId = scopeSelect && scopeSelect.value ? parseInt(scopeSelect.value, 10) : null;
+
     try {
       if (id) {
         /* editing existing booking — check if date range changed */
@@ -2700,6 +2768,7 @@
           var data = {
             resource_id: resourceIds[0],
             project_id: projectId,
+            project_scope_id: projectScopeId,
             date: startDateVal,
             hours: Math.round(totalH * 10) / 10,
             is_tentative: document.getElementById('bk-tentative').checked,
@@ -2775,6 +2844,7 @@
               body: {
                 resource_id: resourceIds[0],
                 project_id: projectId,
+                project_scope_id: projectScopeId,
                 date: s[0],
                 end_date: s[s.length - 1],
                 hours: Math.round(totalH * 10) / 10,
@@ -2864,6 +2934,7 @@
                 body: {
                   resource_id: rid,
                   project_id: projectId,
+                  project_scope_id: projectScopeId,
                   date: s[0],
                   end_date: s[s.length - 1],
                   hours: Math.round(totalH * 10) / 10,
@@ -2883,6 +2954,7 @@
               body: {
                 resource_id: rid,
                 project_id: projectId,
+                project_scope_id: projectScopeId,
                 date: startDateVal,
                 end_date: endDateVal,
                 hours: Math.round(totalH * 10) / 10,
