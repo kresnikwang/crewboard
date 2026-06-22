@@ -316,7 +316,13 @@ function migrate(db) {
         `).run(dup.resource_id, dup.project_id, dup.date, dup.max_id);
       }
     }
-    db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_timesheets_unique ON timesheets(resource_id, project_id, date)');
+    try {
+      db.exec('DROP INDEX IF EXISTS idx_timesheets_unique');
+    } catch (_) {}
+    try {
+      db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_timesheets_unique_scope ON timesheets(resource_id, project_id, date, project_scope_id) WHERE project_scope_id IS NOT NULL');
+      db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_timesheets_unique_null_scope ON timesheets(resource_id, project_id, date) WHERE project_scope_id IS NULL');
+    } catch (_) {}
   } catch (_) { /* index may already exist or deduplication failed */ }
 
   // Create project_scopes table
