@@ -334,6 +334,7 @@ module.exports = function(db) {
   });
 
   router.post('/bookings', (req, res) => {
+    console.log('[DEBUG-POST-BOOKING] Received body:', req.body, 'user:', req.user?.id);
     const { resource_id, project_id, date, end_date, hours, is_tentative, notes } = req.body;
     const entId = req.user?.enterprise_id;
     if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
@@ -373,6 +374,10 @@ module.exports = function(db) {
     });
 
     const ids = batchInsert();
+
+    if (ids.length === 0) {
+      return res.status(400).json({ error: '所选日期已存在该项目的排程，无需重复创建' });
+    }
 
     // Webhook notification
     const r = db.prepare('SELECT name FROM resources WHERE id=?').get(resource_id);

@@ -80,7 +80,7 @@ window.api = async function api(path, opts = {}) {
   const res = await fetch(path, Object.assign({}, opts, { headers }));
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error(err.message || res.statusText);
+    throw new Error(err.message || err.error || res.statusText);
   }
   return res.json();
 };
