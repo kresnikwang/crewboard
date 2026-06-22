@@ -151,15 +151,20 @@ window.api = async function api(path, opts = {}) {
 
   window.apiCache = {
     /** Invalidate a specific URL (exact match) */
-    invalidate: function (url) { delete _cache[url]; },
-    /** Invalidate all URLs matching a prefix */
+    invalidate: function (url) { delete _cache[url]; delete _inflight[url]; },
+    /** Invalidate all URLs matching a prefix — also cancels in-flight requests
+     *  so that _fetchAndCache doesn't return a stale Promise after a mutation. */
     invalidatePrefix: function (prefix) {
       Object.keys(_cache).forEach(function (k) {
         if (k.indexOf(prefix) === 0) delete _cache[k];
       });
+      // Also drop any in-flight requests so the next fetch gets fresh data
+      Object.keys(_inflight).forEach(function (k) {
+        if (k.indexOf(prefix) === 0) delete _inflight[k];
+      });
     },
     /** Invalidate everything */
-    invalidateAll: function () { _cache = {}; },
+    invalidateAll: function () { _cache = {}; _inflight = {}; },
     /** Manually set cache for a URL (useful after mutation) */
     set: function (url, data) {
       _cache[url] = { data: data, timestamp: Date.now() };

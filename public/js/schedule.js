@@ -10,12 +10,16 @@
   var api   = window.api;
   var cachedApi = window.cachedApi;
 
-  /** Invalidate schedule caches and reload. Call after any booking/leave mutation. */
+  /** Invalidate schedule caches and reload. Call after any booking/leave mutation.
+   *  Resets the _isLoading lock so a concurrent background fetch can't block
+   *  the post-mutation reload from showing the newly created booking. */
   function reloadAfterMutation() {
     if (window.apiCache) {
       window.apiCache.invalidatePrefix('/api/schedule-data');
       window.apiCache.invalidatePrefix('/api/bookings');
     }
+    // Force-unlock in case a background SWR revalidation is mid-flight
+    if (window.loadSchedule) window.loadSchedule._isLoading = false;
     window.loadSchedule();
   }
 
