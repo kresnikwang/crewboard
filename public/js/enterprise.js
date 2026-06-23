@@ -546,6 +546,10 @@ window.loadAccount = async function loadAccount() {
   fileInput.addEventListener('change', function () {
     var file = fileInput.files[0];
     if (!file) return;
+    if (file.size > 3 * 1024 * 1024) {
+      toast('选择的头像图片大小不能超过 3MB', 'error');
+      return;
+    }
     if (!file.type.startsWith('image/')) {
       toast(t('account.select_image'), 'error');
       return;
@@ -614,38 +618,45 @@ function compressAndUploadAvatar(file) {
     var img = new Image();
     img.onload = function () {
       var canvas = document.createElement('canvas');
-      var maxSize = 400; // max dimension px
+      var maxSize = 500; // max dimension px
       var w = img.width;
       var h = img.height;
-
+ 
       // Scale down
       if (w > h) {
         if (w > maxSize) { h = Math.round(h * maxSize / w); w = maxSize; }
       } else {
         if (h > maxSize) { w = Math.round(w * maxSize / h); h = maxSize; }
       }
-
+ 
       canvas.width = w;
       canvas.height = h;
       var ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, w, h);
-
-      // Try JPEG at decreasing quality until under 500KB
-      var quality = 0.9;
-      var dataUrl;
-      for (var q = quality; q >= 0.3; q -= 0.1) {
-        dataUrl = canvas.toDataURL('image/jpeg', q);
-        // Estimate base64 size: base64 length * 0.75 = bytes
-        var sizeKB = (dataUrl.length - 'data:image/jpeg;base64,'.length) * 0.75 / 1024;
-        if (sizeKB <= 500) break;
+ 
+      // Try WebP first, fall back to JPEG if not supported
+      var mimeType = 'image/webp';
+      var testUrl = canvas.toDataURL('image/webp');
+      if (!testUrl.startsWith('data:image/webp')) {
+        mimeType = 'image/jpeg';
       }
 
+      // Try compressing at decreasing quality until under 500KB
+      var quality = 0.9;
+      var dataUrl;
+      for (var q = quality; q >= 0.2; q -= 0.1) {
+        dataUrl = canvas.toDataURL(mimeType, q);
+        var base64Part = dataUrl.split(',')[1];
+        var sizeKB = base64Part ? (base64Part.length * 0.75 / 1024) : 0;
+        if (sizeKB <= 500) break;
+      }
+ 
       // Update preview immediately
       var previewEl = document.getElementById('avatar-preview');
       if (previewEl) {
         previewEl.innerHTML = '<img src="' + dataUrl + '" class="avatar-preview-img" id="avatar-img">';
       }
-
+ 
       // Upload to server
       uploadAvatarData(dataUrl);
     };

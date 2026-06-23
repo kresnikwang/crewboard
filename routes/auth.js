@@ -350,8 +350,8 @@ module.exports = function(db) {
     const buffer = Buffer.from(base64Data, 'base64');
 
     // Check size (should be under 500KB after client compression)
-    if (buffer.length > 600 * 1024) {
-      return res.status(400).json({ error: '图片过大，请压缩后重试' });
+    if (buffer.length > 500 * 1024) {
+      return res.status(400).json({ error: '头像压缩后文件大小不能超过 500KB' });
     }
 
     // Ensure avatars directory exists
