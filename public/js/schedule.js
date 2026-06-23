@@ -621,9 +621,13 @@
      -------------------------------------------------- */
   function buildResourceRow(r, days, bMap, lMap) {
     var initial = r.name.charAt(0);
+    var avatarHtml = r.avatar
+      ? '<img class="resource-avatar" src="' + r.avatar + '" style="object-fit:cover;">'
+      : '<div class="resource-avatar" style="background:' + (r.color || '#3B7DDD') + '">' + initial + '</div>';
+
     var html = '<tr>' +
       '<td><div class="resource-cell">' +
-        '<div class="resource-avatar" style="background:' + (r.color || '#3B7DDD') + '">' + initial + '</div>' +
+        avatarHtml +
         '<div class="resource-info">' +
           '<div class="resource-name">' + r.name + '</div>' +
           '<div class="resource-role">' + (r.role || '') + '</div>' +
@@ -1786,9 +1790,13 @@
 
   function buildMonthResourceRow(r, days, bMap, lMap) {
     var initial = r.name.charAt(0);
+    var avatarHtml = r.avatar
+      ? '<img class="m-res-avatar" src="' + r.avatar + '" style="object-fit:cover;">'
+      : '<div class="m-res-avatar" style="background:' + (r.color || '#3B7DDD') + '">' + initial + '</div>';
+
     var html = '<tr>';
     html += '<td class="m-res-cell"><div class="m-res-inner">' +
-      '<div class="m-res-avatar" style="background:' + (r.color || '#3B7DDD') + '">' + initial + '</div>' +
+      avatarHtml +
       '<div><div class="m-res-name">' + esc(r.name) + '</div>' +
       '<div class="m-res-role">' + esc(r.role || '') + '</div></div>' +
     '</div></td>';
@@ -2023,7 +2031,7 @@
         buildTentativeField(tentChecked) +
         '<div class="bk-separator"></div>' +
         buildNotesField(notesVal) +
-        (booking ? buildCreatedByField(booking.created_by_name, booking.created_at) : '') +
+        (booking ? buildCreatedByField(booking.created_by_name, booking.created_at, booking.created_by_avatar) : '') +
       '</div>' +
       /* ---- TIME OFF TAB ---- */
       '<div class="bk-tab-content" id="bk-tab-timeoff">' +
@@ -2108,6 +2116,7 @@
         '<div class="bk-field-body"><div class="bk-field-label">' + t('common.notes') + '</div>' +
           '<textarea id="batch-notes" class="text-input form-control" rows="2" style="resize:vertical" placeholder="' + t('schedule.optional_notes') + '">' + esc(first.notes || '') + '</textarea>' +
         '</div></div>' +
+      buildCreatedByField(first.created_by_name, first.created_at, first.created_by_avatar) +
       '<div class="bk-batch-preview" id="batch-preview">' +
         '<div class="bk-batch-preview-title">' + t('schedule.preview_changes') + '</div>' +
         '<div class="bk-batch-preview-list">' + groupBookings.map(function (b) {
@@ -2606,7 +2615,7 @@
   }
 
   /* ---- Created by field (read-only, shown in edit mode) ---- */
-  function buildCreatedByField(creatorName, createdAt) {
+  function buildCreatedByField(creatorName, createdAt, avatarUrl) {
     if (!creatorName && !createdAt) return '';
     var info = '';
     if (creatorName) info += esc(creatorName);
@@ -2614,12 +2623,26 @@
       var d = createdAt.replace('T', ' ').substring(0, 16);
       info += (info ? ', ' : '') + d;
     }
+
+    var avatarPart = '';
+    if (avatarUrl) {
+      avatarPart = '<img src="' + avatarUrl + '" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover; flex-shrink: 0; display: block;">';
+    } else {
+      var initial = creatorName ? creatorName.charAt(0) : '?';
+      avatarPart = '<div style="width: 24px; height: 24px; border-radius: 50%; background: #9CA3AF; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0;">' + esc(initial) + '</div>';
+    }
+
     return '<div class="bk-separator"></div>' +
-      '<div class="bk-field">' +
-        '<svg class="bk-field-icon" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="7" r="3.5" stroke="currentColor" stroke-width="1.5"/><path d="M3 17.5c0-3.5 3.1-5.5 7-5.5s7 2 7 5.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' +
-        '<div class="bk-field-body">' +
-          '<div class="bk-field-label">' + t('schedule.booker') + '</div>' +
-          '<div style="font-size:13px;color:var(--text-secondary)">' + info + '</div>' +
+      '<div class="bk-field" style="display: flex; align-items: center; gap: 14px; margin-bottom: 18px;">' +
+        '<div style="width: 20px; display: flex; justify-content: center; color: var(--text-tertiary);">' +
+          '<svg class="bk-field-icon" style="margin:0;" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="7" r="3.5" stroke="currentColor" stroke-width="1.5"/><path d="M3 17.5c0-3.5 3.1-5.5 7-5.5s7 2 7 5.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' +
+        '</div>' +
+        '<div class="bk-field-body" style="flex: 1; min-width: 0;">' +
+          '<div class="bk-field-label" style="font-size: 11px; font-weight: 500; color: var(--text-secondary); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .3px;">' + t('schedule.booker') + '</div>' +
+          '<div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-secondary);">' +
+            avatarPart +
+            '<span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + info + '</span>' +
+          '</div>' +
         '</div>' +
       '</div>';
   }

@@ -342,15 +342,22 @@ module.exports = function(db) {
     if (!start || !end) return res.status(400).json({ error: '缺少日期参数' });
 
     /* Resources */
-    const resources = db.prepare(
-      'SELECT * FROM resources WHERE is_active = 1 AND enterprise_id = ? ORDER BY team, name'
-    ).all(entId);
+    const resources = db.prepare(`
+      SELECT r.*, u.avatar
+      FROM resources r
+      LEFT JOIN users u
+        ON lower(r.email) = lower(u.email)
+        AND u.enterprise_id = r.enterprise_id
+        AND u.status = 'active'
+      WHERE r.is_active = 1 AND r.enterprise_id = ?
+      ORDER BY r.team, r.name
+    `).all(entId);
 
     /* Bookings with joined names */
     const bookings = db.prepare(`
       SELECT b.*, r.name as resource_name, r.color as resource_color, r.team,
              p.name as project_name, COALESCE(c.color, p.color) as project_color, c.name as client_name,
-             u.name as created_by_name, ps.name as scope_name
+             u.name as created_by_name, u.avatar as created_by_avatar, ps.name as scope_name
       FROM bookings b
       JOIN resources r ON b.resource_id = r.id
       JOIN projects p ON b.project_id = p.id
@@ -422,7 +429,7 @@ module.exports = function(db) {
     let sql = `
       SELECT b.*, r.name as resource_name, r.color as resource_color, r.team,
              p.name as project_name, COALESCE(c.color, p.color) as project_color, c.name as client_name,
-             u.name as created_by_name, ps.name as scope_name
+             u.name as created_by_name, u.avatar as created_by_avatar, ps.name as scope_name
       FROM bookings b
       JOIN resources r ON b.resource_id = r.id
       JOIN projects p ON b.project_id = p.id
