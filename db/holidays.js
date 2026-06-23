@@ -100,7 +100,7 @@ function isWorkingDay(dateStr) {
   const h = holidays[dateStr];
   if (h) return h.type === 'workday';
   const d = new Date(dateStr);
-  const day = d.getDay();
+  const day = d.getUTCDay();
   return day !== 0 && day !== 6;
 }
 

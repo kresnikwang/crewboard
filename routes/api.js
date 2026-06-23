@@ -1027,7 +1027,7 @@ module.exports = function(db) {
       let count = 0;
       while (d <= end) {
         const dateStr = d.toISOString().split('T')[0];
-        const day = d.getDay();
+        const day = d.getUTCDay();
         const holiday = getHoliday(dateStr);
 
         // 调休上班日（workday）即使是周末也要允许创建休假
@@ -1039,7 +1039,7 @@ module.exports = function(db) {
           insert.run(resource_id, dateStr, leaveType, leaveNotes);
           count++;
         }
-        d.setDate(d.getDate() + 1);
+        d.setUTCDate(d.getUTCDate() + 1);
       }
       return count;
     });
@@ -1065,7 +1065,7 @@ module.exports = function(db) {
       const end = new Date(end_date);
       while (d <= end) {
         const dateStr = d.toISOString().split('T')[0];
-        const day = d.getDay();
+        const day = d.getUTCDay();
         const holiday = getHoliday(dateStr);
         const isWeekend = day === 0 || day === 6;
 
@@ -1073,7 +1073,7 @@ module.exports = function(db) {
         if (holiday && holiday.type === 'holiday' && !isWeekend) {
           holidayDates.push({ dateStr, name: holiday.name });
         }
-        d.setDate(d.getDate() + 1);
+        d.setUTCDate(d.getUTCDate() + 1);
       }
 
       for (const rid of resource_ids) {
