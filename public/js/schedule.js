@@ -2682,7 +2682,20 @@
     var info = '';
     if (creatorName) info += esc(creatorName);
     if (createdAt) {
-      var d = createdAt.replace('T', ' ').substring(0, 16);
+      var isoString = createdAt.replace(' ', 'T');
+      if (isoString.indexOf('Z') === -1 && isoString.indexOf('+') === -1) {
+        isoString += 'Z';
+      }
+      var dateObj = new Date(isoString);
+      var d = createdAt.replace('T', ' ').substring(0, 16); // Default fallback
+      if (!isNaN(dateObj.getTime())) {
+        var yyyy = dateObj.getFullYear();
+        var mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+        var dd = String(dateObj.getDate()).padStart(2, '0');
+        var hh = String(dateObj.getHours()).padStart(2, '0');
+        var min = String(dateObj.getMinutes()).padStart(2, '0');
+        d = yyyy + '-' + mm + '-' + dd + ' ' + hh + ':' + min;
+      }
       info += (info ? ', ' : '') + d;
     }
 
