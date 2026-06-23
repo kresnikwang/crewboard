@@ -650,28 +650,36 @@
       <!-- Feature 2 -->
       <div class="feature-card">
         <div class="feature-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
         </div>
-        <h3 class="feature-title">实际工时追踪 (Timesheets)</h3>
-        <p class="feature-desc">支持员工每天按项目填报实际耗时。提供「从排程复制」的快捷功能，将规划工时一键转为实际填报，极大地简化日常报工流程。</p>
+        <h3 class="feature-title">工作范围细分 (Scopes)</h3>
+        <p class="feature-desc">支持将项目拆分为多个工作范围（如前端、设计、测试等）。排程与工时填报可精确追踪到工作范围，实现细颗粒度的人力管控。</p>
       </div>
       <!-- Feature 3 -->
       <div class="feature-card">
         <div class="feature-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
         </div>
-        <h3 class="feature-title">多维度报表分析与 Excel 导出</h3>
-        <p class="feature-desc">内置人员饱和度与利用率计算，以及项目累计投入分析。支持多 Sheet 高格式的 Excel 导出，方便向决策层和财务团队汇报。</p>
+        <h3 class="feature-title">实际工时表 (Timesheets)</h3>
+        <p class="feature-desc">支持员工按天、项目及特定范围填报工时。提供「从排程复制」的快捷功能，将规划工时一键转为实际填报，极大地简化日常报工。</p>
       </div>
       <!-- Feature 4 -->
       <div class="feature-card">
         <div class="feature-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
         </div>
-        <h3 class="feature-title">人员与项目库配置</h3>
-        <p class="feature-desc">快速建立客户、项目库以及团队资源的匹配。管理员可以通过专属色标、部门/团队分类来标识人员，便于在大团队中快速过滤和查找。</p>
+        <h3 class="feature-title">多维度报表与下钻分析</h3>
+        <p class="feature-desc">内置人员饱和度与利用率计算。项目工时表支持按人员和工作范围（Scope）双维度进行下钻（Drill-down）分析，并支持高格式 Excel 导出。</p>
       </div>
       <!-- Feature 5 -->
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><polyline points="17 11 19 13 23 9"></polyline></svg>
+        </div>
+        <h3 class="feature-title">项目协同管理 (Co-management)</h3>
+        <p class="feature-desc">管理员可为项目经理分配协同管理项目。副项目经理与主负责人拥有同等排班、工作范围编辑和查看数据报表的权限，便于团队协作。</p>
+      </div>
+      <!-- Feature 6 -->
       <div class="feature-card">
         <div class="feature-icon">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
@@ -679,13 +687,21 @@
         <h3 class="feature-title">多租户与权限体系</h3>
         <p class="feature-desc">基于企业代码隔离多企业数据。拥有 Admin（全权所有者）、Manager（创建/编辑负责项目）、Basic（只读查看自己排程）三级角色控制。</p>
       </div>
-      <!-- Feature 6 -->
+      <!-- Feature 7 -->
       <div class="feature-card">
         <div class="feature-icon">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
         </div>
         <h3 class="feature-title">休假联动与节假日更新</h3>
         <p class="feature-desc">人员休假计划在排程日历上智能体现。系统集成了年度节假日抓取脚本，每年 12 月自动抓取下一年的法定节假日与调休，排班永不冲突。</p>
+      </div>
+      <!-- Feature 8 -->
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+        </div>
+        <h3 class="feature-title">IM 协同与企微深度同步</h3>
+        <p class="feature-desc">集成微信/钉钉/飞书群机器人，发生排班变动即刻发送群消息。同时支持通过自建应用一键同步企业微信的组织架构并推送个人卡片通知。</p>
       </div>
     </div>
   </section>
