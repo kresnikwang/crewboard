@@ -2689,12 +2689,35 @@
       var dateObj = new Date(isoString);
       var d = createdAt.replace('T', ' ').substring(0, 16); // Default fallback
       if (!isNaN(dateObj.getTime())) {
-        var yyyy = dateObj.getFullYear();
-        var mm = String(dateObj.getMonth() + 1).padStart(2, '0');
-        var dd = String(dateObj.getDate()).padStart(2, '0');
-        var hh = String(dateObj.getHours()).padStart(2, '0');
-        var min = String(dateObj.getMinutes()).padStart(2, '0');
-        d = yyyy + '-' + mm + '-' + dd + ' ' + hh + ':' + min;
+        var tz = (state && state.enterprise && state.enterprise.timezone) || null;
+        var options = {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        };
+        if (tz) {
+          options.timeZone = tz;
+        }
+        try {
+          var formatter = new Intl.DateTimeFormat('zh-CN', options);
+          var parts = formatter.formatToParts(dateObj);
+          var partMap = {};
+          parts.forEach(function (p) {
+            partMap[p.type] = p.value;
+          });
+          d = partMap.year + '-' + partMap.month + '-' + partMap.day + ' ' + partMap.hour + ':' + partMap.minute;
+        } catch (err) {
+          console.error('Timezone formatting error', err);
+          var yyyy = dateObj.getFullYear();
+          var mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+          var dd = String(dateObj.getDate()).padStart(2, '0');
+          var hh = String(dateObj.getHours()).padStart(2, '0');
+          var min = String(dateObj.getMinutes()).padStart(2, '0');
+          d = yyyy + '-' + mm + '-' + dd + ' ' + hh + ':' + min;
+        }
       }
       info += (info ? ', ' : '') + d;
     }

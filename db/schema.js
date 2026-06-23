@@ -304,6 +304,9 @@ function migrate(db) {
     db.exec('ALTER TABLE enterprises ADD COLUMN wecom_department_id INTEGER DEFAULT 1');
   }
   db.exec('UPDATE enterprises SET wecom_department_id = 1 WHERE wecom_department_id IS NULL OR wecom_department_id = 0');
+  if (!entCols.find(c => c.name === 'timezone')) {
+    db.exec("ALTER TABLE enterprises ADD COLUMN timezone TEXT DEFAULT 'Asia/Shanghai'");
+  }
 
   // Add UNIQUE INDEXes on timesheets to prevent duplicates within the same scope bucket.
   // First deduplicate: keep the highest-id row for each (resource_id, project_id, date, project_scope_id).

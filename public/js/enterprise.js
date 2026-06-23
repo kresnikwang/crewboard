@@ -175,6 +175,20 @@ window.loadEnterprise = async function loadEnterprise() {
         }).join('')
       : '<option value="">' + escHtml(t('wecom.test_no_matched_employees')) + '</option>';
 
+    var currentTimezone = ent.timezone || 'Asia/Shanghai';
+    var timezoneOptions = [
+      { value: 'Asia/Shanghai', label: 'Asia/Shanghai (北京 / Beijing)' },
+      { value: 'Asia/Tokyo', label: 'Asia/Tokyo (东京 / Tokyo)' },
+      { value: 'Europe/London', label: 'Europe/London (伦敦 / London)' },
+      { value: 'America/New_York', label: 'America/New_York (纽约 / New York)' },
+      { value: 'America/Los_Angeles', label: 'America/Los_Angeles (洛杉矶 / Los Angeles)' },
+      { value: 'UTC', label: 'UTC (UTC)' }
+    ];
+    var timezoneOptionsHtml = timezoneOptions.map(function (tz) {
+      var selected = tz.value === currentTimezone ? ' selected' : '';
+      return '<option value="' + tz.value + '"' + selected + '>' + escHtml(tz.label) + '</option>';
+    }).join('');
+
     var settingsHtml =
       '<div class="section-card card mb-3">' +
         '<h3>' + t('wecom.app_title') + '</h3>' +
@@ -216,6 +230,15 @@ window.loadEnterprise = async function loadEnterprise() {
           '</select>' +
         '</div>' +
         '<button class="btn btn-primary" id="btn-send-wecom-test" ' + (matchedWeComResources.length ? '' : 'disabled') + '>' + t('wecom.test_send') + '</button>' +
+      '</div>' +
+      '<div class="section-card card mb-3">' +
+        '<h3>' + t('enterprise.timezone') + '</h3>' +
+        '<p style="color:var(--text-secondary);margin-bottom:12px">' + t('enterprise.timezone_desc') + '</p>' +
+        '<div class="form-group mb-3">' +
+          '<select id="set-enterprise-timezone" class="text-input form-control">' +
+            timezoneOptionsHtml +
+          '</select>' +
+        '</div>' +
       '</div>' +
       '<div class="section-card card mb-3">' +
         '<h3>' + t('theme.title') + '</h3>' +
@@ -260,6 +283,7 @@ window.loadEnterprise = async function loadEnterprise() {
         wecom_secret: document.getElementById('set-wecom-secret').value.trim(),
         wecom_department_id: document.getElementById('set-wecom-department-id').value.trim() || '1',
         theme_color: selectedTheme,
+        timezone: document.getElementById('set-enterprise-timezone').value,
       };
     }
 

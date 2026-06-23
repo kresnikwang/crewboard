@@ -549,7 +549,9 @@
     'enterprise.send_invite': '发送邀请', 'enterprise.invite_sent': '邀请已发送',
     'enterprise.invite_failed': '邀请失败，请检查邮箱', 'enterprise.invite_cancelled': '邀请已取消',
     'enterprise.no_invites': '暂无待处理的邀请',
-    'enterprise.requests_load_failed': '加载申请失败，请刷新重试'
+    'enterprise.requests_load_failed': '加载申请失败，请刷新重试',
+    'enterprise.timezone': '公司时区',
+    'enterprise.timezone_desc': '决定预定信息等时间的显示时区。默认为北京时间。'
   });
   Object.assign(translations.en, {
     'enterprise.title': 'Enterprise', 'enterprise.create': 'Create Enterprise',
@@ -579,7 +581,9 @@
     'enterprise.send_invite': 'Send Invite', 'enterprise.invite_sent': 'Invite sent',
     'enterprise.invite_failed': 'Invite failed', 'enterprise.invite_cancelled': 'Invite cancelled',
     'enterprise.no_invites': 'No pending invites',
-    'enterprise.requests_load_failed': 'Failed to load requests'
+    'enterprise.requests_load_failed': 'Failed to load requests',
+    'enterprise.timezone': 'Company Timezone',
+    'enterprise.timezone_desc': 'Determines the timezone for displaying booking and audit times. Defaults to Beijing Time (Asia/Shanghai).'
   });
 
   // --- account ---

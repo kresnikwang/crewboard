@@ -72,7 +72,7 @@ module.exports = function(db) {
     }
 
     const enterprise = enterprise_id
-      ? db.prepare('SELECT id, name, code, webhook_dingtalk, webhook_wecom, webhook_feishu, wecom_corp_id, wecom_agent_id, wecom_secret, wecom_department_id, currency, theme_color FROM enterprises WHERE id = ?').get(enterprise_id)
+      ? db.prepare('SELECT id, name, code, webhook_dingtalk, webhook_wecom, webhook_feishu, wecom_corp_id, wecom_agent_id, wecom_secret, wecom_department_id, currency, theme_color, timezone FROM enterprises WHERE id = ?').get(enterprise_id)
       : null;
 
     res.json({
@@ -96,7 +96,7 @@ module.exports = function(db) {
     db.prepare('INSERT INTO sessions (token, user_id, expires_at) VALUES (?,?,?)').run(token, user.id, expires);
 
     const enterprise = user.enterprise_id
-      ? db.prepare('SELECT id, name, code, webhook_dingtalk, webhook_wecom, webhook_feishu, wecom_corp_id, wecom_agent_id, wecom_secret, wecom_department_id, currency, theme_color FROM enterprises WHERE id = ?').get(user.enterprise_id)
+      ? db.prepare('SELECT id, name, code, webhook_dingtalk, webhook_wecom, webhook_feishu, wecom_corp_id, wecom_agent_id, wecom_secret, wecom_department_id, currency, theme_color, timezone FROM enterprises WHERE id = ?').get(user.enterprise_id)
       : null;
 
     res.json({
@@ -117,7 +117,7 @@ module.exports = function(db) {
   router.get('/me', (req, res) => {
     if (!req.user) return res.status(401).json({ error: '未登录' });
     const enterprise = req.user.enterprise_id
-      ? db.prepare('SELECT id, name, code, webhook_dingtalk, webhook_wecom, webhook_feishu, wecom_corp_id, wecom_agent_id, wecom_secret, wecom_department_id, currency, theme_color FROM enterprises WHERE id = ?').get(req.user.enterprise_id)
+      ? db.prepare('SELECT id, name, code, webhook_dingtalk, webhook_wecom, webhook_feishu, wecom_corp_id, wecom_agent_id, wecom_secret, wecom_department_id, currency, theme_color, timezone FROM enterprises WHERE id = ?').get(req.user.enterprise_id)
       : null;
     res.json({ user: req.user, enterprise });
   });
@@ -287,9 +287,10 @@ module.exports = function(db) {
       wecom_secret,
       wecom_department_id,
       currency,
-      theme_color
+      theme_color,
+      timezone
     } = req.body;
-    db.prepare(`UPDATE enterprises SET name=?, webhook_dingtalk=?, webhook_wecom=?, webhook_feishu=?, wecom_corp_id=?, wecom_agent_id=?, wecom_secret=?, wecom_department_id=?, currency=?, theme_color=? WHERE id=?`)
+    db.prepare(`UPDATE enterprises SET name=?, webhook_dingtalk=?, webhook_wecom=?, webhook_feishu=?, wecom_corp_id=?, wecom_agent_id=?, wecom_secret=?, wecom_department_id=?, currency=?, theme_color=?, timezone=? WHERE id=?`)
       .run(
         name,
         webhook_dingtalk || '',
@@ -301,6 +302,7 @@ module.exports = function(db) {
         Math.max(1, parseInt(wecom_department_id, 10) || 1),
         currency || 'CNY',
         theme_color || '',
+        timezone || 'Asia/Shanghai',
         req.user.enterprise_id
       );
     res.json({ ok: true });
