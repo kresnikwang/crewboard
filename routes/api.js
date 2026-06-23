@@ -1049,6 +1049,47 @@ module.exports = function(db) {
     sseBroadcast(req.user?.enterprise_id, 'schedule-change', { action: 'leave-batch' }, req.user?.id);
   });
 
+  // Book public holidays for selected resources and date range (weekdays only)
+  router.post('/leave/book-holidays', (req, res) => {
+    const { resource_ids, start_date, end_date } = req.body;
+    if (!resource_ids || !Array.isArray(resource_ids) || resource_ids.length === 0 || !start_date || !end_date) {
+      return res.status(400).json({ error: '缺少必要参数' });
+    }
+
+    const insert = db.prepare('INSERT OR IGNORE INTO leave_entries (resource_id, date, type, notes) VALUES (?,?,?,?)');
+    const batchInsert = db.transaction(() => {
+      let totalCount = 0;
+      const holidayDates = [];
+
+      const d = new Date(start_date);
+      const end = new Date(end_date);
+      while (d <= end) {
+        const dateStr = d.toISOString().split('T')[0];
+        const day = d.getDay();
+        const holiday = getHoliday(dateStr);
+        const isWeekend = day === 0 || day === 6;
+
+        // Only book official holidays that fall on Monday to Friday
+        if (holiday && holiday.type === 'holiday' && !isWeekend) {
+          holidayDates.push({ dateStr, name: holiday.name });
+        }
+        d.setDate(d.getDate() + 1);
+      }
+
+      for (const rid of resource_ids) {
+        for (const h of holidayDates) {
+          const info = insert.run(rid, h.dateStr, 'holiday', h.name);
+          totalCount += info.changes;
+        }
+      }
+      return { totalCount, bookedHolidays: holidayDates };
+    });
+
+    const result = batchInsert();
+    res.json({ ok: true, count: result.totalCount, bookedHolidays: result.bookedHolidays });
+    sseBroadcast(req.user?.enterprise_id, 'schedule-change', { action: 'leave-batch' }, req.user?.id);
+  });
+
   router.put('/leave/:id', (req, res) => {
     const { type, notes, date } = req.body;
     const existing = db.prepare('SELECT * FROM leave_entries WHERE id = ?').get(req.params.id);

@@ -228,7 +228,13 @@
     'schedule.split_booking': '分割排程',
     'schedule.cannot_split': '无法在此处分割',
     'schedule.split_ready': '已分割，点击任一部分可编辑',
-    'schedule.split_failed': '分割失败，请重试'
+    'schedule.split_failed': '分割失败，请重试',
+    'schedule.book_holidays_btn': '一键预订法定节假日',
+    'schedule.select_date_range': '请选择日期范围',
+    'schedule.book_holidays_confirm_prompt': '确认要为所选人员预订从 {start} 到 {end} 之间的所有周一至周五的法定节假日吗？',
+    'schedule.book_holidays_success': '成功预订了 {count} 天的法定节假日！',
+    'schedule.book_holidays_none': '所选时间段内没有周一至周五的法定节假日。',
+    'schedule.book_holidays_failed': '一键预订法定节假日失败'
   });
   Object.assign(translations.en, {
     'schedule.title': 'Schedule', 'schedule.week_view': 'Week', 'schedule.month_view': 'Month',
@@ -283,7 +289,13 @@
     'schedule.split_booking': 'Split Schedule',
     'schedule.cannot_split': 'Cannot split here',
     'schedule.split_ready': 'Split complete. Click either part to edit',
-    'schedule.split_failed': 'Split failed, please retry'
+    'schedule.split_failed': 'Split failed, please retry',
+    'schedule.book_holidays_btn': 'Book Public Holidays',
+    'schedule.select_date_range': 'Please select a date range',
+    'schedule.book_holidays_confirm_prompt': 'Are you sure you want to book all Monday-to-Friday public holidays between {start} and {end} for the selected staff?',
+    'schedule.book_holidays_success': 'Successfully booked {count} day(s) of public holidays!',
+    'schedule.book_holidays_none': 'No Monday-to-Friday public holidays found in the selected date range.',
+    'schedule.book_holidays_failed': 'Failed to book public holidays'
   });
 
   // --- timesheets ---

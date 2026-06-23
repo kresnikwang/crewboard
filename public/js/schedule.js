@@ -2381,6 +2381,12 @@
           '<input type="date" id="to-date-end" class="text-input form-control form-control-sm" value="' + endDateVal + '" onchange="window._updateToTotal()">' +
         '</div>' +
         '<div class="bk-total" id="to-total"></div>' +
+        '<div style="margin-top: 10px;">' +
+          '<button type="button" class="btn btn-outline" style="width:100%; display:inline-flex; align-items:center; justify-content:center; gap:6px; font-size:12px; padding:4px 8px; border-color:var(--primary-color,#3B7DDD); color:var(--primary-color,#3B7DDD);" onclick="window.bookPublicHolidays()">' +
+            '<svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="3" y="4" width="14" height="13" rx="2"/><path d="M3 8h14M7 2v4M13 2v4M7 12h6M10 10v4"/></svg>' +
+            t('schedule.book_holidays_btn') +
+          '</button>' +
+        '</div>' +
       '</div>' +
     '</div>';
   }
@@ -3038,6 +3044,54 @@
       toast(err.message || t('schedule.add_leave_failed'), 'error');
     }
   }
+
+  /* --------------------------------------------------
+     6b. bookPublicHolidays
+     -------------------------------------------------- */
+  window.bookPublicHolidays = async function () {
+    var resourceIds = getSelectedResourceIds('to');
+    var startDate = document.getElementById('to-date-start').value;
+    var endDate = document.getElementById('to-date-end').value || startDate;
+
+    if (resourceIds.length === 0) {
+      toast(t('schedule.search_resource'), 'error');
+      return;
+    }
+
+    if (!startDate) {
+      toast(t('schedule.select_date_range'), 'error');
+      return;
+    }
+
+    var confirmed = window.confirm(t('schedule.book_holidays_confirm_prompt', { start: startDate, end: endDate }));
+    if (!confirmed) return;
+
+    try {
+      var res = await api('/api/leave/book-holidays', {
+        method: 'POST',
+        body: {
+          resource_ids: resourceIds,
+          start_date: startDate,
+          end_date: endDate
+        }
+      });
+
+      if (res.ok) {
+        if (res.count > 0) {
+          toast(t('schedule.book_holidays_success', { count: res.count }), 'success');
+          document.getElementById('modal').classList.remove('bk-modal');
+          closeModal();
+          reloadAfterMutation();
+        } else {
+          toast(t('schedule.book_holidays_none'), 'info');
+        }
+      } else {
+        toast(res.error || t('schedule.book_holidays_failed'), 'error');
+      }
+    } catch (err) {
+      toast(err.message || t('schedule.book_holidays_failed'), 'error');
+    }
+  };
 
   /* --------------------------------------------------
      7. editBooking & deleteBooking
