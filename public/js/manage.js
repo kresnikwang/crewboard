@@ -203,7 +203,7 @@ window.showResourceModal = async function showResourceModal(id) {
     '<div class="rg-field">' +
       '<div class="rg-field-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="7" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M3 18c0-3.3 2.7-6 7-6s7 2.7 7 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>' +
       '<div class="rg-field-body">' +
-        '<label class="rg-label">' + t('common.name') + ' <span style="color:#EF4444">*</span></label>' +
+        '<label class="rg-label" for="res-name">' + t('common.name') + ' <span style="color:#EF4444">*</span></label>' +
         '<input class="rg-input" type="text" id="res-name" value="' + escapeAttr(resource ? resource.name : '') + '" placeholder="' + t('manage.input_name') + '">' +
       '</div>' +
     '</div>' +
@@ -219,7 +219,7 @@ window.showResourceModal = async function showResourceModal(id) {
     '<div class="rg-field">' +
       '<div class="rg-field-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="4" width="16" height="13" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M7 4V2h6v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>' +
       '<div class="rg-field-body">' +
-        '<label class="rg-label">' + t('manage.position_label') + '</label>' +
+        '<label class="rg-label" for="res-role">' + t('manage.position_label') + '</label>' +
         '<input class="rg-input" type="text" id="res-role" value="' + escapeAttr(resource ? resource.role : '') + '" placeholder="' + t('manage.position_placeholder') + '">' +
       '</div>' +
     '</div>' +
@@ -227,7 +227,7 @@ window.showResourceModal = async function showResourceModal(id) {
     '<div class="rg-field">' +
       '<div class="rg-field-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="4" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M2 6l8 5 8-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>' +
       '<div class="rg-field-body">' +
-        '<label class="rg-label">' + t('common.email') + '</label>' +
+        '<label class="rg-label" for="res-email">' + t('common.email') + '</label>' +
         '<input class="rg-input" type="email" id="res-email" value="' + escapeAttr(resource ? resource.email : '') + '" placeholder="name@company.com">' +
       '</div>' +
     '</div>' +
@@ -235,7 +235,7 @@ window.showResourceModal = async function showResourceModal(id) {
     '<div class="rg-field">' +
       '<div class="rg-field-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="7" cy="7" r="2.5" stroke="currentColor" stroke-width="1.5"/><circle cx="13" cy="7" r="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M1 17c0-2.5 2-4.5 5-4.5h1M14 12.5c3 0 5 2 5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>' +
       '<div class="rg-field-body">' +
-        '<label class="rg-label">' + t('manage.team_label') + '</label>' +
+        '<label class="rg-label" for="res-team">' + t('manage.team_label') + '</label>' +
         '<input class="rg-input" type="text" id="res-team" value="' + escapeAttr(resource ? resource.team : '') + '" placeholder="' + t('manage.team_placeholder') + '">' +
       '</div>' +
     '</div>' +
@@ -243,7 +243,7 @@ window.showResourceModal = async function showResourceModal(id) {
     '<div class="rg-field">' +
       '<div class="rg-field-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>' +
       '<div class="rg-field-body">' +
-        '<label class="rg-label">' + t('manage.hours_day') + '</label>' +
+        '<label class="rg-label" for="res-hours">' + t('manage.hours_day') + '</label>' +
         '<input class="rg-input" type="number" id="res-hours" min="0" max="24" step="0.5" value="' + (resource && resource.hours_per_day != null ? resource.hours_per_day : 8) + '" style="width:100px">' +
       '</div>' +
     '</div>';
