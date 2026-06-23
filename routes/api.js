@@ -180,6 +180,29 @@ module.exports = function(db) {
   });
 
   // === PROJECTS ===
+  // Permission helper: can this user edit/manage a specific project (and its scopes)?
+  // admin: yes | manager: creator OR co-manager | basic: no
+  function canEditProject(user, projectId) {
+    if (!user) return false;
+    if (user.role === 'admin') return true;
+    if (user.role === 'manager') {
+      const proj = db.prepare('SELECT created_by FROM projects WHERE id = ?').get(projectId);
+      if (!proj) return false;
+      if (proj.created_by === user.id) return true;
+      if (user.managed_project_ids) {
+        try {
+          const managedIds = JSON.parse(user.managed_project_ids);
+          if (Array.isArray(managedIds) && managedIds.includes(Number(projectId))) {
+            return true;
+          }
+        } catch (e) {
+          console.error('[canEditProject] Error parsing managed_project_ids:', e);
+        }
+      }
+    }
+    return false;
+  }
+
   router.get('/projects', (req, res) => {
     const entId = req.user?.enterprise_id;
     if (!entId) return res.json([]);
@@ -206,22 +229,8 @@ module.exports = function(db) {
 
   router.put('/projects/:id', (req, res) => {
     const { name, client_id, color, code, start_date, end_date, budget_hours, hourly_rate, billable, details } = req.body;
-    const userRole = req.user?.role;
-    if (userRole !== 'admin' && userRole !== 'manager') return res.status(403).json({ error: '仅经理及以上可编辑项目' });
-    if (userRole === 'manager') {
-      const proj = db.prepare('SELECT created_by FROM projects WHERE id=?').get(req.params.id);
-      let isAllowed = proj && proj.created_by === req.user.id;
-      if (!isAllowed && req.user.managed_project_ids) {
-        try {
-          const managedIds = JSON.parse(req.user.managed_project_ids);
-          if (Array.isArray(managedIds) && managedIds.includes(Number(req.params.id))) {
-            isAllowed = true;
-          }
-        } catch (e) {
-          console.error('[projects-update] Error parsing managed_project_ids:', e);
-        }
-      }
-      if (!isAllowed) return res.status(403).json({ error: '经理只能编辑自己创建或分配给自己的项目' });
+    if (!canEditProject(req.user, req.params.id)) {
+      return res.status(403).json({ error: '您没有权限编辑该项目' });
     }
     db.prepare('UPDATE projects SET name=?, client_id=?, color=?, code=?, start_date=?, end_date=?, budget_hours=?, hourly_rate=?, billable=?, details=? WHERE id=?')
       .run(name, client_id, color, code || '', start_date, end_date, budget_hours, hourly_rate, billable != null ? (billable ? 1 : 0) : 1, details || '', req.params.id);
@@ -264,14 +273,18 @@ module.exports = function(db) {
   router.post('/projects/:id/scopes', (req, res) => {
     const entId = req.user?.enterprise_id;
     if (!entId) return res.status(401).json({ error: '请先登录并创建或加入企业' });
-    if (req.user.role !== 'admin' && req.user.role !== 'manager') {
-      return res.status(403).json({ error: '仅经理及以上权限可添加工作范围' });
+    if (!canEditProject(req.user, req.params.id)) {
+      return res.status(403).json({ error: '您没有权限修改该项目的工作范围' });
     }
     const { name, description } = req.body;
     if (!name) return res.status(400).json({ error: '范围名称不能为空' });
 
+    const trimmedName = name.trim();
+    const existing = db.prepare('SELECT id FROM project_scopes WHERE project_id = ? AND name = ? AND enterprise_id = ?').get(req.params.id, trimmedName, entId);
+    if (existing) return res.status(400).json({ error: '该工作范围已存在' });
+
     const result = db.prepare('INSERT INTO project_scopes (project_id, name, description, enterprise_id) VALUES (?, ?, ?, ?)')
-      .run(req.params.id, name, description || '', entId);
+      .run(req.params.id, trimmedName, description || '', entId);
     res.json({ id: result.lastInsertRowid });
     sseBroadcast(entId, 'project-change', { action: 'update-scopes', project_id: +req.params.id }, req.user.id);
   });
@@ -280,17 +293,21 @@ module.exports = function(db) {
   router.put('/project-scopes/:id', (req, res) => {
     const entId = req.user?.enterprise_id;
     if (!entId) return res.status(401).json({ error: '请先登录并创建或加入企业' });
-    if (req.user.role !== 'admin' && req.user.role !== 'manager') {
-      return res.status(403).json({ error: '仅经理及以上权限可编辑工作范围' });
-    }
     const scope = db.prepare('SELECT * FROM project_scopes WHERE id = ? AND enterprise_id = ?').get(req.params.id, entId);
     if (!scope) return res.status(404).json({ error: '工作范围不存在' });
+    if (!canEditProject(req.user, scope.project_id)) {
+      return res.status(403).json({ error: '您没有权限修改该项目的工作范围' });
+    }
 
     const { name, description } = req.body;
     if (!name) return res.status(400).json({ error: '范围名称不能为空' });
 
+    const trimmedName = name.trim();
+    const existing = db.prepare('SELECT id FROM project_scopes WHERE project_id = ? AND name = ? AND enterprise_id = ? AND id != ?').get(scope.project_id, trimmedName, entId, req.params.id);
+    if (existing) return res.status(400).json({ error: '该工作范围已存在' });
+
     db.prepare('UPDATE project_scopes SET name = ?, description = ? WHERE id = ?')
-      .run(name, description || '', req.params.id);
+      .run(trimmedName, description || '', req.params.id);
     res.json({ ok: true });
     sseBroadcast(entId, 'project-change', { action: 'update-scopes', project_id: scope.project_id }, req.user.id);
   });
@@ -299,11 +316,11 @@ module.exports = function(db) {
   router.delete('/project-scopes/:id', (req, res) => {
     const entId = req.user?.enterprise_id;
     if (!entId) return res.status(401).json({ error: '请先登录并创建或加入企业' });
-    if (req.user.role !== 'admin' && req.user.role !== 'manager') {
-      return res.status(403).json({ error: '仅经理及以上权限可删除工作范围' });
-    }
     const scope = db.prepare('SELECT * FROM project_scopes WHERE id = ? AND enterprise_id = ?').get(req.params.id, entId);
     if (!scope) return res.status(404).json({ error: '工作范围不存在' });
+    if (!canEditProject(req.user, scope.project_id)) {
+      return res.status(403).json({ error: '您没有权限修改该项目的工作范围' });
+    }
 
     // Set referencing bookings and timesheets to NULL first
     db.prepare('UPDATE bookings SET project_scope_id = NULL WHERE project_scope_id = ?').run(req.params.id);
