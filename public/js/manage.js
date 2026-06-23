@@ -158,10 +158,45 @@ window.loadResources = async function loadResources() {
   }
 };
 
-window.showResourceModal = function showResourceModal(id) {
+window.showResourceModal = async function showResourceModal(id) {
   var resource = null;
   if (id) resource = state.resources.find(function (r) { return r.id === id; });
   var title = resource ? t('manage.edit_resource_title') : t('manage.add_resource_title');
+
+  var hasManagedProjectsField = false;
+  var projectsHtml = '';
+  if (resource && resource.user_id && resource.user_role === 'manager') {
+    hasManagedProjectsField = true;
+    if (!state.projects || !state.projects.length) {
+      try {
+        state.projects = await api('/api/projects');
+      } catch (err) {
+        console.error('Failed to load projects:', err);
+      }
+    }
+
+    var managedIds = [];
+    if (resource.user_managed_project_ids) {
+      try {
+        managedIds = JSON.parse(resource.user_managed_project_ids);
+      } catch (e) {
+        console.error('Error parsing user_managed_project_ids:', e);
+      }
+    }
+    if (!Array.isArray(managedIds)) managedIds = [];
+
+    if (state.projects && state.projects.length) {
+      state.projects.forEach(function (proj) {
+        var checked = managedIds.includes(proj.id) ? ' checked' : '';
+        projectsHtml += '<div class="form-check" style="margin-bottom:6px; font-size:13px; display:flex; align-items:center; gap:8px;">' +
+          '<input class="form-check-input managed-project-checkbox" type="checkbox" value="' + proj.id + '" id="m-proj-' + proj.id + '"' + checked + ' style="margin:0;">' +
+          '<label class="form-check-label" for="m-proj-' + proj.id + '" style="margin:0; cursor:pointer; color:var(--text-primary);">' + escapeHtml(proj.name) + '</label>' +
+        '</div>';
+      });
+    } else {
+      projectsHtml = '<div class="text-muted text-center py-2" style="font-size: 13px;">' + t('manage.no_active_projects') + '</div>';
+    }
+  }
 
   var body = '<div class="rg-form" style="padding:0 24px">' +
     /* Name */
@@ -211,8 +246,19 @@ window.showResourceModal = function showResourceModal(id) {
         '<label class="rg-label">' + t('manage.hours_day') + '</label>' +
         '<input class="rg-input" type="number" id="res-hours" min="0" max="24" step="0.5" value="' + (resource && resource.hours_per_day != null ? resource.hours_per_day : 8) + '" style="width:100px">' +
       '</div>' +
-    '</div>' +
-  '</div>';
+    '</div>';
+
+  if (hasManagedProjectsField) {
+    body += '<div class="rg-separator" style="border-top: 1px solid var(--border-color); margin: 15px 0;"></div>' +
+      '<div style="font-weight:600; font-size:14px; color:var(--text-primary); margin-bottom:10px;">' +
+        t('manage.co_managed_projects') +
+      '</div>' +
+      '<div style="max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 4px; padding: 10px; background: var(--bg-secondary);">' +
+        projectsHtml +
+      '</div>';
+  }
+
+  body += '</div>';
 
   var footer = '';
   if (id) {
@@ -248,11 +294,38 @@ window.saveResource = async function saveResource(id) {
     hours_per_day: parseFloat(document.getElementById('res-hours').value) || 8,
   };
   try {
-    if (id) { await api('/api/resources/' + id, { method: 'PUT', body: payload }); toast(t('manage.resource_updated')); }
-    else { await api('/api/resources', { method: 'POST', body: payload }); toast(t('manage.resource_added')); }
+    if (id) {
+      await api('/api/resources/' + id, { method: 'PUT', body: payload });
+      toast(t('manage.resource_updated'));
+    } else {
+      await api('/api/resources', { method: 'POST', body: payload });
+      toast(t('manage.resource_added'));
+    }
+
+    // Save co-managed projects if checkboxes exist
+    var resource = id ? state.resources.find(function (r) { return r.id === id; }) : null;
+    if (resource && resource.user_id && resource.user_role === 'manager') {
+      var checkboxes = document.querySelectorAll('.managed-project-checkbox');
+      if (checkboxes.length > 0) {
+        var selectedProjectIds = [];
+        checkboxes.forEach(function (cb) {
+          if (cb.checked) {
+            selectedProjectIds.push(parseInt(cb.value, 10));
+          }
+        });
+        await api('/api/auth/enterprises/members/' + resource.user_id + '/managed-projects', {
+          method: 'PUT',
+          body: { project_ids: selectedProjectIds }
+        });
+      }
+    }
+
     document.getElementById('modal').classList.remove('rg-modal');
-    closeModal(); loadResources();
-  } catch (err) { toast(t('common.save_failed') + ': ' + err.message, 'error'); }
+    closeModal();
+    loadResources();
+  } catch (err) {
+    toast(t('common.save_failed') + ': ' + err.message, 'error');
+  }
 };
 
 window.deleteResource = async function deleteResource(id) {

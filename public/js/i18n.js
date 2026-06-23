@@ -397,7 +397,8 @@
     'manage.color_label': '标识颜色', 'manage.billable': '计费项目 (Billable)',
     'manage.confirm_delete_resource': '确定删除此人员吗？',
     'manage.resource_added': '人员已添加', 'manage.resource_updated': '人员信息已更新',
-    'manage.resource_deleted': '人员已删除'
+    'manage.resource_deleted': '人员已删除',
+    'manage.co_managed_projects': '协同管理的项目', 'manage.no_active_projects': '暂无活跃项目'
   });
   Object.assign(translations.en, {
     'manage.resources_title': 'Resources', 'manage.add_resource': 'Add Resource',
@@ -415,7 +416,8 @@
     'manage.color_label': 'Color', 'manage.billable': 'Billable',
     'manage.confirm_delete_resource': 'Delete this resource?',
     'manage.resource_added': 'Resource added', 'manage.resource_updated': 'Resource updated',
-    'manage.resource_deleted': 'Resource deleted'
+    'manage.resource_deleted': 'Resource deleted',
+    'manage.co_managed_projects': 'Co-managed Projects', 'manage.no_active_projects': 'No active projects'
   });
 
   // --- colors ---

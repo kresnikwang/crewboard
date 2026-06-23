@@ -89,6 +89,7 @@ module.exports = function(db) {
              u.phone     AS user_phone,
              u.role      AS user_role,
              u.status    AS user_status,
+             u.managed_project_ids AS user_managed_project_ids,
              u.created_at AS user_joined_at
       FROM resources r
       LEFT JOIN users u
