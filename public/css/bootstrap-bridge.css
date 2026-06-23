@@ -570,6 +570,12 @@ body {
   color: var(--text);
   margin-bottom: 14px;
 }
+.section-card.card > .btn {
+  align-self: flex-start;
+  min-width: 120px;
+  justify-content: center;
+}
+
 
 /* ---- report-summary / report-charts 布局 ----
    style.css 已改为 display:flex，Bootstrap .row 可直接生效
