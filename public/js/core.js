@@ -383,6 +383,22 @@ window.isWeekend = isWeekend;
 // --------------- Modal (Bootstrap 5 实现) ---------------
 // 全局单例：在页面生命周期内复用同一个 Bootstrap Modal 实例
 var _bsModalInstance = null;
+var _triggerElement = null; // 记录触发弹窗的元素，关闭时恢复，防止 aria-hidden 的后代保留焦点产生可访问性问题
+
+function _restoreFocus() {
+  if (_triggerElement && typeof _triggerElement.focus === 'function') {
+    try {
+      _triggerElement.focus();
+    } catch (e) {}
+    _triggerElement = null;
+  } else {
+    if (document.activeElement && document.activeElement !== document.body) {
+      try {
+        document.activeElement.blur();
+      } catch (e) {}
+    }
+  }
+}
 
 function _getModalInstance() {
   var el = document.getElementById('modal-overlay');
@@ -400,6 +416,8 @@ function _getModalInstance() {
 }
 
 window.showModal = function showModal(title, bodyHtml, footerHtml) {
+  _triggerElement = document.activeElement; // 记录焦点
+
   document.getElementById('modal-title').textContent = title;
   document.getElementById('modal-body').innerHTML = bodyHtml || '';
   document.getElementById('modal-footer').innerHTML = footerHtml || '';
@@ -429,6 +447,8 @@ window.closeModal = function closeModal() {
     }
   }
 
+  _restoreFocus(); // 恢复焦点
+
   // 延迟清除内容（等待 Bootstrap 关闭动画完成）
   setTimeout(function() {
     var body = document.getElementById('modal-body');
@@ -448,6 +468,7 @@ document.addEventListener('DOMContentLoaded', function() {
   var el = document.getElementById('modal-overlay');
   if (el) {
     el.addEventListener('hidden.bs.modal', function() {
+      _restoreFocus(); // 确保手动通过 Esc、点击外部关闭也恢复焦点
       var body = document.getElementById('modal-body');
       var footer = document.getElementById('modal-footer');
       if (body) body.innerHTML = '';
@@ -455,7 +476,7 @@ document.addEventListener('DOMContentLoaded', function() {
       if (typeof window._clearDragHighlight === 'function') {
         window._clearDragHighlight();
       }
-      // 安全废除：确保没有残留的 backdrop 元素阔塞点击
+      // 安全废除：确保没有残留的 backdrop 元素阻碍点击
       // Bootstrap 正常情况下会自动清除，这里仅作保险
       document.querySelectorAll('.modal-backdrop').forEach(function(el) {
         el.remove();
