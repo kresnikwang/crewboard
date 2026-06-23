@@ -4,6 +4,45 @@ const { holidays, getHoliday, isWorkingDay } = require('../db/holidays');
 const { notifyAll } = require('./webhook');
 const { notifyBookingCreated, notifyBookingUpdated, notifyBookingDeleted, getDepartmentUsers, getRuntimeWeComConfig, validateWeComConfig, normalizeEmail, sendTextMessage, sendCardMessage } = require('../utils/wecom');
 const router = express.Router();
+const fs = require('fs');
+const path = require('path');
+
+function saveAvatarHelper(avatarData, oldAvatarUrl, prefix = 'resource') {
+  if (!avatarData) {
+    if (oldAvatarUrl) {
+      const oldPath = path.join(__dirname, '..', 'public', oldAvatarUrl);
+      if (fs.existsSync(oldPath)) {
+        try { fs.unlinkSync(oldPath); } catch (_) {}
+      }
+    }
+    return '';
+  }
+  if (avatarData.startsWith('/avatars/')) {
+    return avatarData;
+  }
+  const match = avatarData.match(/^data:image\/(png|jpeg|jpg|webp);base64,(.+)$/);
+  if (!match) return oldAvatarUrl || '';
+  const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
+  const base64Data = match[2];
+  const buffer = Buffer.from(base64Data, 'base64');
+  if (buffer.length > 500 * 1024) {
+    return oldAvatarUrl || '';
+  }
+  const avatarDir = path.join(__dirname, '..', 'public', 'avatars');
+  if (!fs.existsSync(avatarDir)) {
+    fs.mkdirSync(avatarDir, { recursive: true });
+  }
+  if (oldAvatarUrl) {
+    const oldPath = path.join(__dirname, '..', 'public', oldAvatarUrl);
+    if (fs.existsSync(oldPath)) {
+      try { fs.unlinkSync(oldPath); } catch (_) {}
+    }
+  }
+  const filename = `avatar_${prefix}_${Date.now()}.${ext}`;
+  const filePath = path.join(avatarDir, filename);
+  fs.writeFileSync(filePath, buffer);
+  return `/avatars/${filename}`;
+}
 
 // --------------- SSE Connection Pool ---------------
 // Map<enterpriseId, Set<{res, userId}>>
@@ -84,7 +123,8 @@ module.exports = function(db) {
     if (!entId) return res.json([]);
     // LEFT JOIN users to include linked account info (matched by email)
     const resources = db.prepare(`
-      SELECT r.*,
+      SELECT r.id, r.name, r.email, r.role, r.team, r.color, r.hours_per_day, r.is_active, r.enterprise_id, r.created_at, r.wecom_userid,
+             COALESCE(NULLIF(r.avatar, ''), u.avatar, '') AS avatar,
              u.id        AS user_id,
              u.phone     AS user_phone,
              u.role      AS user_role,
@@ -103,21 +143,33 @@ module.exports = function(db) {
   });
 
   router.post('/resources', (req, res) => {
-    const { name, email, role, team, color, hours_per_day } = req.body;
+    const { name, email, role, team, color, hours_per_day, avatar } = req.body;
     const entId = req.user?.enterprise_id;
     if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
     if (req.user?.role !== 'admin') return res.status(403).json({ error: '仅管理员可添加人员' });
-    const stmt = db.prepare('INSERT INTO resources (name, email, role, team, color, hours_per_day, enterprise_id) VALUES (?, ?, ?, ?, ?, ?, ?)');
-    const result = stmt.run(name, email || null, role || '', team || '', color || '#4F46E5', hours_per_day || 8, entId);
+    const avatarUrl = saveAvatarHelper(avatar, '', 'resource');
+    const stmt = db.prepare('INSERT INTO resources (name, email, role, team, color, hours_per_day, enterprise_id, avatar) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+    const result = stmt.run(name, email || null, role || '', team || '', color || '#4F46E5', hours_per_day || 8, entId, avatarUrl);
+    if (email) {
+      db.prepare('UPDATE users SET avatar = ? WHERE lower(email) = lower(?) AND enterprise_id = ?')
+        .run(avatarUrl, email, entId);
+    }
     res.json({ id: result.lastInsertRowid });
     sseBroadcast(req.user?.enterprise_id, 'resource-change', { action: 'create' }, req.user?.id);
   });
 
   router.put('/resources/:id', (req, res) => {
-    const { name, email, role, team, color, hours_per_day } = req.body;
+    const { name, email, role, team, color, hours_per_day, avatar } = req.body;
     if (req.user?.role !== 'admin') return res.status(403).json({ error: '仅管理员可编辑人员' });
-    db.prepare('UPDATE resources SET name=?, email=?, role=?, team=?, color=?, hours_per_day=? WHERE id=?')
-      .run(name, email, role, team, color, hours_per_day, req.params.id);
+    const oldRes = db.prepare('SELECT avatar FROM resources WHERE id=?').get(req.params.id);
+    const oldAvatarUrl = oldRes ? oldRes.avatar : '';
+    const avatarUrl = saveAvatarHelper(avatar, oldAvatarUrl, `resource_${req.params.id}`);
+    db.prepare('UPDATE resources SET name=?, email=?, role=?, team=?, color=?, hours_per_day=?, avatar=? WHERE id=?')
+      .run(name, email, role, team, color, hours_per_day, avatarUrl, req.params.id);
+    if (email) {
+      db.prepare('UPDATE users SET avatar = ? WHERE lower(email) = lower(?) AND enterprise_id = ?')
+        .run(avatarUrl, email, req.user.enterprise_id);
+    }
     res.json({ ok: true });
     sseBroadcast(req.user?.enterprise_id, 'resource-change', { action: 'update' }, req.user?.id);
   });
@@ -343,7 +395,8 @@ module.exports = function(db) {
 
     /* Resources */
     const resources = db.prepare(`
-      SELECT r.*, u.avatar
+      SELECT r.id, r.name, r.email, r.role, r.team, r.color, r.hours_per_day, r.is_active, r.enterprise_id, r.created_at, r.wecom_userid,
+             COALESCE(NULLIF(r.avatar, ''), u.avatar, '') AS avatar
       FROM resources r
       LEFT JOIN users u
         ON lower(r.email) = lower(u.email)

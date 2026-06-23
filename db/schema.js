@@ -17,6 +17,7 @@ function initDB() {
       hours_per_day REAL DEFAULT 8,
       is_active INTEGER DEFAULT 1,
       enterprise_id INTEGER,
+      avatar TEXT DEFAULT '',
       created_at TEXT DEFAULT (datetime('now'))
     );
 
@@ -281,6 +282,11 @@ function migrate(db) {
   const resCols = db.prepare('PRAGMA table_info(resources)').all();
   if (!resCols.find(c => c.name === 'wecom_userid')) {
     db.exec("ALTER TABLE resources ADD COLUMN wecom_userid TEXT DEFAULT ''");
+  }
+
+  // Add avatar column to resources table
+  if (!resCols.find(c => c.name === 'avatar')) {
+    db.exec("ALTER TABLE resources ADD COLUMN avatar TEXT DEFAULT ''");
   }
 
   // Add enterprise-level WeCom app configuration fields

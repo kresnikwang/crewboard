@@ -13,6 +13,45 @@ function escapeAttr(str) {
   return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 }
 
+function compressResourceAvatar(file, callback) {
+  var reader = new FileReader();
+  reader.onload = function (e) {
+    var img = new Image();
+    img.onload = function () {
+      var canvas = document.createElement('canvas');
+      var maxSize = 500;
+      var w = img.width;
+      var h = img.height;
+      if (w > h) {
+        if (w > maxSize) { h = Math.round(h * maxSize / w); w = maxSize; }
+      } else {
+        if (h > maxSize) { w = Math.round(w * maxSize / h); h = maxSize; }
+      }
+      canvas.width = w;
+      canvas.height = h;
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      
+      var mimeType = 'image/webp';
+      var testUrl = canvas.toDataURL('image/webp');
+      if (!testUrl.startsWith('data:image/webp')) {
+        mimeType = 'image/jpeg';
+      }
+      
+      var dataUrl;
+      for (var q = 0.9; q >= 0.2; q -= 0.1) {
+        dataUrl = canvas.toDataURL(mimeType, q);
+        var base64Part = dataUrl.split(',')[1];
+        var sizeKB = base64Part ? (base64Part.length * 0.75 / 1024) : 0;
+        if (sizeKB <= 500) break;
+      }
+      callback(dataUrl);
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 // ===================== Resources (人员管理) =====================
 
 window.loadResources = async function loadResources() {
@@ -84,9 +123,13 @@ window.loadResources = async function loadResources() {
         ? '<span class="account-linked" title="' + t('manage.linked') + '">&#10003; ' + t('manage.linked') + '</span>'
         : '<span class="account-unlinked" title="' + t('manage.unregistered') + '">— ' + t('manage.unregistered') + '</span>';
 
+      var avatarContent = r.avatar
+        ? '<img src="' + escapeHtml(r.avatar) + '" class="res-avatar" style="object-fit:cover">'
+        : '<div class="res-avatar" style="background:' + color + '">' + escapeHtml(initial) + '</div>';
+
       html += '<tr data-id="' + r.id + '">' +
         '<td><div class="res-name-cell">' +
-          '<div class="res-avatar" style="background:' + color + '">' + escapeHtml(initial) + '</div>' +
+          avatarContent +
           '<div><div class="res-name">' + escapeHtml(r.name) + '</div>' +
           '<div class="res-meta">' + escapeHtml(r.team || '') + '</div></div>' +
         '</div></td>' +
@@ -198,7 +241,30 @@ window.showResourceModal = async function showResourceModal(id) {
     }
   }
 
+  var initial = resource ? (resource.name ? resource.name.charAt(0) : '?') : '?';
+  var colorVal = resource && resource.color ? resource.color : '#3B7DDD';
+  var avatarPreviewHtml = resource && resource.avatar
+    ? '<img src="' + escapeHtml(resource.avatar) + '" class="avatar-preview-img" style="width:100%;height:100%;object-fit:cover;display:block">'
+    : '<div class="avatar-preview-placeholder" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#fff;background:' + colorVal + '">' + escapeHtml(initial) + '</div>';
+
   var body = '<div class="rg-form" style="padding:0 24px">' +
+    /* Avatar Upload */
+    '<div class="rg-field" style="align-items: center;">' +
+      '<div class="rg-field-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="8" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M4.5 16.5c1-3.5 3-5.5 5.5-5.5s4.5 2 5.5 5.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>' +
+      '<div class="rg-field-body" style="display: flex; align-items: center; gap: 16px;">' +
+        '<div class="avatar-preview" id="res-avatar-preview" style="width: 54px; height: 54px; border-radius: 50%; overflow: hidden; background: ' + colorVal + '; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">' +
+          avatarPreviewHtml +
+        '</div>' +
+        '<div style="display: flex; flex-direction: column; gap: 4px;">' +
+          '<div style="display: flex; gap: 8px;">' +
+            '<button class="btn btn-outline btn-sm" id="btn-upload-res-avatar" type="button" style="padding: 3px 10px; font-size: 11px;">上传头像</button>' +
+            '<button class="btn btn-outline btn-sm text-danger" id="btn-del-res-avatar" type="button" style="padding: 3px 10px; font-size: 11px;' + (resource && resource.avatar ? '' : 'display:none;') + '">删除</button>' +
+          '</div>' +
+          '<input type="file" id="res-avatar-file-input" accept="image/*" style="display: none">' +
+          '<div class="avatar-hint" style="font-size: 11px; color: var(--text-tertiary);">支持 500KB 以内图片</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
     /* Name */
     '<div class="rg-field">' +
       '<div class="rg-field-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="7" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M3 18c0-3.3 2.7-6 7-6s7 2.7 7 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>' +
@@ -273,6 +339,47 @@ window.showResourceModal = async function showResourceModal(id) {
   /* Init color picker */
   initColorPicker('rg-color-value');
 
+  /* Init avatar upload / delete */
+  var uploadBtn = document.getElementById('btn-upload-res-avatar');
+  var deleteBtn = document.getElementById('btn-del-res-avatar');
+  var fileInput = document.getElementById('res-avatar-file-input');
+
+  if (uploadBtn && fileInput) {
+    uploadBtn.addEventListener('click', function () { fileInput.click(); });
+    fileInput.addEventListener('change', function () {
+      var file = fileInput.files[0];
+      if (file) {
+        if (file.size > 3 * 1024 * 1024) {
+          toast('选择的头像图片大小不能超过 3MB', 'error');
+        } else if (file.type.startsWith('image/')) {
+          compressResourceAvatar(file, function (dataUrl) {
+            var previewEl = document.getElementById('res-avatar-preview');
+            if (previewEl) {
+              previewEl.innerHTML = '<img src="' + dataUrl + '" class="avatar-preview-img" style="width:100%;height:100%;object-fit:cover;display:block">';
+            }
+            if (deleteBtn) deleteBtn.style.display = '';
+          });
+        } else {
+          toast(t('account.select_image'), 'error');
+        }
+      }
+    });
+  }
+
+  if (deleteBtn) {
+    deleteBtn.addEventListener('click', function () {
+      var nameVal = document.getElementById('res-name').value.trim();
+      var initChar = nameVal ? nameVal.charAt(0) : '?';
+      var colVal = document.getElementById('rg-color-value') ? document.getElementById('rg-color-value').value : '#3B7DDD';
+      var previewEl = document.getElementById('res-avatar-preview');
+      if (previewEl) {
+        previewEl.innerHTML = '<div class="avatar-preview-placeholder" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#fff;background:' + colVal + '">' + escapeHtml(initChar) + '</div>';
+      }
+      deleteBtn.style.display = 'none';
+      if (fileInput) fileInput.value = '';
+    });
+  }
+
   document.getElementById('btn-save-resource').addEventListener('click', function () { saveResource(id || null); });
   if (id) {
     document.getElementById('btn-del-resource').addEventListener('click', function () {
@@ -285,6 +392,9 @@ window.saveResource = async function saveResource(id) {
   var name = document.getElementById('res-name').value.trim();
   if (!name) { toast(t('manage.enter_name'), 'error'); return; }
   var colorEl = document.getElementById('rg-color-value');
+  var avatarImg = document.querySelector('#res-avatar-preview img');
+  var avatarVal = avatarImg ? avatarImg.src : '';
+
   var payload = {
     name: name,
     email: document.getElementById('res-email').value.trim(),
@@ -292,6 +402,7 @@ window.saveResource = async function saveResource(id) {
     team: document.getElementById('res-team').value.trim(),
     color: colorEl ? colorEl.value : '#3B7DDD',
     hours_per_day: parseFloat(document.getElementById('res-hours').value) || 8,
+    avatar: avatarVal
   };
   try {
     if (id) {
