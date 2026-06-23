@@ -2171,7 +2171,12 @@
       '<div class="bk-batch-preview" id="batch-preview">' +
         '<div class="bk-batch-preview-title">' + t('schedule.preview_changes') + '</div>' +
         '<div class="bk-batch-preview-list">' + groupBookings.map(function (b) {
-          return '<div class="bk-batch-preview-item"><span class="bk-batch-date">' + b.date + '</span><span class="bk-batch-arrow">→</span><span class="bk-batch-new" id="preview-' + b.id + '">' + first.hours + 'h</span></div>';
+          return '<div class="bk-batch-preview-item">' +
+            '<span class="bk-batch-date">' + b.date.slice(5) + '</span>' +
+            '<span class="bk-batch-old">' + b.hours + 'h</span>' +
+            '<span class="bk-batch-arrow">→</span>' +
+            '<span class="bk-batch-new" id="preview-' + b.id + '">' + first.hours + 'h</span>' +
+            '</div>';
         }).join('') + '</div></div>';
 
     var footer =

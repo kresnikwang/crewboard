@@ -317,12 +317,13 @@
 .bk-batch-label { color: var(--text-secondary); min-width: 60px; }
 .bk-batch-value { color: var(--text); font-weight: 500; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bk-batch-days { color: var(--text-secondary); font-size: 12px; margin-left: 8px; }
-.bk-batch-preview { background: var(--surface); border-radius: 8px; padding: 12px; margin-top: 16px; max-height: 160px; overflow-y: auto; }
-.bk-batch-preview-title { font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
-.bk-batch-preview-list { display: flex; flex-direction: column; gap: 4px; }
-.bk-batch-preview-item { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 0; }
-.bk-batch-date { color: var(--text-secondary); width: 90px; font-family: monospace; }
-.bk-batch-arrow { color: var(--text-secondary); }
+.bk-batch-preview { background: var(--surface); border-radius: 8px; padding: 10px 12px; margin-top: 14px; }
+.bk-batch-preview-title { font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+.bk-batch-preview-list { display: flex; flex-wrap: wrap; gap: 6px; max-height: 100px; overflow-y: auto; }
+.bk-batch-preview-item { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 4px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; font-family: monospace; }
+.bk-batch-date { color: var(--text); font-weight: 500; }
+.bk-batch-old { color: var(--text-secondary); text-decoration: line-through; opacity: 0.65; }
+.bk-batch-arrow { color: var(--text-secondary); font-size: 10px; }
 .bk-batch-new { color: var(--primary); font-weight: 600; }
 
 /* Project/Client select with color indicator */
