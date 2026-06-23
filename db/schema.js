@@ -299,20 +299,39 @@ function migrate(db) {
   }
   db.exec('UPDATE enterprises SET wecom_department_id = 1 WHERE wecom_department_id IS NULL OR wecom_department_id = 0');
 
-  // Add UNIQUE INDEX on timesheets(resource_id, project_id, date) to prevent duplicates
-  // First deduplicate: keep the row with the highest id for each (resource_id, project_id, date)
+  // Add UNIQUE INDEXes on timesheets to prevent duplicates within the same scope bucket.
+  // First deduplicate: keep the highest-id row for each (resource_id, project_id, date, project_scope_id).
+  // NOTE: We must handle NULL scope_id separately because NULL != NULL in SQL GROUP BY.
   try {
-    const dupCheck = db.prepare(`
+    // Deduplicate rows where project_scope_id IS NOT NULL
+    const dupCheckScoped = db.prepare(`
+      SELECT resource_id, project_id, date, project_scope_id, COUNT(*) as cnt, MAX(id) as max_id
+      FROM timesheets
+      WHERE project_scope_id IS NOT NULL
+      GROUP BY resource_id, project_id, date, project_scope_id
+      HAVING cnt > 1
+    `).all();
+    if (dupCheckScoped.length > 0) {
+      for (const dup of dupCheckScoped) {
+        db.prepare(`
+          DELETE FROM timesheets
+          WHERE resource_id = ? AND project_id = ? AND date = ? AND project_scope_id = ? AND id != ?
+        `).run(dup.resource_id, dup.project_id, dup.date, dup.project_scope_id, dup.max_id);
+      }
+    }
+    // Deduplicate rows where project_scope_id IS NULL
+    const dupCheckNull = db.prepare(`
       SELECT resource_id, project_id, date, COUNT(*) as cnt, MAX(id) as max_id
       FROM timesheets
+      WHERE project_scope_id IS NULL
       GROUP BY resource_id, project_id, date
       HAVING cnt > 1
     `).all();
-    if (dupCheck.length > 0) {
-      for (const dup of dupCheck) {
+    if (dupCheckNull.length > 0) {
+      for (const dup of dupCheckNull) {
         db.prepare(`
           DELETE FROM timesheets
-          WHERE resource_id = ? AND project_id = ? AND date = ? AND id != ?
+          WHERE resource_id = ? AND project_id = ? AND date = ? AND project_scope_id IS NULL AND id != ?
         `).run(dup.resource_id, dup.project_id, dup.date, dup.max_id);
       }
     }

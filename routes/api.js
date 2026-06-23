@@ -323,11 +323,12 @@ module.exports = function(db) {
       return res.status(403).json({ error: '您没有权限修改该项目的工作范围' });
     }
 
-    // Set referencing bookings and timesheets to NULL first
-    db.prepare('UPDATE bookings SET project_scope_id = NULL WHERE project_scope_id = ?').run(req.params.id);
-    db.prepare('UPDATE timesheets SET project_scope_id = NULL WHERE project_scope_id = ?').run(req.params.id);
-
-    db.prepare('DELETE FROM project_scopes WHERE id = ?').run(req.params.id);
+    // Nullify referencing bookings and timesheets, then delete scope — all in one transaction
+    db.transaction(() => {
+      db.prepare('UPDATE bookings SET project_scope_id = NULL WHERE project_scope_id = ?').run(req.params.id);
+      db.prepare('UPDATE timesheets SET project_scope_id = NULL WHERE project_scope_id = ?').run(req.params.id);
+      db.prepare('DELETE FROM project_scopes WHERE id = ?').run(req.params.id);
+    })();
     res.json({ ok: true });
     sseBroadcast(entId, 'project-change', { action: 'update-scopes', project_id: scope.project_id }, req.user.id);
   });

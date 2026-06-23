@@ -167,12 +167,12 @@ window.showResourceModal = async function showResourceModal(id) {
   var projectsHtml = '';
   if (resource && resource.user_id && resource.user_role === 'manager') {
     hasManagedProjectsField = true;
-    if (!state.projects || !state.projects.length) {
-      try {
-        state.projects = await api('/api/projects');
-      } catch (err) {
-        console.error('Failed to load projects:', err);
-      }
+    // Always fetch fresh project list when showing co-manager checklist
+    // (state.projects may be stale or from a different page context)
+    try {
+      state.projects = await api('/api/projects');
+    } catch (err) {
+      console.error('Failed to load projects:', err);
     }
 
     var managedIds = [];
