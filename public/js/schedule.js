@@ -2288,7 +2288,10 @@
     });
     var optionsHtml = '';
     Object.keys(teams).forEach(function (tm) {
-      optionsHtml += '<div class="ms-team-label">' + esc(tm) + '</div>';
+      optionsHtml += '<div class="ms-team-label" style="display: flex; justify-content: space-between; align-items: center;">' +
+        '<span>' + esc(tm) + '</span>' +
+        '<span class="ms-team-select-all" data-team="' + esc(tm) + '" style="color: var(--primary); cursor: pointer; text-transform: none; font-size: 10px; font-weight: 600;" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">' + t('schedule.select_team_all') + '</span>' +
+      '</div>';
       teams[tm].forEach(function (r) {
         var sel = selIds.indexOf(r.id) >= 0 ? ' selected' : '';
         optionsHtml += '<div class="ms-option' + sel + '" data-id="' + r.id + '">' +
@@ -2340,8 +2343,57 @@
       if (dropdown.classList.contains('open')) searchInput.focus();
     });
 
-    /* Option click */
+    /* Option click / Select All click */
     dropdown.addEventListener('click', function (e) {
+      var btn = e.target.closest('.ms-team-select-all');
+      if (btn) {
+        e.stopPropagation();
+        var labelEl = btn.parentElement;
+        var next = labelEl.nextElementSibling;
+        var teamOptions = [];
+        while (next && !next.classList.contains('ms-team-label')) {
+          if (next.classList.contains('ms-option') && next.style.display !== 'none') {
+            teamOptions.push(next);
+          }
+          next = next.nextElementSibling;
+        }
+
+        var selectedCount = teamOptions.filter(function (opt) {
+          return opt.classList.contains('selected');
+        }).length;
+
+        var allSelected = selectedCount === teamOptions.length;
+
+        teamOptions.forEach(function (opt) {
+          var rid = parseInt(opt.dataset.id, 10);
+          var isSelected = opt.classList.contains('selected');
+
+          if (allSelected) {
+            /* Deselect all */
+            if (isSelected) {
+              opt.classList.remove('selected');
+              var chip = selectedArea.querySelector('.ms-chip[data-id="' + rid + '"]');
+              if (chip) chip.remove();
+            }
+          } else {
+            /* Select all */
+            if (!isSelected) {
+              opt.classList.add('selected');
+              var name = opt.querySelector('.ms-option-name').textContent;
+              var avatarEl = opt.querySelector('.ms-option-avatar');
+              var bg = avatarEl.style.background;
+              var chipHtml = '<span class="ms-chip" data-id="' + rid + '">' +
+                '<span class="ms-chip-avatar" style="background:' + bg + '">' + name.charAt(0) + '</span>' +
+                name +
+                '<span class="ms-chip-remove" data-id="' + rid + '">&times;</span>' +
+              '</span>';
+              searchInput.insertAdjacentHTML('beforebegin', chipHtml);
+            }
+          }
+        });
+        return;
+      }
+
       var opt = e.target.closest('.ms-option');
       if (!opt) return;
       var rid = parseInt(opt.dataset.id, 10);
