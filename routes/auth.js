@@ -72,7 +72,7 @@ module.exports = function(db) {
     }
 
     const enterprise = enterprise_id
-      ? db.prepare('SELECT id, name, code, webhook_dingtalk, webhook_wecom, webhook_feishu, wecom_corp_id, wecom_agent_id, wecom_secret, wecom_department_id, currency, theme_color, timezone FROM enterprises WHERE id = ?').get(enterprise_id)
+      ? db.prepare('SELECT id, name, code, logo_url, webhook_dingtalk, webhook_wecom, webhook_feishu, wecom_corp_id, wecom_agent_id, wecom_secret, wecom_department_id, currency, theme_color, timezone FROM enterprises WHERE id = ?').get(enterprise_id)
       : null;
 
     res.json({
@@ -96,7 +96,7 @@ module.exports = function(db) {
     db.prepare('INSERT INTO sessions (token, user_id, expires_at) VALUES (?,?,?)').run(token, user.id, expires);
 
     const enterprise = user.enterprise_id
-      ? db.prepare('SELECT id, name, code, webhook_dingtalk, webhook_wecom, webhook_feishu, wecom_corp_id, wecom_agent_id, wecom_secret, wecom_department_id, currency, theme_color, timezone FROM enterprises WHERE id = ?').get(user.enterprise_id)
+      ? db.prepare('SELECT id, name, code, logo_url, webhook_dingtalk, webhook_wecom, webhook_feishu, wecom_corp_id, wecom_agent_id, wecom_secret, wecom_department_id, currency, theme_color, timezone FROM enterprises WHERE id = ?').get(user.enterprise_id)
       : null;
 
     res.json({
@@ -117,7 +117,7 @@ module.exports = function(db) {
   router.get('/me', (req, res) => {
     if (!req.user) return res.status(401).json({ error: '未登录' });
     const enterprise = req.user.enterprise_id
-      ? db.prepare('SELECT id, name, code, webhook_dingtalk, webhook_wecom, webhook_feishu, wecom_corp_id, wecom_agent_id, wecom_secret, wecom_department_id, currency, theme_color, timezone FROM enterprises WHERE id = ?').get(req.user.enterprise_id)
+      ? db.prepare('SELECT id, name, code, logo_url, webhook_dingtalk, webhook_wecom, webhook_feishu, wecom_corp_id, wecom_agent_id, wecom_secret, wecom_department_id, currency, theme_color, timezone FROM enterprises WHERE id = ?').get(req.user.enterprise_id)
       : null;
     res.json({ user: req.user, enterprise });
   });
@@ -306,6 +306,48 @@ module.exports = function(db) {
         req.user.enterprise_id
       );
     res.json({ ok: true });
+  });
+
+  // Upload enterprise logo
+  router.put('/enterprises/logo', (req, res) => {
+    if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
+    if (req.user.role !== 'owner' && req.user.role !== 'admin') return res.status(403).json({ error: '无权限' });
+
+    const { logo_data } = req.body;
+    if (!logo_data) return res.status(400).json({ error: '未提供Logo数据' });
+
+    const match = logo_data.match(/^data:image\/(png|jpeg|jpg|webp);base64,(.+)$/);
+    if (!match) return res.status(400).json({ error: '无效的图片格式' });
+
+    const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
+    const base64Data = match[2];
+    const buffer = Buffer.from(base64Data, 'base64');
+
+    if (buffer.length > 1024 * 1024) {
+      return res.status(400).json({ error: 'Logo文件大小不能超过 1MB' });
+    }
+
+    const logosDir = path.join(__dirname, '..', 'public', 'logos');
+    if (!fs.existsSync(logosDir)) {
+      fs.mkdirSync(logosDir, { recursive: true });
+    }
+
+    const oldLogo = db.prepare('SELECT logo_url FROM enterprises WHERE id = ?').get(req.user.enterprise_id)?.logo_url;
+    if (oldLogo) {
+      const oldPath = path.join(__dirname, '..', 'public', oldLogo);
+      if (fs.existsSync(oldPath)) {
+        try { fs.unlinkSync(oldPath); } catch (_) {}
+      }
+    }
+
+    const filename = `logo_${req.user.enterprise_id}_${Date.now()}.${ext}`;
+    const filePath = path.join(logosDir, filename);
+    fs.writeFileSync(filePath, buffer);
+
+    const logoUrl = `/logos/${filename}`;
+    db.prepare('UPDATE enterprises SET logo_url = ? WHERE id = ?').run(logoUrl, req.user.enterprise_id);
+
+    res.json({ ok: true, logo_url: logoUrl });
   });
 
   // === ACCOUNT MANAGEMENT ===

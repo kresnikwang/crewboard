@@ -551,7 +551,12 @@
     'enterprise.no_invites': '暂无待处理的邀请',
     'enterprise.requests_load_failed': '加载申请失败，请刷新重试',
     'enterprise.timezone': '公司时区',
-    'enterprise.timezone_desc': '决定预定信息等时间的显示时区。默认为北京时间。'
+    'enterprise.timezone_desc': '决定预定信息等时间的显示时区。默认为北京时间。',
+    'enterprise.upload_logo': '上传公司Logo',
+    'enterprise.logo_hint': '支持 JPG/PNG/WebP，推荐正方形，自动压缩至 500KB 以内',
+    'enterprise.logo_label': '公司Logo',
+    'enterprise.logo_updated': '公司Logo已更新',
+    'enterprise.logo_failed': '公司Logo上传失败，请重试'
   });
   Object.assign(translations.en, {
     'enterprise.title': 'Enterprise', 'enterprise.create': 'Create Enterprise',
@@ -583,7 +588,12 @@
     'enterprise.no_invites': 'No pending invites',
     'enterprise.requests_load_failed': 'Failed to load requests',
     'enterprise.timezone': 'Company Timezone',
-    'enterprise.timezone_desc': 'Determines the timezone for displaying booking and audit times. Defaults to Beijing Time (Asia/Shanghai).'
+    'enterprise.timezone_desc': 'Determines the timezone for displaying booking and audit times. Defaults to Beijing Time (Asia/Shanghai).',
+    'enterprise.upload_logo': 'Upload Company Logo',
+    'enterprise.logo_hint': 'Supports JPG/PNG/WebP, square recommended, auto-compressed under 500KB',
+    'enterprise.logo_label': 'Company Logo',
+    'enterprise.logo_updated': 'Company Logo updated',
+    'enterprise.logo_failed': 'Company Logo upload failed'
   });
 
   // --- account ---

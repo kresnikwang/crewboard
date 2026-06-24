@@ -89,12 +89,37 @@ window.loadEnterprise = async function loadEnterprise() {
 
   // Has enterprise — show info, requests (if admin/owner), invite
   var ent = state.enterprise || {};
+  var logoHtml = '';
+  if (isOwnerOrAdmin()) {
+    var currentLogo = ent.logo_url || '';
+    var logoPreview = currentLogo
+      ? '<img src="' + escHtml(currentLogo) + '" class="avatar-preview-img" id="ent-logo-img">'
+      : '<div class="avatar-preview-placeholder" id="ent-logo-img" style="border-radius: 8px;">' + escHtml((ent.name || '?').charAt(0)) + '</div>';
+    
+    logoHtml =
+      '<div class="avatar-upload-section" style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px; display: flex; align-items: center; gap: 20px;">' +
+        '<div class="avatar-preview" id="ent-logo-preview" style="border-radius: 8px;">' + logoPreview + '</div>' +
+        '<div class="avatar-upload-info">' +
+          '<button class="btn btn-outline btn-sm" id="btn-upload-ent-logo">' + t('enterprise.upload_logo') + '</button>' +
+          '<input type="file" id="ent-logo-file-input" accept="image/*" style="display:none">' +
+          '<div class="avatar-hint">' + t('enterprise.logo_hint') + '</div>' +
+        '</div>' +
+      '</div>';
+  } else if (ent.logo_url) {
+    logoHtml =
+      '<div class="info-row" style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px; display: flex; align-items: center;">' +
+        '<span class="info-label">' + t('enterprise.logo_label') + '</span>' +
+        '<span class="info-value"><img src="' + escHtml(ent.logo_url) + '" style="width: 48px; height: 48px; border-radius: 8px; object-fit: cover;"></span>' +
+      '</div>';
+  }
+
   var html =
     '<div class="page-header"><h2>' + t('enterprise.title') + '</h2></div>' +
     '<div class="section-card card mb-3">' +
       '<h3>' + t('enterprise.info') + '</h3>' +
       '<div class="info-row"><span class="info-label">' + t('enterprise.name_label') + '</span><span class="info-value">' + escHtml(ent.name) + '</span></div>' +
       '<div class="info-row"><span class="info-label">' + t('enterprise.invite_code_desc') + '</span><span class="info-value" style="font-family:monospace;font-weight:600">' + escHtml(ent.code) + '</span></div>' +
+      logoHtml +
     '</div>';
 
   if (isOwnerOrAdmin()) {
@@ -125,6 +150,28 @@ window.loadEnterprise = async function loadEnterprise() {
   }
 
   container.innerHTML = html;
+
+  // Enterprise Logo upload
+  var uploadLogoBtn = document.getElementById('btn-upload-ent-logo');
+  var logoFileInput = document.getElementById('ent-logo-file-input');
+  if (uploadLogoBtn && logoFileInput) {
+    uploadLogoBtn.addEventListener('click', function () {
+      logoFileInput.click();
+    });
+    logoFileInput.addEventListener('change', function () {
+      var file = logoFileInput.files[0];
+      if (!file) return;
+      if (file.size > 3 * 1024 * 1024) {
+        toast('选择的Logo图片大小不能超过 3MB', 'error');
+        return;
+      }
+      if (!file.type.startsWith('image/')) {
+        toast(t('account.select_image'), 'error');
+        return;
+      }
+      compressAndUploadEntLogo(file);
+    });
+  }
 
   // Load requests if admin/owner
   if (isOwnerOrAdmin()) {
@@ -721,4 +768,67 @@ window.updateSidebarUserInfo = function updateSidebarUserInfo() {
         '<div class="user-role">' + escHtml(user.role || '') + '</div>' +
       '</div>' +
     '</div>';
+}
+
+function compressAndUploadEntLogo(file) {
+  var reader = new FileReader();
+  reader.onload = function (e) {
+    var img = new Image();
+    img.onload = function () {
+      var canvas = document.createElement('canvas');
+      var maxSize = 500; // max dimension px
+      var w = img.width;
+      var h = img.height;
+ 
+      // Scale down
+      if (w > h) {
+        if (w > maxSize) { h = Math.round(h * maxSize / w); w = maxSize; }
+      } else {
+        if (h > maxSize) { w = Math.round(w * maxSize / h); h = maxSize; }
+      }
+ 
+      canvas.width = w;
+      canvas.height = h;
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+ 
+      var mimeType = 'image/webp';
+      var testUrl = canvas.toDataURL('image/webp');
+      if (!testUrl.startsWith('data:image/webp')) {
+        mimeType = 'image/jpeg';
+      }
+
+      var quality = 0.9;
+      var dataUrl;
+      for (var q = quality; q >= 0.2; q -= 0.1) {
+        dataUrl = canvas.toDataURL(mimeType, q);
+        var base64Part = dataUrl.split(',')[1];
+        var sizeKB = base64Part ? (base64Part.length * 0.75 / 1024) : 0;
+        if (sizeKB <= 500) break;
+      }
+ 
+      var previewEl = document.getElementById('ent-logo-preview');
+      if (previewEl) {
+        previewEl.innerHTML = '<img src="' + dataUrl + '" class="avatar-preview-img" id="ent-logo-img">';
+      }
+ 
+      uploadEntLogoData(dataUrl);
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function uploadEntLogoData(dataUrl) {
+  try {
+    var result = await api('/api/auth/enterprises/logo', {
+      method: 'PUT',
+      body: { logo_data: dataUrl }
+    });
+    state.enterprise.logo_url = result.logo_url;
+    toast(t('enterprise.logo_updated'));
+    updateHeaderEnterpriseInfo();
+  } catch (err) {
+    toast(err.message || t('enterprise.logo_failed'), 'error');
+  }
 }

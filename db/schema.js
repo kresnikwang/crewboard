@@ -81,6 +81,7 @@ function initDB() {
       name TEXT NOT NULL,
       code TEXT UNIQUE NOT NULL,
       owner_id INTEGER,
+      logo_url TEXT DEFAULT '',
       webhook_dingtalk TEXT DEFAULT '',
       webhook_wecom TEXT DEFAULT '',
       webhook_feishu TEXT DEFAULT '',
@@ -306,6 +307,9 @@ function migrate(db) {
   db.exec('UPDATE enterprises SET wecom_department_id = 1 WHERE wecom_department_id IS NULL OR wecom_department_id = 0');
   if (!entCols.find(c => c.name === 'timezone')) {
     db.exec("ALTER TABLE enterprises ADD COLUMN timezone TEXT DEFAULT 'Asia/Shanghai'");
+  }
+  if (!entCols.find(c => c.name === 'logo_url')) {
+    db.exec("ALTER TABLE enterprises ADD COLUMN logo_url TEXT DEFAULT ''");
   }
 
   // Add UNIQUE INDEXes on timesheets to prevent duplicates within the same scope bucket.

@@ -299,23 +299,23 @@
       <button class="hamburger-btn" id="hamburger-btn" aria-label="Open menu">
         <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M3 5h16M3 11h16M3 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       </button>
-      <div class="logo" style="color:#fff">
-        <img src="/img/logo_small.png" alt="神马排班 Logo" style="width:30px;height:auto;">
-        <span data-i18n="nav.brand">神马排班</span>
+      <div class="mobile-logo-container" id="mobile-logo-container" style="color:#fff; display: flex; align-items: center; gap: 8px;">
+        <img src="/img/logo_small.png" alt="Logo" class="mobile-logo-img" style="width:24px;height:24px;border-radius:4px;object-fit:cover;">
+        <span class="mobile-logo-name" style="font-size:14px;font-weight:600;">神马排班</span>
       </div>
     </div>
     <!-- Sidebar overlay for mobile -->
     <div class="sidebar-overlay" id="sidebar-overlay"></div>
     <nav class="sidebar" id="sidebar">
       <div class="sidebar-header">
-        <div class="logo">
-          <img src="/img/logo_small.png" alt="神马排班 Logo" style="width: 36px; height: auto;">
+        <div class="sidebar-brand-subtle">
+          <img src="/img/logo_small.png" alt="Logo" class="brand-logo-subtle">
           <span data-i18n="nav.brand">神马排班</span>
         </div>
+        <div class="sidebar-enterprise-container" id="sidebar-enterprise-container"></div>
         <button class="sidebar-close-btn" id="sidebar-close-btn" aria-label="Close menu">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
         </button>
-        <div class="sidebar-enterprise" id="sidebar-enterprise"></div>
       </div>
       <ul class="nav-menu">
         <li class="nav-item active" data-page="schedule">

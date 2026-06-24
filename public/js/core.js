@@ -755,6 +755,35 @@ window.applyTheme = function applyTheme(themeColor) {
   }
 };
 
+// --------------- Update Header Enterprise Info ---------------
+window.updateHeaderEnterpriseInfo = function updateHeaderEnterpriseInfo() {
+  const enterprise = window.state.enterprise;
+  if (!enterprise) return;
+
+  function escHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // Update sidebar header
+  const entEl = document.getElementById('sidebar-enterprise-container');
+  if (entEl) {
+    const logoHtml = enterprise.logo_url
+      ? '<img src="' + enterprise.logo_url + '" alt="Logo" class="enterprise-logo-preview">'
+      : '<div class="enterprise-logo-placeholder">' + escHtml(enterprise.name.charAt(0)) + '</div>';
+    entEl.innerHTML = logoHtml + '<div class="enterprise-name-text" title="' + escHtml(enterprise.name) + '">' + escHtml(enterprise.name) + '</div>';
+  }
+
+  // Update mobile topbar brand
+  const mobileContainer = document.getElementById('mobile-logo-container');
+  if (mobileContainer) {
+    const logoHtml = enterprise.logo_url
+      ? '<img src="' + enterprise.logo_url + '" alt="Logo" class="mobile-logo-img" style="width:24px;height:24px;border-radius:4px;object-fit:cover;">'
+      : '<div class="enterprise-logo-placeholder" style="width:24px;height:24px;border-radius:4px;font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;background:var(--primary);color:#fff;border:1px solid rgba(255,255,255,0.15);">' + escHtml(enterprise.name.charAt(0)) + '</div>';
+    mobileContainer.innerHTML = logoHtml + '<span class="mobile-logo-name" style="font-size:14px;font-weight:600;margin-left:8px;">' + escHtml(enterprise.name) + '</span>';
+  }
+};
+
 // --------------- Enter App ---------------
 async function enterApp() {
   const { user, enterprise } = window.state;
@@ -784,12 +813,9 @@ async function enterApp() {
     }
   }
 
-  // Update sidebar enterprise info
-  const entEl = document.getElementById('sidebar-enterprise');
-  if (entEl && enterprise) {
-    entEl.innerHTML =
-      '<div class="ent-name">' + enterprise.name + '</div>' +
-      '<div class="ent-code">' + (enterprise.code || '') + '</div>';
+  // Update sidebar and mobile header enterprise info
+  if (typeof window.updateHeaderEnterpriseInfo === 'function') {
+    window.updateHeaderEnterpriseInfo();
   }
 
   // Apply theme
