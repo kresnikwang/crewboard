@@ -4,9 +4,10 @@
 .schedule-grid { flex: 1; overflow: auto; padding: 0; min-height: 0; }
 .schedule-table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 900px; table-layout: fixed; }
 .schedule-table th {
-  position: sticky; top: 0; z-index: 10; background: var(--surface); border-bottom: 2px solid var(--border);
+  position: sticky; top: 0; z-index: 10; background: rgba(255,255,255,.96); border-bottom: 1px solid rgba(232,224,216,.90);
   padding: 10px 8px; font-size: 12px; font-weight: 600; text-transform: uppercase; color: var(--text-secondary);
   text-align: center; letter-spacing: .5px;
+  box-shadow: 0 1px 0 rgba(255,255,255,.80), 0 8px 18px rgba(30,58,110,.04);
 }
 .schedule-table th:first-child { text-align: left; padding-left: 16px; width: 180px; min-width: 180px; position: sticky; left: 0; z-index: 11; }
 .schedule-table th.today { color: var(--primary); }
@@ -14,10 +15,11 @@
   content: ''; position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%);
   width: 4px; height: 4px; border-radius: 50%; background: var(--accent);
 }
-.schedule-table td { border-bottom: 1px solid var(--border); padding: 0; vertical-align: top; height: 70px; position: relative; background: var(--surface); }
+.schedule-table td { border-bottom: 1px solid rgba(232,224,216,.74); padding: 0; vertical-align: top; height: 70px; position: relative; background: var(--surface); }
 .schedule-table td:first-child {
   position: sticky; left: 0; z-index: 5; background: var(--surface); padding: 8px 12px 8px 16px;
-  border-right: 1px solid var(--border);
+  border-right: 1px solid rgba(232,224,216,.80);
+  box-shadow: 8px 0 18px -18px rgba(30,58,110,.28);
 }
 .resource-cell { display: flex; align-items: center; gap: 8px; }
 .resource-avatar {
@@ -31,8 +33,8 @@
 .team-divider td:first-child { background: var(--bg); }
 .team-label { font-size: 12px; font-weight: 600; text-transform: uppercase; color: var(--text-tertiary); letter-spacing: .5px; }
 
-.booking-cell { padding: 2px 0; min-height: 56px; cursor: pointer; position: relative; user-select: none; overflow: visible; background: var(--surface); }
-.booking-cell:hover { background: var(--primary-light); }
+.booking-cell { padding: 3px 0; min-height: 56px; cursor: pointer; position: relative; user-select: none; overflow: visible; background: var(--surface); transition: background-color .12s var(--ease-out), box-shadow .12s var(--ease-out); }
+.booking-cell:hover { background: rgba(235,242,252,.78); box-shadow: inset 0 0 0 1px rgba(59,125,221,.10); }
 .booking-cell.drag-selecting,
 .m-day-cell.drag-selecting { background: rgba(59, 125, 221, 0.15) !important; outline: 2px solid var(--primary); outline-offset: -2px; }
 .booking-cell.drag-start,
@@ -40,20 +42,20 @@
 .booking-cell.drag-end,
 .m-day-cell.drag-end { border-top-right-radius: 4px; border-bottom-right-radius: 4px; }
 .booking-block {
-  padding: 4px 6px 4px 8px; border-radius: 4px; font-size: 11px; margin-bottom: 1px;
-  cursor: grab; transition: opacity .15s; line-height: 1.3; white-space: nowrap;
+  padding: 4px 6px 4px 8px; border-radius: 5px; font-size: 11px; margin-bottom: 2px;
+  cursor: grab; transition: opacity .15s var(--ease-out), filter .15s var(--ease-out), box-shadow .15s var(--ease-out), transform .1s var(--ease-out); line-height: 1.3; white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis; position: relative;
   height: 24px; box-sizing: border-box; color: #374151;
   margin-left: 2px; margin-right: 2px;
   z-index: 1;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.06);
 }
 .booking-block.hover-highlight {
   z-index: 3;
   overflow: visible;
   opacity: 1;
   filter: brightness(1.08);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-  transition: filter 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 1px 2px rgba(30,58,110,.08), 0 8px 18px rgba(30,58,110,.12), inset 0 0 0 1px rgba(0,0,0,.05);
 }
 
 /* === Continuous booking bar (span) styles === */
@@ -75,13 +77,13 @@
 /* Continuous segments have no individual hover outlines now, they use unified hover class */
 .booking-block .booking-hours { font-weight: 600; color: #374151; }
 .booking-block .booking-project { color: #374151; }
-.booking-block.moving { opacity: 0.4; cursor: grabbing; }
+.booking-block.moving { opacity: 0.4; cursor: grabbing; transform: scale(0.96); }
 .booking-block.tentative { opacity: .5; border: 1.5px dashed; }
 /* Resize handles — 默认不可见且不接收鼠标事件，hover 时激活 */
 .booking-block .resize-handle {
   position: absolute; right: 0; top: 0; bottom: 0; width: 8px; cursor: ew-resize; opacity: 0;
   pointer-events: none;
-  transition: opacity .15s; background: linear-gradient(90deg, transparent 20%, rgba(59,125,221,0.85) 100%);
+  transition: opacity .15s var(--ease-out); background: linear-gradient(90deg, transparent 20%, rgba(59,125,221,0.85) 100%);
   border-top-right-radius: 4px; border-bottom-right-radius: 4px;
   z-index: 10;
 }
@@ -91,7 +93,7 @@
 .booking-block .resize-handle-left {
   position: absolute; left: 0; top: 0; bottom: 0; width: 8px; cursor: ew-resize; opacity: 0;
   pointer-events: none;
-  transition: opacity .15s; background: linear-gradient(270deg, transparent 20%, rgba(59,125,221,0.85) 100%);
+  transition: opacity .15s var(--ease-out); background: linear-gradient(270deg, transparent 20%, rgba(59,125,221,0.85) 100%);
   border-top-left-radius: 4px; border-bottom-left-radius: 4px;
   z-index: 10;
 }
@@ -113,7 +115,7 @@
   background-size: 4px 8px;
   background-position: center;
   background-repeat: repeat-y;
-  transition: opacity 0.15s;
+  transition: opacity 0.15s var(--ease-out);
 }
 .booking-block.hover-highlight .split-handle {
   pointer-events: auto; /* Active pointer events when block is hovered */
@@ -137,7 +139,7 @@
   background-size: contain;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.15s, transform 0.15s;
+  transition: opacity 0.15s var(--ease-out), transform 0.15s var(--ease-out);
   z-index: 100;
 }
 .booking-block .split-handle:hover::before {
@@ -161,7 +163,7 @@
   white-space: nowrap;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.15s, transform 0.15s;
+  transition: opacity 0.15s var(--ease-out), transform 0.15s var(--ease-out);
   z-index: 100;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
@@ -245,9 +247,9 @@
 .bk-modal { width: 520px; max-width: 95vw; }
 .bk-tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin: -20px -20px 20px; padding: 0 20px; }
 .bk-tab {
-  padding: 12px 20px; font-size: 14px; font-weight: 500; cursor: pointer;
+  min-height: 40px; padding: 12px 20px; font-size: 14px; font-weight: 500; cursor: pointer;
   color: var(--text-secondary); border-bottom: 2px solid transparent;
-  margin-bottom: -2px; transition: all .15s; background: none; border-top: none; border-left: none; border-right: none;
+  margin-bottom: -2px; transition: color .15s var(--ease-out), border-color .15s var(--ease-out), background-color .15s var(--ease-out); background: none; border-top: none; border-left: none; border-right: none;
   font-family: var(--font);
 }
 .bk-tab:hover { color: var(--text); }
@@ -267,11 +269,12 @@
 /* Time mode toggle */
 .bk-time-toggle { display: flex; gap: 0; margin-bottom: 12px; }
 .bk-time-btn {
-  display: flex; align-items: center; gap: 6px; padding: 7px 16px;
+  display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 7px 16px;
   border: 1px solid var(--border); font-size: 13px; font-weight: 500;
   cursor: pointer; background: var(--surface); color: var(--text-secondary);
-  font-family: var(--font); transition: all .15s;
+  font-family: var(--font); transition: background-color .15s var(--ease-out), border-color .15s var(--ease-out), color .15s var(--ease-out), box-shadow .15s var(--ease-out), transform .1s var(--ease-out);
 }
+.bk-time-btn:active { transform: scale(0.96); }
 .bk-time-btn:first-child { border-radius: 6px 0 0 6px; }
 .bk-time-btn:last-child { border-radius: 0 6px 6px 0; border-left: none; }
 .bk-time-btn.active { background: var(--primary-light); color: var(--primary); border-color: var(--primary); }
@@ -295,12 +298,12 @@
 .bk-toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
 .bk-toggle-track {
   width: 36px; height: 20px; border-radius: 10px; background: var(--border);
-  position: relative; transition: background .2s; flex-shrink: 0;
+  position: relative; transition: background-color .2s var(--ease-out); flex-shrink: 0;
 }
 .bk-toggle-track::after {
   content: ''; position: absolute; top: 2px; left: 2px;
   width: 16px; height: 16px; border-radius: 50%; background: #fff;
-  transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.2);
+  transition: transform .2s var(--ease-out); box-shadow: 0 1px 3px rgba(0,0,0,.2);
 }
 .bk-toggle input { display: none; }
 .bk-toggle input:checked + .bk-toggle-track { background: var(--primary); }
@@ -333,10 +336,11 @@
 /* Leave type pills */
 .bk-leave-types { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
 .bk-leave-type {
-  padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 500;
+  min-height: 34px; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 500;
   border: 1px solid var(--border); cursor: pointer; background: var(--surface);
-  color: var(--text-secondary); transition: all .15s; font-family: var(--font);
+  color: var(--text-secondary); transition: background-color .15s var(--ease-out), border-color .15s var(--ease-out), color .15s var(--ease-out), box-shadow .15s var(--ease-out), transform .1s var(--ease-out); font-family: var(--font);
 }
+.bk-leave-type:active { transform: scale(0.96); }
 .bk-leave-type:hover { border-color: var(--text-tertiary); }
 .bk-leave-type.active { background: #E5E7EB; color: #374151; border-color: #6B7280; }
 .bk-leave-type.sick.active { background: #FFF3E0; color: #B35900; border-color: var(--warning); }
@@ -351,31 +355,33 @@
 
 /* === VIEW TOGGLE (Week / Month) === */
 .view-toggle {
-  display: flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
+  display: flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; padding: 3px; background: var(--bg-secondary);
 }
 .view-btn {
   display: flex; align-items: center; justify-content: center;
-  padding: 0 12px; height: 32px; border: none; background: var(--surface);
-  cursor: pointer; color: var(--text-secondary); transition: all .15s;
+  padding: 0 12px; min-height: 34px; border: none; border-radius: 7px; background: transparent;
+  cursor: pointer; color: var(--text-secondary); transition: background-color .15s var(--ease-out), color .15s var(--ease-out), box-shadow .15s var(--ease-out), transform .1s var(--ease-out);
   font-size: 13px; font-weight: 500; white-space: nowrap;
 }
-.view-btn:first-child { border-right: 1px solid var(--border); }
+.view-btn:first-child { border-right: none; }
 .view-btn:hover { background: var(--bg); color: var(--text); }
-.view-btn.active { background: var(--primary-light); color: var(--primary); }
+.view-btn:active { transform: scale(0.96); }
+.view-btn.active { background: var(--surface); color: var(--primary); box-shadow: var(--shadow-sm); }
 
 /* === MONTH VIEW SCHEDULE === */
 .month-schedule { display: flex; flex-direction: column; height: 100%; }
 .month-scroll { flex: 1; overflow: auto; position: relative; height: 100%; }
 .month-table { border-collapse: separate; border-spacing: 0; table-layout: fixed; }
 /* content-visibility removed — caused rendering issues on wide tables */
-.month-table th, .month-table td { border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); }
+.month-table th, .month-table td { border-bottom: 1px solid rgba(232,224,216,.74); border-right: 1px solid rgba(232,224,216,.74); }
 
 /* Sticky resource name column */
 .month-table th.m-res-hd,
 .month-table td.m-res-cell {
   position: sticky; left: 0; z-index: 14; background: var(--surface);
   width: 220px; min-width: 220px; max-width: 220px;
-  border-right: 2px solid var(--border);
+  border-right: 1px solid rgba(232,224,216,.90);
+  box-shadow: 8px 0 18px -18px rgba(30,58,110,.28);
 }
 .month-table th.m-res-hd { z-index: 16; }
 
@@ -384,7 +390,8 @@
   position: sticky;
   top: 0;
   z-index: 15;
-  background: var(--surface);
+  background: rgba(255,255,255,.96);
+  box-shadow: 0 8px 18px rgba(30,58,110,.04);
 }
 .month-table-header { margin-bottom: -1px; }
 .month-table .m-day-row th {
@@ -453,29 +460,31 @@
   padding: 1px 0; vertical-align: top; height: 70px; position: relative; cursor: pointer;
   width: 60px; min-width: 60px; overflow: visible; background: var(--surface);
 }
-.m-day-cell:hover { background: var(--primary-light); }
+.m-day-cell { transition: background-color .12s var(--ease-out), box-shadow .12s var(--ease-out); }
+.m-day-cell:hover { background: rgba(235,242,252,.78); box-shadow: inset 0 0 0 1px rgba(59,125,221,.10); }
 .m-day-cell.m-weekend { background: #F3F4F6; }
 .m-day-cell.m-weekend:hover { background: #E5E7EB; }
 .m-day-cell.m-weekend:has(.m-booking, .m-leave) { background: #fff; }
 
 /* Booking block in month view */
 .m-booking {
-  font-size: 10.5px; line-height: 1.15; padding: 1px 2px; border-radius: 2px;
+  font-size: 10.5px; line-height: 1.15; padding: 1px 3px; border-radius: 3px;
   margin-bottom: 1px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
   cursor: grab; position: relative;
   height: 18px; box-sizing: border-box;
   color: #374151;
   z-index: 1;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.05);
+  transition: opacity .15s var(--ease-out), filter .15s var(--ease-out), box-shadow .15s var(--ease-out), transform .1s var(--ease-out);
 }
 .m-booking.hover-highlight {
   z-index: 3;
   overflow: visible;
   opacity: 1;
   filter: brightness(1.08);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-  transition: filter 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 1px 2px rgba(30,58,110,.08), 0 8px 18px rgba(30,58,110,.12), inset 0 0 0 1px rgba(0,0,0,.05);
 }
-.m-booking.moving { opacity: 0.4; cursor: grabbing; }
+.m-booking.moving { opacity: 0.4; cursor: grabbing; transform: scale(0.96); }
 .m-booking-hours { font-weight: 600; color: #374151; }
 .m-booking .booking-project {
   display: inline-block;
@@ -508,7 +517,7 @@
 .m-booking .resize-handle {
   position: absolute; right: 0; top: 0; bottom: 0; width: 6px; cursor: ew-resize; opacity: 0;
   pointer-events: none;
-  transition: opacity .15s; background: linear-gradient(90deg, transparent 20%, rgba(59,125,221,0.85) 100%);
+  transition: opacity .15s var(--ease-out); background: linear-gradient(90deg, transparent 20%, rgba(59,125,221,0.85) 100%);
   border-top-right-radius: 2px; border-bottom-right-radius: 2px;
   z-index: 10;
 }
@@ -518,7 +527,7 @@
 .m-booking .resize-handle-left {
   position: absolute; left: 0; top: 0; bottom: 0; width: 6px; cursor: ew-resize; opacity: 0;
   pointer-events: none;
-  transition: opacity .15s; background: linear-gradient(270deg, transparent 20%, rgba(59,125,221,0.85) 100%);
+  transition: opacity .15s var(--ease-out); background: linear-gradient(270deg, transparent 20%, rgba(59,125,221,0.85) 100%);
   border-top-left-radius: 2px; border-bottom-left-radius: 2px;
   z-index: 10;
 }
@@ -540,7 +549,7 @@
   background-size: 4px 8px;
   background-position: center;
   background-repeat: repeat-y;
-  transition: opacity 0.15s;
+  transition: opacity 0.15s var(--ease-out);
 }
 .m-booking.hover-highlight .split-handle {
   pointer-events: auto; /* Active pointer events when block is hovered */
@@ -562,7 +571,7 @@
   background-size: contain;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.15s, transform 0.15s;
+  transition: opacity 0.15s var(--ease-out), transform 0.15s var(--ease-out);
   z-index: 100;
 }
 .m-booking .split-handle:hover::before {
@@ -584,7 +593,7 @@
   white-space: nowrap;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.15s, transform 0.15s;
+  transition: opacity 0.15s var(--ease-out), transform 0.15s var(--ease-out);
   z-index: 100;
   box-shadow: 0 2px 6px rgba(0,0,0,0.15);
 }
@@ -609,7 +618,7 @@
   border-radius: 1.5px; background: var(--border);
 }
 .m-util-fill {
-  height: 100%; border-radius: 1.5px; transition: width .2s;
+  height: 100%; border-radius: 1.5px; transition: width .2s var(--ease-out);
 }
 .m-util-fill.green { background: var(--success); }
 .m-util-fill.yellow { background: var(--warning); }

@@ -62,7 +62,7 @@
 
 /* quick preset buttons */
 .report-presets { display: flex; gap: 4px; flex-wrap: wrap; }
-.btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text-secondary); border-radius: var(--radius); padding: 4px 10px; font-size: 12px; cursor: pointer; transition: all .15s; }
+.btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text-secondary); border-radius: var(--radius); padding: 4px 10px; font-size: 12px; cursor: pointer; transition: background-color .15s var(--ease-out), border-color .15s var(--ease-out), color .15s var(--ease-out), transform .1s var(--ease-out); }
 .btn-ghost:hover { background: var(--hover); color: var(--text); border-color: var(--primary); }
 
 /* PM project assignment panel */
@@ -101,7 +101,7 @@
 .ts-preset-btn {
   border: none; background: var(--bg); color: var(--text-secondary);
   font-size: 11px; padding: 3px 8px; border-radius: 4px; cursor: pointer;
-  transition: all .12s; font-family: var(--font);
+  transition: background-color .12s var(--ease-out), color .12s var(--ease-out), transform .1s var(--ease-out); font-family: var(--font);
 }
 .ts-preset-btn:hover { background: var(--primary-light); color: var(--primary); }
 
@@ -433,7 +433,7 @@
 .theme-palette { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
 .theme-swatch {
   width: 48px; height: 48px; border-radius: 10px; cursor: pointer;
-  border: 3px solid transparent; transition: all .15s; position: relative;
+  border: 3px solid transparent; transition: transform .15s var(--ease-out), border-color .15s var(--ease-out), box-shadow .15s var(--ease-out); position: relative;
 }
 .theme-swatch:hover { transform: scale(1.1); }
 .theme-swatch.active { border-color: var(--text); box-shadow: 0 0 0 2px var(--surface); }
@@ -465,7 +465,7 @@
 .pc-tab {
   padding: 8px 20px; font-size: 14px; font-weight: 500; cursor: pointer;
   color: var(--text-secondary); background: none; border: none; border-bottom: 3px solid transparent;
-  font-family: var(--font); transition: all .15s; white-space: nowrap;
+  font-family: var(--font); transition: color .15s var(--ease-out), border-color .15s var(--ease-out), background-color .15s var(--ease-out), transform .1s var(--ease-out); white-space: nowrap;
 }
 .pc-tab:hover { color: var(--text); }
 .pc-tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
@@ -501,7 +501,7 @@
 
 .btn-icon {
   background: none; border: none; cursor: pointer; padding: 4px 6px; border-radius: 4px;
-  font-size: 14px; color: var(--text-secondary); transition: all .15s;
+  font-size: 14px; color: var(--text-secondary); transition: background-color .15s var(--ease-out), color .15s var(--ease-out), transform .1s var(--ease-out);
 }
 .btn-icon:hover { background: var(--bg); color: var(--text); }
 .btn-icon.btn-delete:hover { color: var(--danger); }
@@ -526,3 +526,140 @@
 .pc-row-archived .col-actions .btn-delete { opacity: 0; transition: opacity .15s; }
 .pc-row-archived:hover .col-actions .btn-restore,
 .pc-row-archived:hover .col-actions .btn-delete { opacity: 1; }
+
+/* === UI POLISH OVERRIDES === */
+.ts-table,
+.report-card,
+.summary-card,
+.report-chart-card,
+.section-card,
+.card {
+  box-shadow: var(--shadow);
+}
+
+.report-card,
+.summary-card,
+.section-card,
+.card {
+  transition: box-shadow .18s var(--ease-out), transform .18s var(--ease-out);
+}
+
+.report-card:hover,
+.summary-card:hover,
+.section-card:hover,
+.card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.ts-table th {
+  border-bottom: 1px solid rgba(232,224,216,.90);
+}
+
+.ts-table td {
+  border-bottom: 1px solid rgba(232,224,216,.74);
+}
+
+.ts-input {
+  min-height: 34px;
+  border-radius: 7px;
+  transition: border-color .15s var(--ease-out), background-color .15s var(--ease-out), box-shadow .15s var(--ease-out);
+}
+
+.ts-input:focus {
+  background: var(--surface);
+  box-shadow: var(--focus-ring);
+}
+
+.report-row-drillable {
+  transition: background-color .15s var(--ease-out), box-shadow .15s var(--ease-out);
+}
+
+.btn-ghost {
+  min-height: 32px;
+  border-radius: 8px;
+  transition: background-color .15s var(--ease-out), border-color .15s var(--ease-out), color .15s var(--ease-out), transform .1s var(--ease-out);
+}
+
+.btn-ghost:active,
+.ts-notes-btn:active,
+.ts-preset-btn:active,
+.pc-tab:active,
+.btn-icon:active {
+  transform: scale(0.96);
+}
+
+.ts-notes-btn {
+  width: 24px;
+  height: 24px;
+  transition: opacity .15s var(--ease-out), background-color .15s var(--ease-out), color .15s var(--ease-out), transform .1s var(--ease-out);
+}
+
+.ts-preset-bar {
+  border-color: rgba(232,224,216,.70);
+  border-radius: 10px;
+  box-shadow: var(--shadow-lg);
+}
+
+.ts-preset-btn {
+  min-height: 28px;
+  border-radius: 7px;
+  transition: background-color .12s var(--ease-out), color .12s var(--ease-out), transform .1s var(--ease-out);
+}
+
+.auth-form .text-input {
+  transition: border-color .2s var(--ease-out), box-shadow .2s var(--ease-out), background-color .2s var(--ease-out);
+}
+
+.auth-form .text-input:focus {
+  box-shadow: var(--focus-ring);
+}
+
+.btn-block {
+  transition: background-color .15s var(--ease-out), box-shadow .15s var(--ease-out), transform .1s var(--ease-out);
+}
+
+.btn-block:active {
+  transform: scale(0.96);
+}
+
+.member-card {
+  border-color: rgba(232,224,216,.80);
+  transition: box-shadow .15s var(--ease-out), border-color .15s var(--ease-out), transform .15s var(--ease-out);
+}
+
+.member-card:hover {
+  border-color: rgba(59,125,221,.18);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+.theme-swatch {
+  transition: transform .15s var(--ease-out), border-color .15s var(--ease-out), box-shadow .15s var(--ease-out);
+}
+
+.pc-tab {
+  min-height: 40px;
+  transition: color .15s var(--ease-out), border-color .15s var(--ease-out), background-color .15s var(--ease-out), transform .1s var(--ease-out);
+}
+
+.search-box {
+  border-radius: 10px;
+  transition: border-color .15s var(--ease-out), box-shadow .15s var(--ease-out);
+}
+
+.search-box:focus-within {
+  border-color: var(--primary);
+  box-shadow: var(--focus-ring);
+}
+
+.col-actions .btn-icon {
+  transition: opacity .15s var(--ease-out), background-color .15s var(--ease-out), color .15s var(--ease-out), transform .1s var(--ease-out);
+}
+
+.btn-icon {
+  min-width: 32px;
+  min-height: 32px;
+  border-radius: 7px;
+  transition: background-color .15s var(--ease-out), color .15s var(--ease-out), transform .1s var(--ease-out);
+}

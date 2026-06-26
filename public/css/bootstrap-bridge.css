@@ -127,7 +127,7 @@ body {
   font-family: var(--font, 'Inter', -apple-system, BlinkMacSystemFont, sans-serif);
   border-radius: 6px;
   padding: 7px 14px;
-  transition: all 0.15s;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s, transform 0.1s;
 }
 
 /* 修复：恢复 Bootstrap .btn-close 原生样式（被 .btn 规则覆盖导致图标不显示） */
@@ -324,7 +324,7 @@ body {
   padding: 12px 20px;
   margin-bottom: -1px;
   border-radius: 0;
-  transition: all 0.15s;
+  transition: color 0.15s, border-color 0.15s, background-color 0.15s, transform 0.1s;
 }
 .nav-tabs .nav-link:hover {
   color: var(--text, #1A1A1A);
@@ -1386,4 +1386,144 @@ body.modal-open {
   }
   .sidebar-close-btn { display: none !important; }
   .app { padding-top: 0; }
+}
+
+/* ================================================================
+   Interface polish pass — tactile controls, explicit transitions, depth
+   ================================================================ */
+.btn:not(.btn-close) {
+  min-height: 40px;
+  border-radius: 8px;
+  transition: background-color .15s var(--ease-out), border-color .15s var(--ease-out), color .15s var(--ease-out), box-shadow .15s var(--ease-out), transform .1s var(--ease-out);
+}
+
+.btn:not(.btn-close):active {
+  transform: scale(0.96);
+}
+
+.btn-sm {
+  min-height: 32px;
+  border-radius: 7px;
+}
+
+.btn-primary {
+  box-shadow: 0 1px 2px rgba(59,125,221,.20), 0 8px 18px rgba(59,125,221,.14);
+}
+
+.btn-primary:hover {
+  box-shadow: 0 2px 4px rgba(59,125,221,.18), 0 12px 28px rgba(59,125,221,.18);
+}
+
+.form-control,
+.form-select,
+.text-input,
+.select-input,
+.date-input {
+  border-radius: 8px;
+  transition: border-color .15s var(--ease-out), box-shadow .15s var(--ease-out), background-color .15s var(--ease-out);
+}
+
+.form-control:focus,
+.form-select:focus,
+.text-input:focus,
+.select-input:focus,
+.date-input:focus {
+  box-shadow: var(--focus-ring);
+}
+
+.card,
+.section-card,
+.summary-card.card,
+.report-chart-card.card {
+  box-shadow: var(--shadow);
+}
+
+.card,
+.section-card,
+.summary-card.card {
+  transition: box-shadow .18s var(--ease-out), transform .18s var(--ease-out);
+}
+
+.card:hover,
+.section-card:hover,
+.summary-card.card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.modal-content,
+#modal-overlay .modal-content {
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
+}
+
+.nav-tabs .nav-link,
+.pc-tabs.nav-tabs .pc-tab.nav-link,
+.view-toggle.btn-group .view-btn.btn,
+.report-presets.btn-group .btn-ghost,
+.hamburger-btn,
+.sidebar-close-btn {
+  transition: background-color .15s var(--ease-out), border-color .15s var(--ease-out), color .15s var(--ease-out), box-shadow .15s var(--ease-out), transform .1s var(--ease-out), opacity .15s var(--ease-out);
+}
+
+.nav-tabs .nav-link:active,
+.pc-tabs.nav-tabs .pc-tab.nav-link:active,
+.view-toggle.btn-group .view-btn.btn:active,
+.report-presets.btn-group .btn-ghost:active,
+.hamburger-btn:active,
+.sidebar-close-btn:active {
+  transform: scale(0.96);
+}
+
+.view-toggle.btn-group {
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--bg-secondary);
+}
+
+.view-toggle.btn-group .view-btn.btn {
+  min-height: 34px;
+  border-radius: 7px !important;
+}
+
+.view-toggle.btn-group .view-btn.btn.active {
+  box-shadow: var(--shadow-sm);
+}
+
+.table,
+.res-table.table,
+.pc-table.table,
+.report-table.table {
+  --bs-table-border-color: rgba(232, 224, 216, 0.74);
+}
+
+.res-table.table tbody tr:hover,
+.pc-table.table tbody tr:hover,
+.report-table.table tbody tr:hover {
+  box-shadow: inset 3px 0 0 rgba(59,125,221,.24);
+}
+
+.toast.toast-error,
+.toast.toast-info,
+.toast.toast-success {
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+}
+
+.toast:not(.show),
+.toast.show,
+.toast.hiding {
+  transition: opacity .3s var(--ease-out), transform .3s var(--ease-out);
+}
+
+.hamburger-btn {
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: 8px;
+}
+
+.sidebar-close-btn {
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: 8px;
 }

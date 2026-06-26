@@ -11,8 +11,41 @@
   --success: #10B981; --warning: #FFC832; --danger: #EF4444;
   --sidebar-bg: #1E3A6E; --sidebar-text: #FFFFFF; --sidebar-active: #FFFFFF;
   --radius: 10px; --radius-lg: 16px; --radius-sm: 6px;
-  --shadow: 0 2px 8px rgba(30,58,110,.06);
+  --shadow: 0 1px 2px rgba(30,58,110,.05), 0 8px 24px rgba(30,58,110,.06);
+  --shadow-sm: 0 1px 2px rgba(30,58,110,.06);
+  --shadow-md: 0 2px 6px rgba(30,58,110,.06), 0 12px 32px rgba(30,58,110,.10);
+  --shadow-lg: 0 8px 24px rgba(30,58,110,.10), 0 24px 64px rgba(30,58,110,.14);
+  --focus-ring: 0 0 0 3px rgba(59,125,221,.14);
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
   --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
+html {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
 html, body { height: 100%; font-family: var(--font); font-size: 14px; color: var(--text); background: var(--bg); }
+body { text-wrap: pretty; }
+h1, h2, h3, h4, h5, h6 { text-wrap: balance; letter-spacing: 0; }
+button, input, select, textarea { font: inherit; }
+img { outline: 1px solid rgba(0, 0, 0, 0.1); outline-offset: -1px; }
+.tabular-nums,
+.date-range,
+.day-total,
+.m-day-num,
+.m-week-label,
+.booking-hours,
+.m-booking-hours,
+.report-card-value,
+.summary-value,
+.summary-sub,
+.ts-input,
+.ts-row-total,
+.bk-total,
+.bk-batch-preview-item,
+.col-code,
+.badge,
+.role-badge,
+.archive-badge {
+  font-variant-numeric: tabular-nums;
+}
 a { text-decoration: none; color: inherit; }
