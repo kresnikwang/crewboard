@@ -163,7 +163,7 @@
       var scopeId = parseInt(parts[1], 10);
       var p = projectMap[pid];
       
-      var name = p ? p.name : (projectNameMap[pid] || '未知项目');
+      var name = p ? p.name : (projectNameMap[pid] || t('timesheets.unknown_project'));
       var clientName = p ? p.client_name : '';
       var color = p ? (p.client_color || p.color) : '#8B5CF6';
       var code = p ? p.code : '';

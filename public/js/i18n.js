@@ -735,6 +735,18 @@
     'wecom.test_no_matched_employees': 'No employees with a bound WeCom user ID yet. Please sync contacts first'
   });
 
+  // --- misc dynamic (settings / account toasts) ---
+  Object.assign(translations.zh, {
+    'enterprise.logo_too_large': '选择的Logo图片大小不能超过 3MB',
+    'account.avatar_too_large': '选择的头像图片大小不能超过 3MB',
+    'timesheets.unknown_project': '未知项目'
+  });
+  Object.assign(translations.en, {
+    'enterprise.logo_too_large': 'Selected logo image must not exceed 3MB',
+    'account.avatar_too_large': 'Selected avatar image must not exceed 3MB',
+    'timesheets.unknown_project': 'Unknown Project'
+  });
+
   // --- logout & status ---
   Object.assign(translations.zh, {
     'logout.title': '退出登录', 'logout.desc': '退出当前账号，返回登录页面。',

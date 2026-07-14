@@ -162,7 +162,7 @@ window.loadEnterprise = async function loadEnterprise() {
       var file = logoFileInput.files[0];
       if (!file) return;
       if (file.size > 3 * 1024 * 1024) {
-        toast('选择的Logo图片大小不能超过 3MB', 'error');
+        toast(t('enterprise.logo_too_large'), 'error');
         return;
       }
       if (!file.type.startsWith('image/')) {
@@ -618,7 +618,7 @@ window.loadAccount = async function loadAccount() {
     var file = fileInput.files[0];
     if (!file) return;
     if (file.size > 3 * 1024 * 1024) {
-      toast('选择的头像图片大小不能超过 3MB', 'error');
+      toast(t('account.avatar_too_large'), 'error');
       return;
     }
     if (!file.type.startsWith('image/')) {

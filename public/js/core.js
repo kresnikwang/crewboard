@@ -1059,8 +1059,20 @@ function handleHashRoute() {
 // --------------- Language Toggle ---------------
 document.querySelectorAll('.lang-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    setLang(btn.dataset.lang);
-    updateLangToggle();
+    setLang(btn.dataset.lang);      // persist + applyI18n() for static [data-i18n] (nav / headers)
+    updateLangToggle();             // reflect active button state
+    // Re-render the current page so dynamically-rendered content (feature settings,
+    // enterprise/account pages, lists, grids built via t()) switches language live.
+    // User-entered data (enterprise & employee info) is never translated — it is
+    // re-rendered from the same source values, so switching language leaves it intact.
+    try {
+      var mainApp = document.getElementById('main-app');
+      if (mainApp && mainApp.style.display !== 'none' &&
+          window.state && window.state.currentPage &&
+          typeof window.loadPage === 'function') {
+        window.loadPage(window.state.currentPage);
+      }
+    } catch (e) { /* no-op: language is already applied to static UI */ }
   });
 });
 function updateLangToggle() {
