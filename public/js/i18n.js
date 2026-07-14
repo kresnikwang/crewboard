@@ -109,7 +109,11 @@
     'auth.err_link_expired': '链接无效或已过期',
     'auth.reset_success': '密码重置成功，正在跳转登录...',
     'auth.btn_resetting': '重置中...', 'auth.err_reset_failed': '重置失败',
-    'auth.reset_account': '重置账号：'
+    'auth.reset_account': '重置账号：',
+    'auth.tagline': '让排程更简单，让协作更高效',
+    'auth.fc_schedule_desc': '拖拽式日历视图',
+    'auth.fc_timesheet_desc': '精确记录每日工时',
+    'auth.fc_reports_desc': '多维度分析导出'
   });
   Object.assign(translations.en, {
     'auth.app_title': 'CrewBoard',
@@ -171,7 +175,11 @@
     'auth.err_link_expired': 'Link is invalid or expired',
     'auth.reset_success': 'Password reset successfully, redirecting to login...',
     'auth.btn_resetting': 'Resetting...', 'auth.err_reset_failed': 'Reset failed',
-    'auth.reset_account': 'Reset account:'
+    'auth.reset_account': 'Reset account:',
+    'auth.tagline': 'Simpler scheduling, smoother collaboration',
+    'auth.fc_schedule_desc': 'Drag-and-drop calendar view',
+    'auth.fc_timesheet_desc': 'Accurate daily time tracking',
+    'auth.fc_reports_desc': 'Multi-dimensional analytics & export'
   });
 
   // --- schedule ---
@@ -745,6 +753,56 @@
     'enterprise.logo_too_large': 'Selected logo image must not exceed 3MB',
     'account.avatar_too_large': 'Selected avatar image must not exceed 3MB',
     'timesheets.unknown_project': 'Unknown Project'
+  });
+
+  // --- schedule tooltips / scope selector / load errors ---
+  Object.assign(translations.zh, {
+    'schedule.work_scope': '工作范围',
+    'schedule.hours_label': '工时',
+    'schedule.load_failed': '加载排程数据失败',
+    'schedule.unknown_error': '未知错误',
+    'schedule.no_scope_option': '-- 无特定工作范围 --'
+  });
+  Object.assign(translations.en, {
+    'schedule.work_scope': 'Work Scope',
+    'schedule.hours_label': 'Hours',
+    'schedule.load_failed': 'Failed to load schedule data',
+    'schedule.unknown_error': 'Unknown error',
+    'schedule.no_scope_option': '-- No specific work scope --'
+  });
+
+  // --- manage: resource avatar & project work scopes ---
+  Object.assign(translations.zh, {
+    'common.add_failed': '添加失败',
+    'manage.upload_avatar': '上传头像',
+    'manage.avatar_hint': '支持 500KB 以内图片',
+    'manage.res_avatar_too_large': '选择的头像图片大小不能超过 3MB',
+    'manage.no_scopes': '暂无工作范围，请在下方添加',
+    'manage.scope_name_empty': '名称不能为空',
+    'manage.scope_updated': '修改成功',
+    'manage.scope_delete_confirm': '确定删除此工作范围吗？相关排班和工时将失去关联。',
+    'manage.scope_deleted': '删除成功',
+    'manage.scopes_title': '工作范围 (Work Scopes)',
+    'manage.new_scope_placeholder': '新增工作范围名称，如：前端开发',
+    'manage.add_btn': '添加',
+    'manage.scope_name_required': '请输入工作范围名称',
+    'manage.scope_added': '添加成功'
+  });
+  Object.assign(translations.en, {
+    'common.add_failed': 'Add failed',
+    'manage.upload_avatar': 'Upload Avatar',
+    'manage.avatar_hint': 'Image up to 500KB',
+    'manage.res_avatar_too_large': 'Selected avatar image must not exceed 3MB',
+    'manage.no_scopes': 'No work scopes yet — add one below',
+    'manage.scope_name_empty': 'Name cannot be empty',
+    'manage.scope_updated': 'Updated successfully',
+    'manage.scope_delete_confirm': 'Delete this work scope? Related bookings and timesheets will lose their association.',
+    'manage.scope_deleted': 'Deleted successfully',
+    'manage.scopes_title': 'Work Scopes',
+    'manage.new_scope_placeholder': 'New scope name, e.g. Frontend Development',
+    'manage.add_btn': 'Add',
+    'manage.scope_name_required': 'Please enter a work scope name',
+    'manage.scope_added': 'Added successfully'
   });
 
   // --- logout & status ---

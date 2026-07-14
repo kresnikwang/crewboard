@@ -105,7 +105,7 @@
       });
     } catch (err) {
       console.error('[loadSchedule] API error:', err);
-      if (window.showToast) window.showToast('加载排程数据失败: ' + (err.message || '未知错误'), 'error');
+      if (window.showToast) window.showToast(t('schedule.load_failed') + ': ' + (err.message || t('schedule.unknown_error')), 'error');
       loadSchedule._isLoading = false;
       return;
     }
@@ -682,11 +682,11 @@
         var borderStyle = hasBorderLeft ? 'border-left:3px solid ' + projColor + ';' : '';
 
         var tooltipLines = [
-          '项目: ' + b.project_name + (b.client_name ? ' (' + b.client_name + ')' : ''),
-          b.scope_name ? '工作范围: ' + b.scope_name : null,
-          '工时: ' + b.hours + 'h',
-          b.created_by_name ? '预订人: ' + b.created_by_name : null,
-          b.notes ? '备注: ' + b.notes : null
+          t('schedule.project') + ': ' + b.project_name + (b.client_name ? ' (' + b.client_name + ')' : ''),
+          b.scope_name ? t('schedule.work_scope') + ': ' + b.scope_name : null,
+          t('schedule.hours_label') + ': ' + b.hours + 'h',
+          b.created_by_name ? t('schedule.booker') + ': ' + b.created_by_name : null,
+          b.notes ? t('common.notes') + ': ' + b.notes : null
         ].filter(Boolean).join('\n');
 
         html += '<div class="booking-block' + tentCls + spanCls + '"' +
@@ -963,7 +963,7 @@
             });
           } else {
             // 连续 booking：鼠标还在同一格子，不执行操作
-            toast(t('schedule.drag_further_to_shorten') || '请继续向左拖动以缩短', 'info');
+            toast(t('schedule.drag_further_to_shorten'), 'info');
             return;
           }
         } else {
@@ -1847,11 +1847,11 @@
         var borderStyle = hasBorderLeft ? 'border-left:2px solid ' + projColor + ';' : '';
 
         var tooltipText = [
-          '项目: ' + b.project_name + (b.client_name ? ' (' + b.client_name + ')' : ''),
-          b.scope_name ? '工作范围: ' + b.scope_name : null,
-          '工时: ' + b.hours + 'h',
-          b.created_by_name ? '预订人: ' + b.created_by_name : null,
-          b.notes ? '备注: ' + b.notes : null
+          t('schedule.project') + ': ' + b.project_name + (b.client_name ? ' (' + b.client_name + ')' : ''),
+          b.scope_name ? t('schedule.work_scope') + ': ' + b.scope_name : null,
+          t('schedule.hours_label') + ': ' + b.hours + 'h',
+          b.created_by_name ? t('schedule.booker') + ': ' + b.created_by_name : null,
+          b.notes ? t('common.notes') + ': ' + b.notes : null
         ].filter(Boolean).join('\n');
         html += '<div class="m-booking' + spanCls + '" data-booking-id="' + b.id + '"' +
           ' data-resource-id="' + b.resource_id + '"' +
@@ -2570,9 +2570,9 @@
     return '<div class="bk-field" id="bk-scope-container" style="display:none;">' +
       '<svg class="bk-field-icon" viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M7 8h6M7 12h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' +
       '<div class="bk-field-body">' +
-        '<div class="bk-field-label">工作范围 (Work Scope)</div>' +
+        '<div class="bk-field-label">' + t('schedule.work_scope') + '</div>' +
         '<select id="bk-scope" class="rg-select text-input form-control form-control-sm">' +
-          '<option value="">-- 无特定工作范围 --</option>' +
+          '<option value="">' + t('schedule.no_scope_option') + '</option>' +
         '</select>' +
       '</div>' +
     '</div>';
@@ -2585,14 +2585,14 @@
 
     if (!projectId) {
       container.style.display = 'none';
-      select.innerHTML = '<option value="">-- 无特定工作范围 --</option>';
+      select.innerHTML = '<option value="">' + t('schedule.no_scope_option') + '</option>';
       return;
     }
 
     try {
       var scopes = await api('/api/projects/' + projectId + '/scopes');
       if (scopes && scopes.length > 0) {
-        var html = '<option value="">-- 无特定工作范围 --</option>';
+        var html = '<option value="">' + t('schedule.no_scope_option') + '</option>';
         scopes.forEach(function (s) {
           var sel = s.id == selectedScopeId ? ' selected' : '';
           html += '<option value="' + s.id + '"' + sel + '>' + esc(s.name) + '</option>';
@@ -2601,7 +2601,7 @@
         container.style.display = '';
       } else {
         container.style.display = 'none';
-        select.innerHTML = '<option value="">-- 无特定工作范围 --</option>';
+        select.innerHTML = '<option value="">' + t('schedule.no_scope_option') + '</option>';
       }
     } catch (e) {
       console.error('Failed to load scopes for project ' + projectId, e);

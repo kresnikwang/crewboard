@@ -257,11 +257,11 @@ window.showResourceModal = async function showResourceModal(id) {
         '</div>' +
         '<div style="display: flex; flex-direction: column; gap: 4px;">' +
           '<div style="display: flex; gap: 8px;">' +
-            '<button class="btn btn-outline btn-sm" id="btn-upload-res-avatar" type="button" style="padding: 3px 10px; font-size: 11px;">上传头像</button>' +
-            '<button class="btn btn-outline btn-sm text-danger" id="btn-del-res-avatar" type="button" style="padding: 3px 10px; font-size: 11px;' + (resource && resource.avatar ? '' : 'display:none;') + '">删除</button>' +
+            '<button class="btn btn-outline btn-sm" id="btn-upload-res-avatar" type="button" style="padding: 3px 10px; font-size: 11px;">' + t('manage.upload_avatar') + '</button>' +
+            '<button class="btn btn-outline btn-sm text-danger" id="btn-del-res-avatar" type="button" style="padding: 3px 10px; font-size: 11px;' + (resource && resource.avatar ? '' : 'display:none;') + '">' + t('common.delete') + '</button>' +
           '</div>' +
           '<input type="file" id="res-avatar-file-input" accept="image/*" style="display: none">' +
-          '<div class="avatar-hint" style="font-size: 11px; color: var(--text-tertiary);">支持 500KB 以内图片</div>' +
+          '<div class="avatar-hint" style="font-size: 11px; color: var(--text-tertiary);">' + t('manage.avatar_hint') + '</div>' +
         '</div>' +
       '</div>' +
     '</div>' +
@@ -350,7 +350,7 @@ window.showResourceModal = async function showResourceModal(id) {
       var file = fileInput.files[0];
       if (file) {
         if (file.size > 3 * 1024 * 1024) {
-          toast('选择的头像图片大小不能超过 3MB', 'error');
+          toast(t('manage.res_avatar_too_large'), 'error');
         } else if (file.type.startsWith('image/')) {
           compressResourceAvatar(file, function (dataUrl) {
             var previewEl = document.getElementById('res-avatar-preview');
@@ -805,11 +805,11 @@ window.deleteClient = async function deleteClient(id) {
 window.loadProjectScopes = async function loadProjectScopes(projectId) {
   const container = document.getElementById('scopes-list-container');
   if (!container) return;
-  container.innerHTML = '<div class="text-muted text-center py-2" style="font-size: 13px;">加载中...</div>';
+  container.innerHTML = '<div class="text-muted text-center py-2" style="font-size: 13px;">' + t('common.loading') + '</div>';
   try {
     const scopes = await api('/api/projects/' + projectId + '/scopes');
     if (!scopes.length) {
-      container.innerHTML = '<div class="text-muted text-center py-2" style="font-size: 13px;">暂无工作范围，请在下方添加</div>';
+      container.innerHTML = '<div class="text-muted text-center py-2" style="font-size: 13px;">' + t('manage.no_scopes') + '</div>';
       return;
     }
     let html = '<table class="table table-sm align-middle" style="font-size: 13px; margin-bottom: 0; width: 100%;"><tbody>';
@@ -838,32 +838,32 @@ window.loadProjectScopes = async function loadProjectScopes(projectId) {
 
       saveBtn.addEventListener('click', async function () {
         const newName = input.value.trim();
-        if (!newName) { toast('名称不能为空', 'error'); return; }
+        if (!newName) { toast(t('manage.scope_name_empty'), 'error'); return; }
         try {
           await api('/api/project-scopes/' + scopeId, {
             method: 'PUT',
             body: { name: newName }
           });
-          toast('修改成功');
+          toast(t('manage.scope_updated'));
           saveBtn.style.display = 'none';
         } catch (err) {
-          toast('保存失败: ' + err.message, 'error');
+          toast(t('common.save_failed') + ': ' + err.message, 'error');
         }
       });
 
       deleteBtn.addEventListener('click', async function () {
-        if (!confirm('确定删除此工作范围吗？相关排班和工时将失去关联。')) return;
+        if (!confirm(t('manage.scope_delete_confirm'))) return;
         try {
           await api('/api/project-scopes/' + scopeId, { method: 'DELETE' });
-          toast('删除成功');
+          toast(t('manage.scope_deleted'));
           loadProjectScopes(projectId);
         } catch (err) {
-          toast('删除失败: ' + err.message, 'error');
+          toast(t('common.delete_failed') + ': ' + err.message, 'error');
         }
       });
     });
   } catch (err) {
-    container.innerHTML = '<div class="text-danger text-center py-2" style="font-size: 13px;">加载失败: ' + err.message + '</div>';
+    container.innerHTML = '<div class="text-danger text-center py-2" style="font-size: 13px;">' + t('common.load_failed') + ': ' + err.message + '</div>';
   }
 };
 
@@ -929,14 +929,14 @@ window.showProjectModal = async function showProjectModal(id) {
   if (isEdit) {
     body += '<div class="rg-separator"></div>' +
       '<div class="rg-field-title" style="margin-top:15px; font-weight:600; font-size:14px; color:var(--text-primary)">' +
-        '工作范围 (Work Scopes)' +
+        t('manage.scopes_title') +
       '</div>' +
       '<div class="scopes-manager" style="margin-top:10px;">' +
         '<div id="scopes-list-container" style="max-height: 150px; overflow-y: auto; margin-bottom: 10px; border: 1px solid var(--border-color); border-radius: 4px; padding: 5px;">' +
         '</div>' +
         '<div class="input-group input-group-sm mb-1" style="display:flex; gap:8px;">' +
-          '<input type="text" id="new-scope-name" class="form-control text-input form-control-sm rg-input" placeholder="新增工作范围名称，如：前端开发" style="flex:1; margin:0; padding:6px 12px; font-size:13px;">' +
-          '<button class="btn btn-outline-secondary btn-sm" type="button" id="btn-add-scope" style="border: 1px solid var(--border-color); padding:6px 12px; border-radius:4px; font-size:13px;">添加</button>' +
+          '<input type="text" id="new-scope-name" class="form-control text-input form-control-sm rg-input" placeholder="' + t('manage.new_scope_placeholder') + '" style="flex:1; margin:0; padding:6px 12px; font-size:13px;">' +
+          '<button class="btn btn-outline-secondary btn-sm" type="button" id="btn-add-scope" style="border: 1px solid var(--border-color); padding:6px 12px; border-radius:4px; font-size:13px;">' + t('manage.add_btn') + '</button>' +
         '</div>' +
       '</div>';
   }
@@ -973,17 +973,17 @@ window.showProjectModal = async function showProjectModal(id) {
     document.getElementById('btn-add-scope').addEventListener('click', async function () {
       const input = document.getElementById('new-scope-name');
       const name = input.value.trim();
-      if (!name) { toast('请输入工作范围名称', 'error'); return; }
+      if (!name) { toast(t('manage.scope_name_required'), 'error'); return; }
       try {
         await api('/api/projects/' + id + '/scopes', {
           method: 'POST',
           body: { name: name }
         });
-        toast('添加成功');
+        toast(t('manage.scope_added'));
         input.value = '';
         loadProjectScopes(id);
       } catch (err) {
-        toast('添加失败: ' + err.message, 'error');
+        toast(t('common.add_failed') + ': ' + err.message, 'error');
       }
     });
   }
