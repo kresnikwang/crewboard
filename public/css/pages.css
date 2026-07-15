@@ -481,6 +481,19 @@
 
 #clients-projects-container { padding: 0; overflow-y: auto; flex: 1; min-height: 0; }
 
+/* Sticky table header for projects / clients / archive lists */
+.pc-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.pc-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--bg, #FEFAF5);
+  box-shadow: 0 1px 0 var(--border, #E8E0D8);
+}
+
 .pc-table tbody tr { cursor: pointer; }
 .pc-table tbody tr:active { background: #EBF2FC; }
 .col-name { min-width: 200px; }

@@ -100,7 +100,7 @@ window.loadEnterprise = async function loadEnterprise() {
       '<div class="avatar-upload-section" style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px; display: flex; align-items: center; gap: 20px;">' +
         '<div class="avatar-preview" id="ent-logo-preview" style="border-radius: 8px;">' + logoPreview + '</div>' +
         '<div class="avatar-upload-info">' +
-          '<button class="btn btn-outline btn-sm" id="btn-upload-ent-logo">' + t('enterprise.upload_logo') + '</button>' +
+          '<button class="btn btn-primary btn-sm" id="btn-upload-ent-logo">' + t('enterprise.upload_logo') + '</button>' +
           '<input type="file" id="ent-logo-file-input" accept="image/*" style="display:none">' +
           '<div class="avatar-hint">' + t('enterprise.logo_hint') + '</div>' +
         '</div>' +
