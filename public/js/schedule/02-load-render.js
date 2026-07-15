@@ -513,67 +513,78 @@ function detectSpans(resourceId, days, bMap) {
 }
 
 /* --------------------------------------------------
+   Find the contiguous booking span containing `booking`.
+   Mirrors detectSpans / splitBooking:
+   - same resource + project + hours + is_tentative
+   - only consecutive calendar days (dayDiff === 1), NOT weekend bridging
+   - respects split_after markers
+   Always returns at least [booking] when booking is valid.
+   -------------------------------------------------- */
+function findBookingSpanSegment(booking) {
+  if (!booking) return [];
+
+  var resourceId = booking.resource_id;
+  var targetProject = booking.project_id;
+  var targetHours = parseFloat(booking.hours);
+  var targetTentative = !!booking.is_tentative;
+  var matchFn = function (b) {
+    return b.resource_id === resourceId &&
+           b.project_id === targetProject &&
+           parseFloat(b.hours) === targetHours &&
+           !!b.is_tentative === targetTentative;
+  };
+
+  // Walk backward to span start
+  var spanStart = new Date(booking.date);
+  while (true) {
+    var prevD = new Date(spanStart);
+    prevD.setDate(prevD.getDate() - 1);
+    var prevStr = fmt(prevD);
+    var prevBk = _allBookings.find(function (b) { return b.date === prevStr && matchFn(b); });
+    if (!prevBk) break;
+    // Cannot extend past a split point on the previous day
+    if (prevBk.split_after === 1 || prevBk.split_after === true) break;
+    spanStart = prevD;
+  }
+
+  // Walk forward from span start, collecting bookings
+  var segment = [];
+  var cur = new Date(spanStart);
+  while (true) {
+    var curStr = fmt(cur);
+    var curBk = _allBookings.find(function (b) { return b.date === curStr && matchFn(b); });
+    if (!curBk) break;
+    segment.push(curBk);
+    if (curBk.split_after === 1 || curBk.split_after === true) break;
+    cur.setDate(cur.getDate() + 1);
+  }
+
+  // Safety: ensure the original booking is included
+  if (segment.length === 0) return [booking];
+  if (!segment.some(function (b) { return b.id === booking.id; })) return [booking];
+  return segment;
+}
+
+/* --------------------------------------------------
    Get span group for a booking: returns array of bookings
    that form a continuous span with same (project_id, hours, is_tentative)
    Respects visual split markers (span-e ends a group)
+   Only returns multi-day groups (null for solo bookings) — used by edit modal.
    -------------------------------------------------- */
 function getSpanGroup(bookingId, bMap, days) {
   var target = _allBookings.find(function (b) { return b.id === bookingId; });
   if (!target) return null;
 
-  var resourceId = target.resource_id;
-  var dateFmts = days.map(fmt);
+  var group = findBookingSpanSegment(target);
+  if (!group || group.length <= 1) return null;
 
-  // Find all bookings for this resource in current view
-  // Filter bookings for this resource and target's project
-  // Same project + same hours + same tentative status forms a group
-  var targetProjectId = target.project_id;
-  var targetHours = target.hours;
-  var targetTentative = target.is_tentative;
-
-  var resourceBookings = _allBookings.filter(function (b) {
-    return b.resource_id === resourceId &&
-           dateFmts.indexOf(b.date) >= 0 &&
-           b.project_id === targetProjectId &&
-           parseFloat(b.hours) === parseFloat(targetHours) &&
-           !!b.is_tentative === !!targetTentative;
-  }).sort(function (a, b) { return a.date.localeCompare(b.date); });
-
-  // Group consecutive bookings, respecting split_after markers
-  var groups = [];
-  var currentGroup = [];
-
-  for (var i = 0; i < resourceBookings.length; i++) {
-    var b = resourceBookings[i];
-    if (currentGroup.length === 0) {
-      currentGroup.push(b);
-    } else {
-      var last = currentGroup[currentGroup.length - 1];
-      var lastDate = new Date(last.date);
-      var curDate = new Date(b.date);
-      var dayDiff = Math.round((curDate - lastDate) / 86400000);
-
-      // Check if last booking has split_after flag (persisted split marker)
-      var isSplitAfter = last.split_after === 1 || last.split_after === true;
-
-      if (dayDiff === 1 && !isSplitAfter) {
-        currentGroup.push(b);
-      } else {
-        groups.push(currentGroup);
-        currentGroup = [b];
-      }
-    }
+  // Optionally restrict to bookings visible in current view (edit modal context)
+  if (days && days.length) {
+    var dateFmts = days.map(fmt);
+    group = group.filter(function (b) { return dateFmts.indexOf(b.date) >= 0; });
+    if (group.length <= 1) return null;
   }
-  if (currentGroup.length > 0) groups.push(currentGroup);
-
-  // Find which group contains the target booking
-  for (var g = 0; g < groups.length; g++) {
-    var group = groups[g];
-    if (group.some(function (b) { return b.id === bookingId; })) {
-      return group.length > 1 ? group : null; // Only return if it's a multi-day span
-    }
-  }
-  return null;
+  return group;
 }
 
 /* --------------------------------------------------

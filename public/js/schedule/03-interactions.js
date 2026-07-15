@@ -18,43 +18,11 @@ function initResizeBooking(blockElement, booking, startEvent) {
   if (originalIndex === -1) return; // 安全检查
 
   // ── 2. 找出当前预定块所属的「连续同项目 booking」范围 ──────────
-  // 用于向左缩短时知道哪些 booking 可以删除
-  // 这里只需要知道原始日期即可，缩短时删除从 newEnd+1 到 originalDate 的 bookings
-  // 同时获取该段的结束日期（处理跨周边界的情况）
-  var sameProjectBookings = _allBookings.filter(function (b) {
-    return b.resource_id === booking.resource_id &&
-           b.project_id  === booking.project_id;
-  }).sort(function (a, b) { return a.date.localeCompare(b.date); });
-
-  // 找包含当前 booking 的连续段（需要检查 split_after 标记）
-  var endDate = booking.date;
-  for (var i = 0; i < sameProjectBookings.length; i++) {
-    if (sameProjectBookings[i].date === booking.date) {
-      // 从这个 booking 往后找连续的
-      endDate = booking.date;
-      for (var j = i; j < sameProjectBookings.length; j++) {
-        if (j === i) {
-          endDate = sameProjectBookings[j].date;
-          // 如果当前 booking 有 split_after，停止延伸
-          if (sameProjectBookings[j].split_after === 1 || sameProjectBookings[j].split_after === true) {
-            break;
-          }
-        } else {
-          var prevBooking = sameProjectBookings[j-1];
-          var prevDate = new Date(prevBooking.date);
-          var currDate = new Date(sameProjectBookings[j].date);
-          var diffDays = (currDate - prevDate) / 86400000;
-          // 允许跨过周末（diffDays <= 3），但要检查前一个 booking 是否有 split_after
-          if (diffDays <= 3 && !(prevBooking.split_after === 1 || prevBooking.split_after === true)) {
-            endDate = sameProjectBookings[j].date;
-          } else {
-            break;
-          }
-        }
-      }
-      break;
-    }
-  }
+  // 与 detectSpans / 拖动一致：仅日历连续日，不跨空档/周末桥接
+  var resizeSegment = findBookingSpanSegment(booking);
+  var endDate = resizeSegment.length
+    ? resizeSegment[resizeSegment.length - 1].date
+    : booking.date;
 
   // ── 3. 视觉状态 ────────────────────────────────────────────────
   blockElement.classList.add('resizing');
@@ -298,41 +266,10 @@ function initResizeBookingLeft(blockElement, booking, startEvent) {
   allCells.forEach(function (c) { dateMap[c.dataset.date] = c; });
   var dates = Object.keys(dateMap).sort();
 
-  // 2. 找出该 booking 所属连续同项目段的最早日期（左侧锚点）
-  var sameGroup = _allBookings
-    .filter(function (b) {
-      return b.resource_id === booking.resource_id &&
-             b.project_id  === booking.project_id;
-    })
-    .sort(function (a, b) { return a.date < b.date ? -1 : 1; });
-
-  // 找包含当前 booking 的连续段（需要检查 split_after 标记）
-  var groupSegment = [];
-  var currentSeg = [];
-  for (var gi = 0; gi < sameGroup.length; gi++) {
-    var cur = sameGroup[gi];
-    if (currentSeg.length === 0) {
-      currentSeg.push(cur);
-    } else {
-      var prev = currentSeg[currentSeg.length - 1];
-      var prevD = new Date(prev.date);
-      var curD  = new Date(cur.date);
-      var diff  = Math.round((curD - prevD) / 86400000);
-      // 允许跨过周末，但要检查前一个 booking 是否有 split_after
-      if (diff <= 3 && !(prev.split_after === 1 || prev.split_after === true)) {
-        currentSeg.push(cur);
-      } else {
-        if (currentSeg.some(function (s) { return s.id === booking.id; })) {
-          groupSegment = currentSeg.slice();
-        }
-        currentSeg = [cur];
-      }
-    }
-  }
-  if (currentSeg.some(function (s) { return s.id === booking.id; })) {
-    groupSegment = currentSeg.slice();
-  }
-  if (groupSegment.length === 0) groupSegment = [booking];
+  // 2. 找出该 booking 所属连续段的最早日期（左侧锚点）
+  // 与 detectSpans / 拖动一致：仅日历连续日，不跨空档/周末桥接
+  var groupSegment = findBookingSpanSegment(booking);
+  if (!groupSegment || groupSegment.length === 0) groupSegment = [booking];
 
   // 段的最早日期为左侧锚点
   var startDate = groupSegment[0].date;
@@ -540,51 +477,15 @@ function initMoveBooking(blockElement, booking, startEvent) {
   var anchorIndex = dates.indexOf(booking.date);
   if (anchorIndex === -1) return;
 
-  // 2. Find the contiguous same-project booking segment
-  var sameGroup = _allBookings
-    .filter(function (b) {
-      return b.resource_id === booking.resource_id &&
-             b.project_id  === booking.project_id;
-    })
-    .sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+  // 2. Contiguous visual span only (matches detectSpans / splitBooking).
+  //    Do NOT bridge gaps/weekends with diff<=3 — that wrongly joins separate
+  //    same-project periods and makes both segments drag together.
+  var groupSegment = findBookingSpanSegment(booking);
+  if (!groupSegment || groupSegment.length === 0) groupSegment = [booking];
 
-  // Walk through sorted bookings, build contiguous segment containing this booking
-  var groupSegment = [];
-  var currentSeg = [];
-  for (var gi = 0; gi < sameGroup.length; gi++) {
-    var cur = sameGroup[gi];
-    if (currentSeg.length === 0) {
-      currentSeg.push(cur);
-    } else {
-      var prev = currentSeg[currentSeg.length - 1];
-      var prevD = new Date(prev.date);
-      var curD  = new Date(cur.date);
-      var diff  = Math.round((curD - prevD) / 86400000);
-      if (diff <= 3 && !(prev.split_after === 1 || prev.split_after === true)) {
-        currentSeg.push(cur);
-      } else {
-        if (currentSeg.some(function (b) { return b.id === booking.id; })) {
-          groupSegment = currentSeg;
-          break;
-        }
-        currentSeg = [cur];
-      }
-    }
-  }
-  if (groupSegment.length === 0) {
-    if (currentSeg.some(function (b) { return b.id === booking.id; })) {
-      groupSegment = currentSeg;
-    } else {
-      groupSegment = [booking];
-    }
-  }
-
-  // Compute segment index range in dates array
-  var segDates = groupSegment.map(function (b) { return b.date; }).sort();
-  var segStartIndex = dates.indexOf(segDates[0]);
-  var segEndIndex   = dates.indexOf(segDates[segDates.length - 1]);
-  if (segStartIndex === -1) segStartIndex = anchorIndex;
-  if (segEndIndex   === -1) segEndIndex   = anchorIndex;
+  // Ids currently being moved — excluded from conflict checks
+  var movingIds = {};
+  groupSegment.forEach(function (b) { movingIds[b.id] = true; });
 
   // 3. Visual state
   groupSegment.forEach(function (b) {
@@ -596,7 +497,7 @@ function initMoveBooking(blockElement, booking, startEvent) {
   overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;cursor:grabbing;user-select:none;';
   document.body.appendChild(overlay);
 
-  // Preview highlight
+  // Preview highlight: only the days of this span (not a filled range across gaps)
   var previewCells = [];
   function clearPreview() {
     previewCells.forEach(function (c) { c.classList.remove('move-preview'); });
@@ -604,16 +505,22 @@ function initMoveBooking(blockElement, booking, startEvent) {
   }
   function applyPreview(delta) {
     clearPreview();
-    var newStart = segStartIndex + delta;
-    var newEnd   = segEndIndex   + delta;
-    if (newStart < 0 || newEnd >= dates.length) return;
-    for (var i = newStart; i <= newEnd; i++) {
-      var c = dateMap[dates[i]];
+    var anyOutOfView = false;
+    groupSegment.forEach(function (b) {
+      var oldIdx = dates.indexOf(b.date);
+      if (oldIdx === -1) return;
+      var newIdx = oldIdx + delta;
+      if (newIdx < 0 || newIdx >= dates.length) {
+        anyOutOfView = true;
+        return;
+      }
+      var c = dateMap[dates[newIdx]];
       if (c) {
         c.classList.add('move-preview');
         previewCells.push(c);
       }
-    }
+    });
+    return !anyOutOfView;
   }
 
   var currentDelta = 0;
@@ -655,14 +562,19 @@ function initMoveBooking(blockElement, booking, startEvent) {
 
     if (currentDelta === 0) return;
 
-    var newStart = segStartIndex + currentDelta;
-    var newEnd   = segEndIndex   + currentDelta;
-    if (newStart < 0 || newEnd >= dates.length) {
+    // Every booking in the span must land on a visible date
+    var outOfView = groupSegment.some(function (b) {
+      var oldIdx = dates.indexOf(b.date);
+      if (oldIdx === -1) return true;
+      var newIdx = oldIdx + currentDelta;
+      return newIdx < 0 || newIdx >= dates.length;
+    });
+    if (outOfView) {
       toast(t('schedule.out_of_view'), 'error');
       return;
     }
 
-    // Check for conflicts before moving
+    // Check for conflicts before moving (ignore other days of the same span)
     var conflictDates = [];
     groupSegment.forEach(function (b) {
       var oldIdx = dates.indexOf(b.date);
@@ -673,7 +585,7 @@ function initMoveBooking(blockElement, booking, startEvent) {
           return other.resource_id === b.resource_id &&
                  other.project_id === b.project_id &&
                  other.date === newDate &&
-                 other.id !== b.id;
+                 !movingIds[other.id];
         });
         if (hasConflict) conflictDates.push(newDate);
       }
@@ -695,6 +607,10 @@ function initMoveBooking(blockElement, booking, startEvent) {
         is_tentative: b.is_tentative ? 1 : 0
       };
     });
+    // Preserve split_after flags (POST does not accept them; re-apply via PUT after create)
+    var splitAfterFlags = groupSegment.map(function (b) {
+      return (b.split_after === 1 || b.split_after === true) ? 1 : 0;
+    });
 
     var deletePromises = groupSegment.map(function (b) {
       return api('/api/bookings/' + b.id, { method: 'DELETE' });
@@ -705,7 +621,7 @@ function initMoveBooking(blockElement, booking, startEvent) {
         var createPromises = groupSegment.map(function (b, idx) {
           var oldIdx = dates.indexOf(b.date);
           var newIdx = oldIdx + currentDelta;
-          if (newIdx < 0 || newIdx >= dates.length) return Promise.resolve();
+          if (newIdx < 0 || newIdx >= dates.length) return Promise.resolve(null);
           var newDate = dates[newIdx];
           var orig = originalBookings[idx];
           return api('/api/bookings', {
@@ -718,12 +634,23 @@ function initMoveBooking(blockElement, booking, startEvent) {
               notes:        orig.notes,
               is_tentative: orig.is_tentative
             }
+          }).then(function (created) {
+            // Restore split_after if the original day had one
+            if (splitAfterFlags[idx] && created) {
+              var newId = Array.isArray(created.ids) ? created.ids[0] : (created.id || null);
+              if (newId) {
+                return api('/api/bookings/' + newId, {
+                  method: 'PUT',
+                  body: { split_after: 1 }
+                }).then(function () { return created; }).catch(function () { return created; });
+              }
+            }
+            return created;
           });
         });
         return Promise.all(createPromises);
       })
       .then(function () {
-        var dir = currentDelta > 0 ? '→' : '←';
         toast(t('schedule.move') + ' ' + Math.abs(currentDelta) + 'd', 'success');
         reloadAfterMutation();
       })
