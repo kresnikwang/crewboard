@@ -395,6 +395,12 @@ function migrate(db) {
     db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)');
     db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)');
   } catch (_) { /* indexes may already exist */ }
+
+  // Audit logs
+  try {
+    const { ensureAuditTable } = require('../utils/audit');
+    ensureAuditTable(db);
+  } catch (_) {}
 }
 
 function seedDemoData(db) {

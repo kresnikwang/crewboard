@@ -59,7 +59,11 @@ if (NODE_ENV === 'production') {
 app.use('/api', authMiddleware(db));
 
 // Lightweight health check (no auth)
+// E2E: start-server.js sets global.__E2E_BLOCK_HEALTH__ until seed finishes
 app.get('/api/health', (req, res) => {
+  if (global.__E2E_BLOCK_HEALTH__) {
+    return res.status(503).json({ ok: false, seeding: true });
+  }
   try {
     db.prepare('SELECT 1').get();
     res.json({ ok: true, env: NODE_ENV });

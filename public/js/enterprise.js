@@ -147,9 +147,19 @@ window.loadEnterprise = async function loadEnterprise() {
       '</div>' +
       '<div id="ent-invitations">...</div>' +
     '</div>';
+
+    html += '<div class="section-card card mb-3">' +
+      '<h3>操作审计</h3>' +
+      '<p style="color:var(--text-secondary);margin-bottom:12px">最近的排程与资源变更记录（仅管理员可见）</p>' +
+      '<div id="ent-audit-logs" style="font-size:13px;max-height:320px;overflow:auto">加载中…</div>' +
+    '</div>';
   }
 
   container.innerHTML = html;
+
+  if (isOwnerOrAdmin()) {
+    loadEnterpriseAuditLogs();
+  }
 
   // Enterprise Logo upload
   var uploadLogoBtn = document.getElementById('btn-upload-ent-logo');
@@ -830,5 +840,62 @@ async function uploadEntLogoData(dataUrl) {
     updateHeaderEnterpriseInfo();
   } catch (err) {
     toast(err.message || t('enterprise.logo_failed'), 'error');
+  }
+}
+
+/** Load recent audit logs into enterprise page (admin) */
+async function loadEnterpriseAuditLogs() {
+  var el = document.getElementById('ent-audit-logs');
+  if (!el) return;
+  try {
+    var data = await api('/api/audit-logs?limit=40');
+    var rows = (data && data.rows) || [];
+    if (!rows.length) {
+      el.innerHTML = '<p style="color:var(--text-secondary);margin:0">暂无审计记录</p>';
+      return;
+    }
+    var actionLabel = {
+      'booking.create': '创建排程',
+      'booking.update': '更新排程',
+      'booking.delete': '删除排程',
+      'leave.create': '登记休假',
+      'leave.delete': '删除休假',
+      'resource.create': '添加人员',
+      'resource.update': '更新人员',
+      'resource.delete': '删除人员'
+    };
+    var html = '<table class="table table-sm" style="margin:0"><thead><tr>' +
+      '<th style="width:140px">时间</th><th style="width:90px">操作人</th><th style="width:100px">动作</th><th>详情</th>' +
+      '</tr></thead><tbody>';
+    rows.forEach(function (r) {
+      var detail = '';
+      try {
+        var d = r.details;
+        if (typeof d === 'string') d = JSON.parse(d);
+        if (d) {
+          if (d.resource_name || d.project_name) {
+            detail = escHtml((d.resource_name || '') + (d.project_name ? ' → ' + d.project_name : '') + (d.date ? ' @ ' + d.date : ''));
+          } else if (d.name) {
+            detail = escHtml(d.name);
+          } else if (d.start) {
+            detail = escHtml((d.start || '') + (d.end && d.end !== d.start ? ' ~ ' + d.end : '') + (d.hours != null ? ' · ' + d.hours + 'h' : ''));
+          } else {
+            detail = escHtml(JSON.stringify(d).slice(0, 120));
+          }
+        }
+      } catch (_) {
+        detail = escHtml(String(r.details || '').slice(0, 120));
+      }
+      html += '<tr>' +
+        '<td style="white-space:nowrap;color:var(--text-secondary)">' + escHtml(r.created_at || '') + '</td>' +
+        '<td>' + escHtml(r.user_name || '—') + '</td>' +
+        '<td>' + escHtml(actionLabel[r.action] || r.action) + '</td>' +
+        '<td style="color:var(--text-secondary)">' + detail + '</td>' +
+        '</tr>';
+    });
+    html += '</tbody></table>';
+    el.innerHTML = html;
+  } catch (err) {
+    el.innerHTML = '<p style="color:var(--danger);margin:0">' + escHtml(err.message || '加载失败') + '</p>';
   }
 }

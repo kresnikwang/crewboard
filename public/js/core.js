@@ -79,10 +79,38 @@ window.api = async function api(path, opts = {}) {
   }
   const res = await fetch(path, Object.assign({}, opts, { headers }));
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error(err.message || err.error || res.statusText);
+    const errBody = await res.json().catch(() => ({ message: res.statusText }));
+    const e = new Error(errBody.message || errBody.error || res.statusText);
+    e.status = res.status;
+    e.code = errBody.code;
+    e.body = errBody;
+    throw e;
   }
   return res.json();
+};
+
+/** POST/PUT booking with conflict handling — prompts user on 409 then retries with force */
+window.apiBookingWithConflictConfirm = async function apiBookingWithConflictConfirm(path, opts) {
+  try {
+    return await window.api(path, opts);
+  } catch (err) {
+    if (err.status === 409 && err.code === 'booking_conflict' && err.body) {
+      var conflicts = err.body.conflicts || [];
+      var lines = conflicts.slice(0, 8).map(function (c) {
+        return '• ' + (c.message || c.type + ' ' + (c.date || ''));
+      });
+      if (conflicts.length > 8) lines.push('• …共 ' + conflicts.length + ' 项');
+      var isLeave = err.body.reason === 'leave_conflict';
+      var title = isLeave
+        ? '与休假冲突，仍要强制创建/更新吗？'
+        : '工时将超过日产能，仍要继续吗？';
+      var ok = window.confirm(title + '\n\n' + lines.join('\n'));
+      if (!ok) throw err;
+      var body = Object.assign({}, (opts && opts.body) || {}, { force: true });
+      return await window.api(path, Object.assign({}, opts, { body: body }));
+    }
+    throw err;
+  }
 };
 
 // --------------- SWR-style API Cache ---------------

@@ -40,6 +40,11 @@ echo "=== [3/7] 拉取最新代码 ==="
 git pull origin main --ff-only
 
 echo "=== [4/7] 自动压缩 JS/CSS 文件 ==="
+# Bundle schedule parts → schedule.js (source of truth: public/js/schedule/*)
+if [ -f "scripts/bundle-schedule.js" ]; then
+  node scripts/bundle-schedule.js || echo "  ⚠️  schedule bundle 失败，使用已有 schedule.js"
+fi
+
 # 检查是否安装了 terser 和 cleancss
 if ! command -v terser &> /dev/null; then
   echo "  ⚠️  terser 未安装，跳过 JS 压缩"

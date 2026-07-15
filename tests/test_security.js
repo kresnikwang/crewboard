@@ -283,6 +283,53 @@ async function main() {
     }
     assert('forgot-password 触发 429', hit429, 'did not rate-limit within 12 requests');
 
+
+    // ── Conflict detection ────────────────────────────────────────────
+    console.log('\n📋 Conflict detection');
+    // Create leave then try booking same day
+    const leaveDay = '2030-03-10';
+    const leaveRes = await request('POST', '/api/leave', {
+      resource_id: aRes.body.id, date: leaveDay, type: 'vacation',
+    }, a.token);
+    assert('创建休假日用于冲突测试', leaveRes.status === 200, JSON.stringify(leaveRes.body));
+
+    const conflictBook = await request('POST', '/api/bookings', {
+      resource_id: aRes.body.id,
+      project_id: aProj.body.id,
+      date: leaveDay,
+      hours: 8,
+    }, a.token);
+    assert('休假冲突返回 409', conflictBook.status === 409 && conflictBook.body.code === 'booking_conflict',
+      `status=${conflictBook.status} body=${JSON.stringify(conflictBook.body)}`);
+
+    // Overload: book 6h then another 6h without force
+    const day = '2030-03-11';
+    const b1 = await request('POST', '/api/bookings', {
+      resource_id: aRes.body.id, project_id: aProj.body.id, date: day, hours: 6,
+    }, a.token);
+    assert('第一笔 6h 排程成功', b1.status === 200, JSON.stringify(b1.body));
+    // need another project for same day second booking
+    const aProj2 = await request('POST', '/api/projects', { name: 'A项目2' }, a.token);
+    const b2 = await request('POST', '/api/bookings', {
+      resource_id: aRes.body.id, project_id: aProj2.body.id, date: day, hours: 6,
+    }, a.token);
+    assert('超产能返回 409', b2.status === 409 && b2.body.reason === 'overload',
+      `status=${b2.status} body=${JSON.stringify(b2.body)}`);
+    const b2force = await request('POST', '/api/bookings', {
+      resource_id: aRes.body.id, project_id: aProj2.body.id, date: day, hours: 6, force: true,
+    }, a.token);
+    assert('force 可覆盖超产能', b2force.status === 200, JSON.stringify(b2force.body));
+
+    // ── Audit logs ────────────────────────────────────────────────────
+    console.log('\n📋 Audit logs');
+    const audit = await request('GET', '/api/audit-logs?limit=20', null, a.token);
+    assert('admin 可查审计日志', audit.status === 200 && Array.isArray(audit.body.rows), JSON.stringify(audit.body));
+    const actions = (audit.body.rows || []).map(r => r.action);
+    assert('审计含 booking.create', actions.includes('booking.create'), actions.join(','));
+    const basicAudit = await request('GET', '/api/audit-logs', null, aBasic.token);
+    assert('basic 不能查审计', basicAudit.status === 403, `status=${basicAudit.status}`);
+
+
     // ── Health ────────────────────────────────────────────────────────
     const health = await request('GET', '/api/health');
     assert('health ok', health.status === 200 && health.body.ok === true);

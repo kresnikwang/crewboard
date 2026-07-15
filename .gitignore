@@ -11,3 +11,8 @@ nginx_cache/
 vue/
 tmp/
 tests/.tmp/
+e2e/.tmp/
+e2e-report/
+test-results/
+playwright-report/
+blob-report/
