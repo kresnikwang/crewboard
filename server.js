@@ -4,7 +4,7 @@ const cors = require('cors');
 const { initDB, seedDemoData } = require('./db/schema');
 const apiRoutes = require('./routes/api');
 const authRoutes = require('./routes/auth');
-const { authMiddleware } = require('./routes/auth');
+const { authMiddleware, cleanupExpiredAuth } = require('./utils/authz');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -58,6 +58,16 @@ if (NODE_ENV === 'production') {
 // Auth middleware - attaches req.user if valid token
 app.use('/api', authMiddleware(db));
 
+// Lightweight health check (no auth)
+app.get('/api/health', (req, res) => {
+  try {
+    db.prepare('SELECT 1').get();
+    res.json({ ok: true, env: NODE_ENV });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: 'db_unavailable' });
+  }
+});
+
 // Routes
 app.use('/api/auth', authRoutes(db));
 app.use('/api', apiRoutes(db));
@@ -68,6 +78,23 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(PORT, '127.0.0.1', () => {
+// Session / reset-token cleanup (hourly)
+function runAuthCleanup() {
+  try {
+    const result = cleanupExpiredAuth(db);
+    if (result.sessionsDeleted || result.tokensDeleted) {
+      console.log(`[cleanup] sessions=${result.sessionsDeleted} reset_tokens=${result.tokensDeleted}`);
+    }
+  } catch (e) {
+    console.error('[cleanup] failed:', e.message);
+  }
+}
+runAuthCleanup();
+setInterval(runAuthCleanup, 60 * 60 * 1000).unref?.();
+
+const server = app.listen(PORT, '127.0.0.1', () => {
   console.log(`CrewBoard [${NODE_ENV}] running at http://127.0.0.1:${PORT}`);
 });
+
+// Export for tests that boot the app in-process
+module.exports = { app, db, server };

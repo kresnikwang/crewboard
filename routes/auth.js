@@ -3,6 +3,13 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { sendMail, passwordResetEmail, invitationEmail, APP_URL } = require('../utils/email');
+const {
+  isAdmin,
+  publicEnterprise,
+  getEnterpriseRow,
+  authMiddleware,
+} = require('../utils/authz');
+const { createRateLimiter } = require('../utils/rateLimit');
 const uuidv4 = () => crypto.randomUUID();
 const router = express.Router();
 
@@ -13,15 +20,61 @@ function hashPassword(pwd) {
 }
 
 function verifyPassword(pwd, stored) {
+  if (!stored || !stored.includes(':')) return false;
   const [salt, hash] = stored.split(':');
   const check = crypto.scryptSync(pwd, salt, 64).toString('hex');
-  return hash === check;
+  try {
+    const a = Buffer.from(hash, 'hex');
+    const b = Buffer.from(check, 'hex');
+    if (a.length !== b.length) return false;
+    return crypto.timingSafeEqual(a, b);
+  } catch (_) {
+    return false;
+  }
+}
+
+function publicUser(user) {
+  if (!user) return null;
+  return {
+    id: user.id,
+    name: user.name,
+    phone: user.phone,
+    email: user.email,
+    role: user.role,
+    enterprise_id: user.enterprise_id,
+    resource_id: user.resource_id,
+    avatar: user.avatar || '',
+    must_change_password: user.must_change_password || 0,
+  };
+}
+
+function enterpriseForUser(db, user) {
+  const row = getEnterpriseRow(db, user?.enterprise_id);
+  return publicEnterprise(row, { forAdmin: isAdmin(user) });
 }
 
 module.exports = function(db) {
+  const authLimiter = createRateLimiter({
+    windowMs: 15 * 60 * 1000,
+    max: 30,
+    message: '登录尝试过于频繁，请 15 分钟后再试',
+    keyFn: (req) => 'login:' + (req.ip || req.body?.account || 'unknown'),
+  });
+  const forgotLimiter = createRateLimiter({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    message: '重置请求过于频繁，请 15 分钟后再试',
+    keyFn: (req) => 'forgot:' + (req.ip || req.body?.email || 'unknown'),
+  });
+  const registerLimiter = createRateLimiter({
+    windowMs: 60 * 60 * 1000,
+    max: 20,
+    message: '注册过于频繁，请稍后再试',
+    keyFn: (req) => 'register:' + (req.ip || 'unknown'),
+  });
 
   // Register
-  router.post('/register', (req, res) => {
+  router.post('/register', registerLimiter, (req, res) => {
     const { phone, email, password, name } = req.body;
     if (!password || !name || (!phone && !email)) {
       return res.status(400).json({ error: '请填写姓名、密码和手机号或邮箱' });
@@ -71,19 +124,17 @@ module.exports = function(db) {
       }
     }
 
-    const enterprise = enterprise_id
-      ? db.prepare('SELECT id, name, code, logo_url, webhook_dingtalk, webhook_wecom, webhook_feishu, wecom_corp_id, wecom_agent_id, wecom_secret, wecom_department_id, currency, theme_color, timezone FROM enterprises WHERE id = ?').get(enterprise_id)
-      : null;
+    const enterprise = publicEnterprise(getEnterpriseRow(db, enterprise_id), { forAdmin: false });
 
     res.json({
       token,
-      user: { id: result.lastInsertRowid, name, phone, email, role: userRole, enterprise_id, resource_id: resourceId },
+      user: { id: result.lastInsertRowid, name, phone, email, role: userRole, enterprise_id, resource_id: resourceId, must_change_password: 0 },
       enterprise
     });
   });
 
   // Login
-  router.post('/login', (req, res) => {
+  router.post('/login', authLimiter, (req, res) => {
     const { account, password } = req.body;
     if (!account || !password) return res.status(400).json({ error: '请输入账号和密码' });
 
@@ -95,14 +146,10 @@ module.exports = function(db) {
     const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     db.prepare('INSERT INTO sessions (token, user_id, expires_at) VALUES (?,?,?)').run(token, user.id, expires);
 
-    const enterprise = user.enterprise_id
-      ? db.prepare('SELECT id, name, code, logo_url, webhook_dingtalk, webhook_wecom, webhook_feishu, wecom_corp_id, wecom_agent_id, wecom_secret, wecom_department_id, currency, theme_color, timezone FROM enterprises WHERE id = ?').get(user.enterprise_id)
-      : null;
-
     res.json({
       token,
-      user: { id: user.id, name: user.name, phone: user.phone, email: user.email, role: user.role, enterprise_id: user.enterprise_id, resource_id: user.resource_id, avatar: user.avatar || '', perm_book_others: user.perm_book_others, perm_manage_resources: user.perm_manage_resources, perm_view_reports: user.perm_view_reports, must_change_password: user.must_change_password || 0 },
-      enterprise,
+      user: publicUser(user),
+      enterprise: enterpriseForUser(db, user),
     });
   });
 
@@ -116,10 +163,10 @@ module.exports = function(db) {
   // Get current user
   router.get('/me', (req, res) => {
     if (!req.user) return res.status(401).json({ error: '未登录' });
-    const enterprise = req.user.enterprise_id
-      ? db.prepare('SELECT id, name, code, logo_url, webhook_dingtalk, webhook_wecom, webhook_feishu, wecom_corp_id, wecom_agent_id, wecom_secret, wecom_department_id, currency, theme_color, timezone FROM enterprises WHERE id = ?').get(req.user.enterprise_id)
-      : null;
-    res.json({ user: req.user, enterprise });
+    // Refresh must_change_password from DB
+    const fresh = db.prepare('SELECT must_change_password FROM users WHERE id = ?').get(req.user.id);
+    const user = { ...req.user, must_change_password: fresh?.must_change_password || 0 };
+    res.json({ user: publicUser(user), enterprise: enterpriseForUser(db, user) });
   });
 
   // Create enterprise
@@ -164,7 +211,7 @@ module.exports = function(db) {
   // List join requests (for owner/admin)
   router.get('/enterprises/requests', (req, res) => {
     if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
-    if (req.user.role !== 'owner' && req.user.role !== 'admin') return res.status(403).json({ error: '无权限' }); // owner kept for legacy
+    if (!isAdmin(req.user)) return res.status(403).json({ error: '无权限' });
 
     const requests = db.prepare(`
       SELECT jr.*, u.name as user_name, u.phone as user_phone, u.email as user_email
@@ -177,7 +224,7 @@ module.exports = function(db) {
   // Approve/reject join request
   router.put('/enterprises/requests/:id', (req, res) => {
     if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
-    if (req.user.role !== 'owner' && req.user.role !== 'admin') return res.status(403).json({ error: '无权限' }); // owner kept for legacy
+    if (!isAdmin(req.user)) return res.status(403).json({ error: '无权限' });
 
     const { status } = req.body; // 'approved' or 'rejected'
     const request = db.prepare('SELECT * FROM join_requests WHERE id = ? AND enterprise_id = ?')
@@ -206,9 +253,7 @@ module.exports = function(db) {
     if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
     const members = db.prepare(`
       SELECT u.id, u.name, u.phone, u.email, u.role, u.resource_id,
-             u.perm_book_others, u.perm_manage_resources, u.perm_view_reports,
-             u.perm_project_manager, u.managed_project_ids,
-             u.created_at
+             u.managed_project_ids, u.created_at
       FROM users u WHERE u.enterprise_id = ? AND u.status = 'active' ORDER BY u.role DESC, u.name
     `).all(req.user.enterprise_id);
     res.json(members);
@@ -216,7 +261,7 @@ module.exports = function(db) {
 
   // Update member role (new three-role system: basic | manager | admin)
   router.put('/enterprises/members/:id/role', (req, res) => {
-    if (req.user?.role !== 'admin' && req.user?.role !== 'owner') return res.status(403).json({ error: '仅管理员可操作' });
+    if (!isAdmin(req.user)) return res.status(403).json({ error: '仅管理员可操作' });
     const { role } = req.body;
     if (!['basic', 'manager', 'admin'].includes(role)) return res.status(400).json({ error: '无效角色，可选：basic / manager / admin' });
     db.prepare('UPDATE users SET role = ? WHERE id = ? AND enterprise_id = ?')
@@ -224,44 +269,38 @@ module.exports = function(db) {
     res.json({ ok: true });
   });
 
-  // Update member permissions (deprecated in new role model, kept for backward compat)
-  // Prefer PUT /enterprises/members/:id/role instead
+  // Update member role via permissions endpoint (compat alias → role only)
+  // Prefer PUT /enterprises/members/:id/role
   router.put('/enterprises/members/:id/permissions', (req, res) => {
     if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
-    if (req.user.role !== 'admin' && req.user.role !== 'owner') return res.status(403).json({ error: '仅管理员可操作' });
+    if (!isAdmin(req.user)) return res.status(403).json({ error: '仅管理员可操作' });
 
-    const target = db.prepare('SELECT * FROM users WHERE id = ? AND enterprise_id = ?')
+    const target = db.prepare('SELECT id, role FROM users WHERE id = ? AND enterprise_id = ?')
       .get(req.params.id, req.user.enterprise_id);
     if (!target) return res.status(404).json({ error: '成员不存在' });
-    if (target.role === 'admin') {
-      return res.status(400).json({ error: '管理员角色默认拥有所有权限' });
+    if (target.role === 'admin' && req.body.role && req.body.role !== 'admin') {
+      return res.status(400).json({ error: '请使用角色接口调整管理员' });
     }
 
-    // In new model, permissions map directly to roles
-    // This endpoint now accepts { role } or legacy perm booleans
-    const { role, perm_book_others, perm_manage_resources, perm_view_reports, perm_project_manager } = req.body;
-    if (role && ['basic', 'manager', 'admin'].includes(role)) {
-      db.prepare('UPDATE users SET role=? WHERE id=? AND enterprise_id=?')
-        .run(role, req.params.id, req.user.enterprise_id);
-      return res.json({ ok: true });
+    let role = req.body.role;
+    // Map legacy booleans → role (book_others / manage → manager)
+    if (!role) {
+      const { perm_book_others, perm_manage_resources, perm_view_reports } = req.body;
+      if (perm_book_others || perm_manage_resources || perm_view_reports) role = 'manager';
+      else role = 'basic';
     }
-    // Legacy boolean support
-    db.prepare('UPDATE users SET perm_book_others=?, perm_manage_resources=?, perm_view_reports=?, perm_project_manager=? WHERE id=? AND enterprise_id=?')
-      .run(
-        perm_book_others ? 1 : 0,
-        perm_manage_resources ? 1 : 0,
-        perm_view_reports ? 1 : 0,
-        perm_project_manager ? 1 : 0,
-        req.params.id,
-        req.user.enterprise_id
-      );
-    res.json({ ok: true });
+    if (!['basic', 'manager', 'admin'].includes(role)) {
+      return res.status(400).json({ error: '无效角色' });
+    }
+    db.prepare('UPDATE users SET role=? WHERE id=? AND enterprise_id=?')
+      .run(role, req.params.id, req.user.enterprise_id);
+    res.json({ ok: true, role });
   });
 
   // Assign managed projects to a project manager
   router.put('/enterprises/members/:id/managed-projects', (req, res) => {
     if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
-    if (req.user.role !== 'owner' && req.user.role !== 'admin') return res.status(403).json({ error: '仅管理员可操作' });
+    if (!isAdmin(req.user)) return res.status(403).json({ error: '仅管理员可操作' });
     const target = db.prepare('SELECT * FROM users WHERE id = ? AND enterprise_id = ?')
       .get(req.params.id, req.user.enterprise_id);
     if (!target) return res.status(404).json({ error: '成员不存在' });
@@ -275,7 +314,7 @@ module.exports = function(db) {
   // Update enterprise settings (webhook, theme etc.)
   router.put('/enterprises/settings', (req, res) => {
     if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
-    if (req.user.role !== 'owner' && req.user.role !== 'admin') return res.status(403).json({ error: '无权限' });
+    if (!isAdmin(req.user)) return res.status(403).json({ error: '无权限' });
 
     const {
       name,
@@ -290,6 +329,8 @@ module.exports = function(db) {
       theme_color,
       timezone
     } = req.body;
+    const current = db.prepare('SELECT wecom_secret FROM enterprises WHERE id = ?').get(req.user.enterprise_id);
+    const secret = (wecom_secret || '').trim() || (current?.wecom_secret || '');
     db.prepare(`UPDATE enterprises SET name=?, webhook_dingtalk=?, webhook_wecom=?, webhook_feishu=?, wecom_corp_id=?, wecom_agent_id=?, wecom_secret=?, wecom_department_id=?, currency=?, theme_color=?, timezone=? WHERE id=?`)
       .run(
         name,
@@ -298,7 +339,7 @@ module.exports = function(db) {
         webhook_feishu || '',
         (wecom_corp_id || '').trim(),
         String(wecom_agent_id || '').trim(),
-        (wecom_secret || '').trim(),
+        secret,
         Math.max(1, parseInt(wecom_department_id, 10) || 1),
         currency || 'CNY',
         theme_color || '',
@@ -311,7 +352,7 @@ module.exports = function(db) {
   // Upload enterprise logo
   router.put('/enterprises/logo', (req, res) => {
     if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
-    if (req.user.role !== 'owner' && req.user.role !== 'admin') return res.status(403).json({ error: '无权限' });
+    if (!isAdmin(req.user)) return res.status(403).json({ error: '无权限' });
 
     const { logo_data } = req.body;
     if (!logo_data) return res.status(400).json({ error: '未提供Logo数据' });
@@ -462,7 +503,7 @@ module.exports = function(db) {
   // Body: { members: [{ email, name, title, team, phone? }], initial_password? }
   router.post('/enterprises/bulk-create', (req, res) => {
     if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
-    if (req.user.role !== 'owner' && req.user.role !== 'admin') return res.status(403).json({ error: '仅管理员可操作' });
+    if (!isAdmin(req.user)) return res.status(403).json({ error: '仅管理员可操作' });
 
     const { members, initial_password } = req.body;
     if (!Array.isArray(members) || members.length === 0) {
@@ -493,9 +534,8 @@ module.exports = function(db) {
         const hash = hashPassword(pwd);
         // Create user with must_change_password = 1
         const userResult = db.prepare(
-          `INSERT INTO users (phone, email, password_hash, name, enterprise_id, role,
-            perm_book_others, perm_manage_resources, perm_view_reports, status, must_change_password)
-           VALUES (?, ?, ?, ?, ?, 'basic', 0, 0, 0, 'active', 1)`
+          `INSERT INTO users (phone, email, password_hash, name, enterprise_id, role, status, must_change_password)
+           VALUES (?, ?, ?, ?, ?, 'basic', 'active', 1)`
         ).run(phone || null, email || null, hash, name, req.user.enterprise_id);
 
         // Create linked resource entry
@@ -520,7 +560,7 @@ module.exports = function(db) {
   // Send invitation
   router.post('/enterprises/invite', async (req, res) => {
     if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
-    if (req.user.role !== 'owner' && req.user.role !== 'admin') return res.status(403).json({ error: '仅管理员可操作' });
+    if (!isAdmin(req.user)) return res.status(403).json({ error: '仅管理员可操作' });
 
     const { email, name } = req.body;
     if (!email) return res.status(400).json({ error: '请输入邮箱地址' });
@@ -558,7 +598,7 @@ module.exports = function(db) {
   // List invitations
   router.get('/enterprises/invitations', (req, res) => {
     if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
-    if (req.user.role !== 'owner' && req.user.role !== 'admin') return res.status(403).json({ error: '无权限' });
+    if (!isAdmin(req.user)) return res.status(403).json({ error: '无权限' });
 
     const invitations = db.prepare(`
       SELECT i.*, u.name as invited_by_name
@@ -573,7 +613,7 @@ module.exports = function(db) {
   // Cancel invitation
   router.delete('/enterprises/invitations/:id', (req, res) => {
     if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
-    if (req.user.role !== 'owner' && req.user.role !== 'admin') return res.status(403).json({ error: '无权限' });
+    if (!isAdmin(req.user)) return res.status(403).json({ error: '无权限' });
 
     db.prepare('DELETE FROM invitations WHERE id = ? AND enterprise_id = ?')
       .run(req.params.id, req.user.enterprise_id);
@@ -583,7 +623,7 @@ module.exports = function(db) {
   // === FORGOT PASSWORD ===
 
   // Step 1: Request password reset (no auth required)
-  router.post('/forgot-password', async (req, res) => {
+  router.post('/forgot-password', forgotLimiter, async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: '请输入邮箱地址' });
 
@@ -654,17 +694,5 @@ module.exports = function(db) {
   return router;
 };
 
-module.exports.authMiddleware = function(db) {
-  return (req, res, next) => {
-    // Support token via Authorization header (normal API calls)
-    // or via ?token= query param (EventSource / SSE cannot set custom headers)
-    const token = req.headers.authorization?.replace('Bearer ', '') || req.query.token;
-    if (token) {
-      const session = db.prepare('SELECT * FROM sessions WHERE token = ? AND expires_at > datetime(?)').get(token, new Date().toISOString());
-      if (session) {
-        req.user = db.prepare('SELECT id, name, phone, email, enterprise_id, resource_id, role, avatar, perm_book_others, perm_manage_resources, perm_view_reports, perm_project_manager, managed_project_ids, status FROM users WHERE id = ?').get(session.user_id);
-      }
-    }
-    next();
-  };
-};
+// Backward-compatible re-export
+module.exports.authMiddleware = authMiddleware;

@@ -1,8 +1,9 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 
-function initDB() {
-  const db = new Database(path.join(__dirname, 'resource-guru.db'));
+function initDB(dbPath) {
+  const resolvedPath = dbPath || process.env.DB_PATH || path.join(__dirname, 'resource-guru.db');
+  const db = new Database(resolvedPath);
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
 
@@ -384,6 +385,16 @@ function migrate(db) {
   if (!tsColsScope.find(c => c.name === 'project_scope_id')) {
     db.exec('ALTER TABLE timesheets ADD COLUMN project_scope_id INTEGER REFERENCES project_scopes(id) ON DELETE SET NULL');
   }
+
+  // Composite indexes for common schedule / timesheet / session queries
+  try {
+    db.exec('CREATE INDEX IF NOT EXISTS idx_bookings_resource_date ON bookings(resource_id, date)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_bookings_project_date ON bookings(project_id, date)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_timesheets_resource_date ON timesheets(resource_id, date)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_timesheets_project_date ON timesheets(project_id, date)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)');
+  } catch (_) { /* indexes may already exist */ }
 }
 
 function seedDemoData(db) {
@@ -440,17 +451,17 @@ function seedDemoData(db) {
 
     // Create demo admin user
     const adminHash = hashPassword('admin123');
-    db.prepare(`INSERT INTO users (phone, email, password_hash, name, enterprise_id, resource_id, role, perm_book_others, perm_manage_resources, perm_view_reports, status)
-      VALUES ('13800000001', 'admin@company.com', ?, '管理员', 1, null, 'owner', 1, 1, 1, 'active')`).run(adminHash);
+    db.prepare(`INSERT INTO users (phone, email, password_hash, name, enterprise_id, resource_id, role, status)
+      VALUES ('13800000001', 'admin@company.com', ?, '管理员', 1, null, 'admin', 'active')`).run(adminHash);
 
     // Create member users linked to resources
     resources.forEach((r, i) => {
       const hash = hashPassword('123456');
       const phone = '138' + String(i + 10).padStart(8, '0');
-      const canBook = (i === 3 || i === 6) ? 1 : 0;
-      const canViewReports = (i === 3 || i === 6) ? 1 : 0;
-      db.prepare(`INSERT INTO users (phone, email, password_hash, name, enterprise_id, resource_id, role, perm_book_others, perm_manage_resources, perm_view_reports, status)
-        VALUES (?, ?, ?, ?, 1, ?, 'member', ?, 0, ?, 'active')`).run(phone, r[1], hash, r[0], i + 1, canBook, canViewReports);
+      // a couple of managers among demo members
+      const role = (i === 3 || i === 6) ? 'manager' : 'basic';
+      db.prepare(`INSERT INTO users (phone, email, password_hash, name, enterprise_id, resource_id, role, status)
+        VALUES (?, ?, ?, ?, 1, ?, ?, 'active')`).run(phone, r[1], hash, r[0], i + 1, role);
     });
 
     // Generate bookings for current week and next 2 weeks

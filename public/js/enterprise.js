@@ -12,7 +12,7 @@ function escHtml(str) {
 
 function isOwnerOrAdmin() {
   var role = state.user && state.user.role;
-  return role === 'owner' || role === 'admin';
+  return role === 'admin';
 }
 
 function isManager() {
@@ -250,7 +250,7 @@ window.loadEnterprise = async function loadEnterprise() {
         '</div>' +
         '<div class="form-group mb-3">' +
           '<label>' + t('wecom.app_secret') + '</label>' +
-          '<input type="password" id="set-wecom-secret" class="text-input form-control" value="' + escHtml(ent.wecom_secret || '') + '" placeholder="' + t('wecom.app_secret_placeholder') + '">' +
+          '<input type="password" id="set-wecom-secret" class="text-input form-control" value="" placeholder="' + (ent.wecom_secret_set ? '••••••••（已配置，留空则保持不变）' : t('wecom.app_secret_placeholder')) + '">' +
         '</div>' +
         '<div class="form-group mb-3">' +
           '<label>' + t('wecom.department_id') + '</label>' +

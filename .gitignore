@@ -8,3 +8,6 @@ logs/
 .DS_Store
 nginx_cache/
 .playwright-cli/
+vue/
+tmp/
+tests/.tmp/

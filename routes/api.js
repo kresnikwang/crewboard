@@ -3,6 +3,7 @@ const ExcelJS = require('exceljs');
 const { holidays, getHoliday, isWorkingDay } = require('../db/holidays');
 const { notifyAll } = require('./webhook');
 const { notifyBookingCreated, notifyBookingUpdated, notifyBookingDeleted, getDepartmentUsers, getRuntimeWeComConfig, validateWeComConfig, normalizeEmail, sendTextMessage, sendCardMessage } = require('../utils/wecom');
+const { createAuthz, isAdmin, isManagerOrAdmin } = require('../utils/authz');
 const router = express.Router();
 const fs = require('fs');
 const path = require('path');
@@ -76,6 +77,7 @@ function sseBroadcast(enterpriseId, event, data, excludeUserId) {
 }
 
 module.exports = function(db) {
+  const authz = createAuthz(db);
 
   // === CURRENT USER PERMISSIONS (effective) ===
   // New three-role model: basic (read-only) | manager (create+edit own) | admin (full access)
@@ -160,25 +162,31 @@ module.exports = function(db) {
 
   router.put('/resources/:id', (req, res) => {
     const { name, email, role, team, color, hours_per_day, avatar } = req.body;
-    if (req.user?.role !== 'admin') return res.status(403).json({ error: '仅管理员可编辑人员' });
-    const oldRes = db.prepare('SELECT avatar FROM resources WHERE id=?').get(req.params.id);
-    const oldAvatarUrl = oldRes ? oldRes.avatar : '';
-    const avatarUrl = saveAvatarHelper(avatar, oldAvatarUrl, `resource_${req.params.id}`);
-    db.prepare('UPDATE resources SET name=?, email=?, role=?, team=?, color=?, hours_per_day=?, avatar=? WHERE id=?')
-      .run(name, email, role, team, color, hours_per_day, avatarUrl, req.params.id);
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
+    if (!isAdmin(req.user)) return res.status(403).json({ error: '仅管理员可编辑人员' });
+    const oldRes = authz.getResourceInEnterprise(req.params.id, entId);
+    if (!oldRes) return res.status(404).json({ error: '人员不存在' });
+    const avatarUrl = saveAvatarHelper(avatar, oldRes.avatar || '', `resource_${req.params.id}`);
+    db.prepare('UPDATE resources SET name=?, email=?, role=?, team=?, color=?, hours_per_day=?, avatar=? WHERE id=? AND enterprise_id=?')
+      .run(name, email, role, team, color, hours_per_day, avatarUrl, req.params.id, entId);
     if (email) {
       db.prepare('UPDATE users SET avatar = ? WHERE lower(email) = lower(?) AND enterprise_id = ?')
-        .run(avatarUrl, email, req.user.enterprise_id);
+        .run(avatarUrl, email, entId);
     }
     res.json({ ok: true });
-    sseBroadcast(req.user?.enterprise_id, 'resource-change', { action: 'update' }, req.user?.id);
+    sseBroadcast(entId, 'resource-change', { action: 'update' }, req.user?.id);
   });
 
   router.delete('/resources/:id', (req, res) => {
-    if (req.user?.role !== 'admin') return res.status(403).json({ error: '仅管理员可删除人员' });
-    db.prepare('UPDATE resources SET is_active = 0 WHERE id = ?').run(req.params.id);
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
+    if (!isAdmin(req.user)) return res.status(403).json({ error: '仅管理员可删除人员' });
+    const existing = authz.getResourceInEnterprise(req.params.id, entId);
+    if (!existing) return res.status(404).json({ error: '人员不存在' });
+    db.prepare('UPDATE resources SET is_active = 0 WHERE id = ? AND enterprise_id = ?').run(req.params.id, entId);
     res.json({ ok: true });
-    sseBroadcast(req.user?.enterprise_id, 'resource-change', { action: 'delete' }, req.user?.id);
+    sseBroadcast(entId, 'resource-change', { action: 'delete' }, req.user?.id);
   });
 
   // === CLIENTS ===
@@ -201,59 +209,54 @@ module.exports = function(db) {
 
   router.put('/clients/:id', (req, res) => {
     const { name, color, details } = req.body;
-    const userRole = req.user?.role;
-    if (userRole !== 'admin' && userRole !== 'manager') return res.status(403).json({ error: '仅经理及以上可编辑客户' });
-    if (userRole === 'manager') {
-      const client = db.prepare('SELECT created_by FROM clients WHERE id=?').get(req.params.id);
-      if (client && client.created_by !== req.user.id) return res.status(403).json({ error: '经理只能编辑自己创建的客户' });
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
+    if (!isManagerOrAdmin(req.user)) return res.status(403).json({ error: '仅经理及以上可编辑客户' });
+    const client = authz.getClientInEnterprise(req.params.id, entId);
+    if (!client) return res.status(404).json({ error: '客户不存在' });
+    if (req.user.role === 'manager' && client.created_by !== req.user.id) {
+      return res.status(403).json({ error: '经理只能编辑自己创建的客户' });
     }
-    db.prepare('UPDATE clients SET name=?, color=?, details=? WHERE id=?')
-      .run(name, color || '#6366F1', details || '', req.params.id);
+    db.prepare('UPDATE clients SET name=?, color=?, details=? WHERE id=? AND enterprise_id=?')
+      .run(name, color || '#6366F1', details || '', req.params.id, entId);
     res.json({ ok: true });
   });
 
   router.patch('/clients/:id/archive', (req, res) => {
-    if (req.user?.role !== 'admin') return res.status(403).json({ error: '仅管理员可归档客户' });
-    db.prepare('UPDATE clients SET is_archived = 1 WHERE id = ?').run(req.params.id);
-    db.prepare('UPDATE projects SET is_archived = 1 WHERE client_id = ? AND is_active = 1').run(req.params.id);
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
+    if (!isAdmin(req.user)) return res.status(403).json({ error: '仅管理员可归档客户' });
+    const client = authz.getClientInEnterprise(req.params.id, entId);
+    if (!client) return res.status(404).json({ error: '客户不存在' });
+    db.prepare('UPDATE clients SET is_archived = 1 WHERE id = ? AND enterprise_id = ?').run(req.params.id, entId);
+    db.prepare('UPDATE projects SET is_archived = 1 WHERE client_id = ? AND enterprise_id = ? AND is_active = 1').run(req.params.id, entId);
     res.json({ ok: true });
   });
 
   router.patch('/clients/:id/unarchive', (req, res) => {
-    if (req.user?.role !== 'admin') return res.status(403).json({ error: '仅管理员可取消归档客户' });
-    db.prepare('UPDATE clients SET is_archived = 0 WHERE id = ?').run(req.params.id);
-    db.prepare('UPDATE projects SET is_archived = 0 WHERE client_id = ?').run(req.params.id);
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
+    if (!isAdmin(req.user)) return res.status(403).json({ error: '仅管理员可取消归档客户' });
+    const client = authz.getClientInEnterprise(req.params.id, entId);
+    if (!client) return res.status(404).json({ error: '客户不存在' });
+    db.prepare('UPDATE clients SET is_archived = 0 WHERE id = ? AND enterprise_id = ?').run(req.params.id, entId);
+    db.prepare('UPDATE projects SET is_archived = 0 WHERE client_id = ? AND enterprise_id = ?').run(req.params.id, entId);
     res.json({ ok: true });
   });
 
   router.delete('/clients/:id', (req, res) => {
-    if (req.user?.role !== 'admin') return res.status(403).json({ error: '仅管理员可删除客户' });
-    db.prepare('UPDATE clients SET is_active = 0 WHERE id = ?').run(req.params.id);
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
+    if (!isAdmin(req.user)) return res.status(403).json({ error: '仅管理员可删除客户' });
+    const client = authz.getClientInEnterprise(req.params.id, entId);
+    if (!client) return res.status(404).json({ error: '客户不存在' });
+    db.prepare('UPDATE clients SET is_active = 0 WHERE id = ? AND enterprise_id = ?').run(req.params.id, entId);
     res.json({ ok: true });
   });
 
   // === PROJECTS ===
-  // Permission helper: can this user edit/manage a specific project (and its scopes)?
-  // admin: yes | manager: creator OR co-manager | basic: no
   function canEditProject(user, projectId) {
-    if (!user) return false;
-    if (user.role === 'admin') return true;
-    if (user.role === 'manager') {
-      const proj = db.prepare('SELECT created_by FROM projects WHERE id = ?').get(projectId);
-      if (!proj) return false;
-      if (proj.created_by === user.id) return true;
-      if (user.managed_project_ids) {
-        try {
-          const managedIds = JSON.parse(user.managed_project_ids);
-          if (Array.isArray(managedIds) && managedIds.includes(Number(projectId))) {
-            return true;
-          }
-        } catch (e) {
-          console.error('[canEditProject] Error parsing managed_project_ids:', e);
-        }
-      }
-    }
-    return false;
+    return authz.canEditProject(user, projectId);
   }
 
   router.get('/projects', (req, res) => {
@@ -281,35 +284,55 @@ module.exports = function(db) {
   });
 
   router.put('/projects/:id', (req, res) => {
-    const { name, client_id, color, code, start_date, end_date, budget_hours, hourly_rate, billable, details } = req.body;
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
+    const proj = authz.getProjectInEnterprise(req.params.id, entId);
+    if (!proj) return res.status(404).json({ error: '项目不存在' });
     if (!canEditProject(req.user, req.params.id)) {
       return res.status(403).json({ error: '您没有权限编辑该项目' });
     }
-    db.prepare('UPDATE projects SET name=?, client_id=?, color=?, code=?, start_date=?, end_date=?, budget_hours=?, hourly_rate=?, billable=?, details=? WHERE id=?')
-      .run(name, client_id, color, code || '', start_date, end_date, budget_hours, hourly_rate, billable != null ? (billable ? 1 : 0) : 1, details || '', req.params.id);
+    const { name, client_id, color, code, start_date, end_date, budget_hours, hourly_rate, billable, details } = req.body;
+    if (client_id) {
+      const client = authz.getClientInEnterprise(client_id, entId);
+      if (!client) return res.status(400).json({ error: '客户不存在或无权访问' });
+    }
+    db.prepare('UPDATE projects SET name=?, client_id=?, color=?, code=?, start_date=?, end_date=?, budget_hours=?, hourly_rate=?, billable=?, details=? WHERE id=? AND enterprise_id=?')
+      .run(name, client_id, color, code || '', start_date, end_date, budget_hours, hourly_rate, billable != null ? (billable ? 1 : 0) : 1, details || '', req.params.id, entId);
     res.json({ ok: true });
-    sseBroadcast(req.user?.enterprise_id, 'project-change', { action: 'update' }, req.user?.id);
+    sseBroadcast(entId, 'project-change', { action: 'update' }, req.user?.id);
   });
 
   router.patch('/projects/:id/archive', (req, res) => {
-    if (req.user?.role !== 'admin') return res.status(403).json({ error: '仅管理员可归档项目' });
-    db.prepare('UPDATE projects SET is_archived = 1 WHERE id = ?').run(req.params.id);
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
+    if (!isAdmin(req.user)) return res.status(403).json({ error: '仅管理员可归档项目' });
+    const proj = authz.getProjectInEnterprise(req.params.id, entId);
+    if (!proj) return res.status(404).json({ error: '项目不存在' });
+    db.prepare('UPDATE projects SET is_archived = 1 WHERE id = ? AND enterprise_id = ?').run(req.params.id, entId);
     res.json({ ok: true });
-    sseBroadcast(req.user?.enterprise_id, 'project-change', { action: 'archive' }, req.user?.id);
+    sseBroadcast(entId, 'project-change', { action: 'archive' }, req.user?.id);
   });
 
   router.patch('/projects/:id/unarchive', (req, res) => {
-    if (req.user?.role !== 'admin') return res.status(403).json({ error: '仅管理员可取消归档项目' });
-    db.prepare('UPDATE projects SET is_archived = 0 WHERE id = ?').run(req.params.id);
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
+    if (!isAdmin(req.user)) return res.status(403).json({ error: '仅管理员可取消归档项目' });
+    const proj = authz.getProjectInEnterprise(req.params.id, entId);
+    if (!proj) return res.status(404).json({ error: '项目不存在' });
+    db.prepare('UPDATE projects SET is_archived = 0 WHERE id = ? AND enterprise_id = ?').run(req.params.id, entId);
     res.json({ ok: true });
-    sseBroadcast(req.user?.enterprise_id, 'project-change', { action: 'unarchive' }, req.user?.id);
+    sseBroadcast(entId, 'project-change', { action: 'unarchive' }, req.user?.id);
   });
 
   router.delete('/projects/:id', (req, res) => {
-    if (req.user?.role !== 'admin') return res.status(403).json({ error: '仅管理员可删除项目' });
-    db.prepare('UPDATE projects SET is_active = 0 WHERE id = ?').run(req.params.id);
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
+    if (!isAdmin(req.user)) return res.status(403).json({ error: '仅管理员可删除项目' });
+    const proj = authz.getProjectInEnterprise(req.params.id, entId);
+    if (!proj) return res.status(404).json({ error: '项目不存在' });
+    db.prepare('UPDATE projects SET is_active = 0 WHERE id = ? AND enterprise_id = ?').run(req.params.id, entId);
     res.json({ ok: true });
-    sseBroadcast(req.user?.enterprise_id, 'project-change', { action: 'delete' }, req.user?.id);
+    sseBroadcast(entId, 'project-change', { action: 'delete' }, req.user?.id);
   });
 
   // === PROJECT SCOPES ===
@@ -444,40 +467,16 @@ module.exports = function(db) {
   });
 
   // === BOOKINGS ===
-
-  // Permission helper: can this user create/edit bookings?
-  // admin: full access | manager: can book for anyone | basic: read-only
-  function canBookResource(user, resourceId) {
-    if (!user) return false;
-    if (user.role === 'admin') return true;
-    if (user.role === 'manager') return true;
-    // basic: can only log their own timesheets, not bookings
-    return false;
+  function canBookResource(user) {
+    return authz.canBookResource(user);
   }
-
-  // Permission helper: can this user edit/delete a specific booking?
-  // admin: yes | manager: only own created bookings | basic: no
   function canEditBooking(user, booking) {
-    if (!user) return false;
-    if (user.role === 'admin') return true;
-    if (user.role === 'manager') {
-      // Manager can edit bookings they created OR bookings on projects they manage
-      if (booking.created_by === user.id) return true;
-      if (user.managed_project_ids) {
-        try {
-          const managedIds = JSON.parse(user.managed_project_ids);
-          if (Array.isArray(managedIds) && managedIds.includes(Number(booking.project_id))) {
-            return true;
-          }
-        } catch (e) {
-          console.error('[canEditBooking] Error parsing managed_project_ids:', e);
-        }
-      }
-    }
-    return false;
+    return authz.canEditBooking(user, booking);
   }
 
   router.get('/bookings', (req, res) => {
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.json([]);
     const { start, end, resource_id } = req.query;
     let sql = `
       SELECT b.*, r.name as resource_name, r.color as resource_color, r.team,
@@ -489,9 +488,9 @@ module.exports = function(db) {
       LEFT JOIN clients c ON p.client_id = c.id
       LEFT JOIN users u ON b.created_by = u.id
       LEFT JOIN project_scopes ps ON b.project_scope_id = ps.id
-      WHERE 1=1
+      WHERE r.enterprise_id = ?
     `;
-    const params = [];
+    const params = [entId];
     if (start) { sql += ' AND b.date >= ?'; params.push(start); }
     if (end) { sql += ' AND b.date <= ?'; params.push(end); }
     if (resource_id) { sql += ' AND b.resource_id = ?'; params.push(resource_id); }
@@ -500,12 +499,11 @@ module.exports = function(db) {
   });
 
   router.post('/bookings', (req, res) => {
-    console.log('[DEBUG-POST-BOOKING] Received body:', req.body, 'user:', req.user?.id);
     const { resource_id, project_id, project_scope_id, date, end_date, hours, is_tentative, notes } = req.body;
     const entId = req.user?.enterprise_id;
     if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
 
-    if (!canBookResource(req.user, resource_id)) {
+    if (!canBookResource(req.user)) {
       return res.status(403).json({ error: '您没有创建排程的权限' });
     }
 
@@ -585,11 +583,16 @@ module.exports = function(db) {
       return;
     }
 
+    const nextResource = authz.getResourceInEnterprise(resource_id, entId);
+    if (!nextResource) return res.status(400).json({ error: '资源不存在或无权访问' });
+    const nextProject = authz.getProjectInEnterprise(project_id, entId);
+    if (!nextProject) return res.status(400).json({ error: '项目不存在或无权访问' });
+
     db.prepare('UPDATE bookings SET resource_id=?, project_id=?, project_scope_id=?, date=?, hours=?, is_tentative=?, notes=? WHERE id=?')
       .run(resource_id, project_id, project_scope_id || null, date, hours, is_tentative ? 1 : 0, notes || '', req.params.id);
 
-    const r = db.prepare('SELECT name FROM resources WHERE id=?').get(resource_id);
-    const p = db.prepare('SELECT name FROM projects WHERE id=?').get(project_id);
+    const r = nextResource;
+    const p = nextProject;
     const enterpriseId = req.user?.enterprise_id;
     if (enterpriseId && r && p) {
       notifyAll(db, enterpriseId, `排程变更: ${r.name} 在 ${date}「${p.name}」已更新为${hours}小时`);
@@ -627,6 +630,8 @@ module.exports = function(db) {
 
   // === TIMESHEETS ===
   router.get('/timesheets', (req, res) => {
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.json([]);
     const { start, end, resource_id, status } = req.query;
     let sql = `
       SELECT t.*, r.name as resource_name, p.name as project_name, COALESCE(c.color, p.color) as project_color, ps.name as scope_name
@@ -635,25 +640,51 @@ module.exports = function(db) {
       JOIN projects p ON t.project_id = p.id
       LEFT JOIN clients c ON p.client_id = c.id
       LEFT JOIN project_scopes ps ON t.project_scope_id = ps.id
-      WHERE 1=1
+      WHERE r.enterprise_id = ?
     `;
-    const params = [];
+    const params = [entId];
+    // basic: only own resource
+    if (!isManagerOrAdmin(req.user)) {
+      if (!req.user.resource_id) return res.json([]);
+      sql += ' AND t.resource_id = ?';
+      params.push(req.user.resource_id);
+    } else if (resource_id) {
+      sql += ' AND t.resource_id = ?';
+      params.push(resource_id);
+    }
     if (start) { sql += ' AND t.date >= ?'; params.push(start); }
     if (end) { sql += ' AND t.date <= ?'; params.push(end); }
-    if (resource_id) { sql += ' AND t.resource_id = ?'; params.push(resource_id); }
     if (status) { sql += ' AND t.status = ?'; params.push(status); }
     sql += ' ORDER BY t.date DESC';
     res.json(db.prepare(sql).all(...params));
   });
 
   router.post('/timesheets', (req, res) => {
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
     const { resource_id, project_id, project_scope_id, date, hours, notes, status } = req.body;
+    if (!authz.canAccessResourceAsSelfOrElevated(req.user, resource_id)) {
+      return res.status(403).json({ error: '只能为自己填报工时' });
+    }
+    if (!authz.getResourceInEnterprise(resource_id, entId)) {
+      return res.status(400).json({ error: '资源不存在或无权访问' });
+    }
+    if (!authz.getProjectInEnterprise(project_id, entId)) {
+      return res.status(400).json({ error: '项目不存在或无权访问' });
+    }
     const result = db.prepare('INSERT INTO timesheets (resource_id, project_id, project_scope_id, date, hours, notes, status) VALUES (?,?,?,?,?,?,?)')
       .run(resource_id, project_id, project_scope_id || null, date, hours, notes || '', status || 'draft');
     res.json({ id: result.lastInsertRowid });
   });
 
   router.put('/timesheets/:id', (req, res) => {
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
+    const existing = authz.getTimesheetInEnterprise(req.params.id, entId);
+    if (!existing) return res.status(404).json({ error: '工时记录不存在' });
+    if (!authz.canAccessResourceAsSelfOrElevated(req.user, existing.resource_id)) {
+      return res.status(403).json({ error: '只能编辑自己的工时' });
+    }
     const { hours, notes, status, project_scope_id } = req.body;
     db.prepare('UPDATE timesheets SET hours=?, notes=?, status=?, project_scope_id=? WHERE id=?')
       .run(hours, notes, status, project_scope_id || null, req.params.id);
@@ -661,21 +692,40 @@ module.exports = function(db) {
   });
 
   router.delete('/timesheets/:id', (req, res) => {
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
+    const existing = authz.getTimesheetInEnterprise(req.params.id, entId);
+    if (!existing) return res.status(404).json({ error: '工时记录不存在' });
+    if (!authz.canAccessResourceAsSelfOrElevated(req.user, existing.resource_id)) {
+      return res.status(403).json({ error: '只能删除自己的工时' });
+    }
     db.prepare('DELETE FROM timesheets WHERE id = ?').run(req.params.id);
     res.json({ ok: true });
   });
 
   // Batch upsert timesheets for a week
   router.post('/timesheets/batch', (req, res) => {
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
     const { entries } = req.body; // [{resource_id, project_id, project_scope_id, date, hours, notes}]
+    if (!Array.isArray(entries)) return res.status(400).json({ error: 'entries 无效' });
+
     const insertOrUpdate = db.transaction((items) => {
       const selectStmt = db.prepare('SELECT id FROM timesheets WHERE resource_id=? AND project_id=? AND date=? AND (project_scope_id = ? OR (project_scope_id IS NULL AND ? IS NULL))');
       const updateStmt = db.prepare('UPDATE timesheets SET hours=?, notes=?, status=? WHERE id=?');
       const insertStmt = db.prepare('INSERT INTO timesheets (resource_id, project_id, project_scope_id, date, hours, notes, status) VALUES (?,?,?,?,?,?,?)');
 
       for (const e of items) {
+        if (!authz.canAccessResourceAsSelfOrElevated(req.user, e.resource_id)) {
+          throw new Error('FORBIDDEN_RESOURCE');
+        }
+        if (!authz.getResourceInEnterprise(e.resource_id, entId)) {
+          throw new Error('BAD_RESOURCE');
+        }
+        if (!authz.getProjectInEnterprise(e.project_id, entId)) {
+          throw new Error('BAD_PROJECT');
+        }
         const scopeId = e.project_scope_id || null;
-        // Check if entry exists
         const existing = selectStmt.get(e.resource_id, e.project_id, e.date, scopeId, scopeId);
         if (existing) {
           updateStmt.run(e.hours, e.notes || '', e.status || 'draft', existing.id);
@@ -684,27 +734,39 @@ module.exports = function(db) {
         }
       }
     });
-    insertOrUpdate(entries);
+    try {
+      insertOrUpdate(entries);
+    } catch (e) {
+      if (e.message === 'FORBIDDEN_RESOURCE') return res.status(403).json({ error: '只能为自己填报工时' });
+      if (e.message === 'BAD_RESOURCE' || e.message === 'BAD_PROJECT') return res.status(400).json({ error: '资源或项目不存在' });
+      throw e;
+    }
     res.json({ ok: true });
   });
 
   // Sync timesheets from bookings for a given week (auto-fill empty cells only)
-  // POST /api/timesheets/sync-from-bookings
-  // Body: { resource_id, start, end }
-  // Returns: { synced: N, skipped: N, entries: [...] }
   router.post('/timesheets/sync-from-bookings', (req, res) => {
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
     const { resource_id, start, end } = req.body;
     if (!resource_id || !start || !end) {
       return res.status(400).json({ error: 'resource_id, start, end required' });
     }
+    if (!authz.canAccessResourceAsSelfOrElevated(req.user, resource_id)) {
+      return res.status(403).json({ error: '只能同步自己的工时' });
+    }
+    if (!authz.getResourceInEnterprise(resource_id, entId)) {
+      return res.status(400).json({ error: '资源不存在或无权访问' });
+    }
 
     // 1. Aggregate bookings for this resource in the week (group by project+scope+date)
     const bookings = db.prepare(`
-      SELECT project_id, project_scope_id, date, SUM(hours) as hours
-      FROM bookings
-      WHERE resource_id = ? AND date >= ? AND date <= ?
-      GROUP BY project_id, project_scope_id, date
-    `).all(resource_id, start, end);
+      SELECT b.project_id, b.project_scope_id, b.date, SUM(b.hours) as hours
+      FROM bookings b
+      JOIN resources r ON b.resource_id = r.id
+      WHERE b.resource_id = ? AND r.enterprise_id = ? AND b.date >= ? AND b.date <= ?
+      GROUP BY b.project_id, b.project_scope_id, b.date
+    `).all(resource_id, entId, start, end);
 
     if (!bookings.length) {
       return res.json({ synced: 0, skipped: 0, entries: [] });
@@ -762,6 +824,7 @@ module.exports = function(db) {
 
   // === REPORTS ===
   router.get('/reports/utilization', (req, res) => {
+    if (req.user?.role === 'basic') return res.status(403).json({ error: '您没有查看报表的权限' });
     const { start, end } = req.query;
     const sql = `
       SELECT r.id, r.name, r.role, r.team, r.color, r.hours_per_day,
@@ -878,17 +941,20 @@ module.exports = function(db) {
     const { resource_id, start, end } = req.query;
     const entId = req.user?.enterprise_id;
     if (!entId || !resource_id) return res.json([]);
+    if (req.user?.role === 'basic') return res.status(403).json({ error: '您没有查看报表的权限' });
+    if (!authz.getResourceInEnterprise(resource_id, entId)) return res.json([]);
     const sql = `
       SELECT p.id, p.name, p.color, c.name as client_name,
         COALESCE(SUM(b.hours), 0) as booked_hours,
         (SELECT COALESCE(SUM(t.hours),0) FROM timesheets t WHERE t.resource_id=? AND t.project_id=p.id AND t.date>=? AND t.date<=?) as actual_hours
       FROM bookings b
       JOIN projects p ON b.project_id = p.id
+      JOIN resources r ON b.resource_id = r.id
       LEFT JOIN clients c ON p.client_id = c.id
-      WHERE b.resource_id=? AND b.date>=? AND b.date<=?
+      WHERE b.resource_id=? AND r.enterprise_id=? AND b.date>=? AND b.date<=?
       GROUP BY p.id ORDER BY booked_hours DESC
     `;
-    res.json(db.prepare(sql).all(resource_id, start, end, resource_id, start, end));
+    res.json(db.prepare(sql).all(resource_id, start, end, resource_id, entId, start, end));
   });
 
   // === DRILL-DOWN: project -> members ===
@@ -992,11 +1058,11 @@ module.exports = function(db) {
 
   // === LEAVE ===
   router.get('/leave', (req, res) => {
-    const { start, end, resource_id } = req.query;
     const entId = req.user?.enterprise_id;
-    let sql = 'SELECT l.*, r.name as resource_name FROM leave_entries l JOIN resources r ON l.resource_id = r.id WHERE 1=1';
-    const params = [];
-    if (entId) { sql += ' AND r.enterprise_id = ?'; params.push(entId); }
+    if (!entId) return res.json([]);
+    const { start, end, resource_id } = req.query;
+    let sql = 'SELECT l.*, r.name as resource_name FROM leave_entries l JOIN resources r ON l.resource_id = r.id WHERE r.enterprise_id = ?';
+    const params = [entId];
     if (start) { sql += ' AND l.date >= ?'; params.push(start); }
     if (end) { sql += ' AND l.date <= ?'; params.push(end); }
     if (resource_id) { sql += ' AND l.resource_id = ?'; params.push(resource_id); }
@@ -1004,17 +1070,29 @@ module.exports = function(db) {
   });
 
   router.post('/leave', (req, res) => {
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
+    if (!isManagerOrAdmin(req.user)) return res.status(403).json({ error: '仅经理及以上可登记休假' });
     const { resource_id, date, type, notes } = req.body;
+    if (!authz.getResourceInEnterprise(resource_id, entId)) {
+      return res.status(400).json({ error: '资源不存在或无权访问' });
+    }
     const result = db.prepare('INSERT INTO leave_entries (resource_id, date, type, notes) VALUES (?,?,?,?)')
       .run(resource_id, date, type || 'vacation', notes || '');
     res.json({ id: result.lastInsertRowid });
-    sseBroadcast(req.user?.enterprise_id, 'schedule-change', { action: 'leave-create' }, req.user?.id);
+    sseBroadcast(entId, 'schedule-change', { action: 'leave-create' }, req.user?.id);
   });
 
   // Batch leave creation for date ranges
   router.post('/leave/batch', (req, res) => {
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
+    if (!isManagerOrAdmin(req.user)) return res.status(403).json({ error: '仅经理及以上可登记休假' });
     const { resource_id, start_date, end_date, type, notes } = req.body;
     if (!resource_id || !start_date) return res.status(400).json({ error: '缺少必要参数' });
+    if (!authz.getResourceInEnterprise(resource_id, entId)) {
+      return res.status(400).json({ error: '资源不存在或无权访问' });
+    }
 
     const endDate = end_date || start_date;
     const leaveType = type || 'vacation';
@@ -1051,9 +1129,17 @@ module.exports = function(db) {
 
   // Book public holidays for selected resources and date range (weekdays only)
   router.post('/leave/book-holidays', (req, res) => {
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
+    if (!isManagerOrAdmin(req.user)) return res.status(403).json({ error: '仅经理及以上可登记休假' });
     const { resource_ids, start_date, end_date } = req.body;
     if (!resource_ids || !Array.isArray(resource_ids) || resource_ids.length === 0 || !start_date || !end_date) {
       return res.status(400).json({ error: '缺少必要参数' });
+    }
+    for (const rid of resource_ids) {
+      if (!authz.getResourceInEnterprise(rid, entId)) {
+        return res.status(400).json({ error: '资源不存在或无权访问' });
+      }
     }
 
     const insert = db.prepare('INSERT OR IGNORE INTO leave_entries (resource_id, date, type, notes) VALUES (?,?,?,?)');
@@ -1091,10 +1177,13 @@ module.exports = function(db) {
   });
 
   router.put('/leave/:id', (req, res) => {
-    const { type, notes, date } = req.body;
-    const existing = db.prepare('SELECT * FROM leave_entries WHERE id = ?').get(req.params.id);
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
+    if (!isManagerOrAdmin(req.user)) return res.status(403).json({ error: '仅经理及以上可编辑休假' });
+    const existing = authz.getLeaveInEnterprise(req.params.id, entId);
     if (!existing) return res.status(404).json({ error: '休假记录不存在' });
 
+    const { type, notes, date } = req.body;
     const newType = type || existing.type;
     const newNotes = notes !== undefined ? notes : existing.notes;
     const newDate = date || existing.date;
@@ -1102,13 +1191,18 @@ module.exports = function(db) {
     db.prepare('UPDATE leave_entries SET type = ?, notes = ?, date = ? WHERE id = ?')
       .run(newType, newNotes, newDate, req.params.id);
     res.json({ ok: true });
-    sseBroadcast(req.user?.enterprise_id, 'schedule-change', { action: 'leave-update' }, req.user?.id);
+    sseBroadcast(entId, 'schedule-change', { action: 'leave-update' }, req.user?.id);
   });
 
   router.delete('/leave/:id', (req, res) => {
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
+    if (!isManagerOrAdmin(req.user)) return res.status(403).json({ error: '仅经理及以上可删除休假' });
+    const existing = authz.getLeaveInEnterprise(req.params.id, entId);
+    if (!existing) return res.status(404).json({ error: '休假记录不存在' });
     db.prepare('DELETE FROM leave_entries WHERE id = ?').run(req.params.id);
     res.json({ ok: true });
-    sseBroadcast(req.user?.enterprise_id, 'schedule-change', { action: 'leave-delete' }, req.user?.id);
+    sseBroadcast(entId, 'schedule-change', { action: 'leave-delete' }, req.user?.id);
   });
 
   // === WECOM SYNC ===
@@ -1116,7 +1210,7 @@ module.exports = function(db) {
   // Fetch WeCom department users and auto-match by name
   router.post('/wecom/sync', async (req, res) => {
     if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
-    if (req.user.role !== 'admin' && req.user.role !== 'owner') return res.status(403).json({ error: '仅管理员可操作' });
+    if (!isAdmin(req.user)) return res.status(403).json({ error: '仅管理员可操作' });
 
     const config = getRuntimeWeComConfig(db, req.user.enterprise_id);
     const configCheck = validateWeComConfig(config);
@@ -1178,7 +1272,7 @@ module.exports = function(db) {
 
   router.post('/wecom/test-message', async (req, res) => {
     if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
-    if (req.user.role !== 'admin' && req.user.role !== 'owner') return res.status(403).json({ error: '仅管理员可操作' });
+    if (!isAdmin(req.user)) return res.status(403).json({ error: '仅管理员可操作' });
 
     const resourceId = parseInt(req.body.resource_id, 10);
     const messageType = String(req.body.message_type || 'schedule_created').trim();
