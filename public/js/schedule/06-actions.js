@@ -158,27 +158,22 @@ window.saveBooking = async function (id) {
         await Promise.all(createPromises);
       }
     } else {
-      /* --- Leave conflict check --- */
-      var startDateVal = document.getElementById('bk-date-start').value;
-      var endDateVal   = document.getElementById('bk-date-end').value || startDateVal;
+      /* Create — supports continuous range OR multi-pick (non-contiguous) dates */
+      var rangeDates = (typeof window.getBookingDateList === 'function')
+        ? window.getBookingDateList()
+        : [];
+      if (!rangeDates.length) {
+        toast(t('schedule.select_dates'), 'error');
+        return;
+      }
+
       var lMap = {};
       if (window._allLeave) {
         window._allLeave.forEach(function (l) {
-          var k = l.resource_id + '_' + l.date;
-          lMap[k] = true;
+          lMap[l.resource_id + '_' + l.date] = true;
         });
       }
 
-      /* Collect all dates in the booking range */
-      var rangeDates = [];
-      var dCursor = new Date(startDateVal);
-      var dEnd    = new Date(endDateVal);
-      while (dCursor <= dEnd) {
-        rangeDates.push(dCursor.toISOString().split('T')[0]);
-        dCursor.setDate(dCursor.getDate() + 1);
-      }
-
-      /* For each resource, find which dates have leave */
       var conflictInfo = [];
       resourceIds.forEach(function (rid) {
         rangeDates.forEach(function (dateStr) {
@@ -188,85 +183,57 @@ window.saveBooking = async function (id) {
         });
       });
 
+      var skipLeave = false;
       if (conflictInfo.length > 0) {
-        /* Build a readable summary */
         var conflictDates = {};
-        conflictInfo.forEach(function (c) {
-          conflictDates[c.date] = true;
-        });
+        conflictInfo.forEach(function (c) { conflictDates[c.date] = true; });
         var dateList = Object.keys(conflictDates).sort().slice(0, 5).join(', ');
         if (Object.keys(conflictDates).length > 5) dateList += ' ...';
-
-        /* Ask user: skip leave days or cancel */
         var skipConfirmed = window.confirm(
           t('schedule.dates_have_leave') + dateList + '\n\n' +
           t('schedule.skip_holidays_confirm')
         );
         if (!skipConfirmed) return;
+        skipLeave = true;
+      }
 
-        /* Filter out leave dates from each resource's booking range */
-        /* We'll create per-resource, per-contiguous-segment bookings */
-        var createPromises = [];
-        resourceIds.forEach(function (rid) {
-          /* Find non-leave dates for this resource */
-          var validDates = rangeDates.filter(function (d) {
-            return !lMap[rid + '_' + d];
-          });
-          if (!validDates.length) return;
+      var groupFn = window.groupContiguousDates || function (dates) {
+        return dates && dates.length ? [dates.slice().sort()] : [];
+      };
+      var hoursRoundedCreate = Math.round(totalH * 10) / 10;
+      var isTentCreate = document.getElementById('bk-tentative').checked;
+      var notesCreate = document.getElementById('bk-notes').value;
+      var createPromises = [];
 
-          /* Group into contiguous segments */
-          var segments = [];
-          var seg = [validDates[0]];
-          for (var vi = 1; vi < validDates.length; vi++) {
-            var prev = new Date(validDates[vi - 1]);
-            var curr = new Date(validDates[vi]);
-            var diff = (curr - prev) / 86400000;
-            if (diff === 1) {
-              seg.push(validDates[vi]);
-            } else {
-              segments.push(seg);
-              seg = [validDates[vi]];
-            }
-          }
-          segments.push(seg);
+      resourceIds.forEach(function (rid) {
+        var validDates = skipLeave
+          ? rangeDates.filter(function (d) { return !lMap[rid + '_' + d]; })
+          : rangeDates.slice();
+        if (!validDates.length) return;
 
-          segments.forEach(function (s) {
-            createPromises.push((window.apiBookingWithConflictConfirm || api)('/api/bookings', {
-              method: 'POST',
-              body: {
-                resource_id: rid,
-                project_id: projectId,
-                project_scope_id: projectScopeId,
-                date: s[0],
-                end_date: s[s.length - 1],
-                hours: Math.round(totalH * 10) / 10,
-                is_tentative: document.getElementById('bk-tentative').checked,
-                notes: document.getElementById('bk-notes').value
-              }
-            }));
-          });
-        });
-        await Promise.all(createPromises);
-
-      } else {
-        /* No conflicts — normal batch create */
-        var promises = resourceIds.map(function (rid) {
-          return (window.apiBookingWithConflictConfirm || api)('/api/bookings', {
+        var segments = groupFn(validDates);
+        segments.forEach(function (s) {
+          createPromises.push((window.apiBookingWithConflictConfirm || api)('/api/bookings', {
             method: 'POST',
             body: {
               resource_id: rid,
               project_id: projectId,
               project_scope_id: projectScopeId,
-              date: startDateVal,
-              end_date: endDateVal,
-              hours: Math.round(totalH * 10) / 10,
-              is_tentative: document.getElementById('bk-tentative').checked,
-              notes: document.getElementById('bk-notes').value
+              date: s[0],
+              end_date: s[s.length - 1],
+              hours: hoursRoundedCreate,
+              is_tentative: isTentCreate,
+              notes: notesCreate
             }
-          });
+          }));
         });
-        await Promise.all(promises);
+      });
+
+      if (!createPromises.length) {
+        toast(t('schedule.all_dates_have_leave'), 'error');
+        return;
       }
+      await Promise.all(createPromises);
     }
     _editSpanContext = null;
     document.getElementById('modal').classList.remove('bk-modal');

@@ -208,6 +208,11 @@ async function showBookingModal(bookingId, resourceId, date, endDate) {
   /* Init time mode toggle */
   initTimeToggle();
 
+  /* Create-only: range vs multi-day pick */
+  if (!bookingId) {
+    initDateModePicker(dateVal, endDateVal);
+  }
+
   /* Edit range (this day vs whole span) */
   initEditRangeToggle(booking, spanGroup);
 
@@ -541,8 +546,96 @@ function getSelectedResourceIds(prefix) {
   return ids;
 }
 
+/* ---- Date helpers (local timezone safe) ---- */
+function parseYmdLocal(s) {
+  if (!s) return null;
+  var p = String(s).split('-');
+  if (p.length < 3) return null;
+  return new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
+}
+
+function expandDateRange(startStr, endStr) {
+  var dates = [];
+  var d = parseYmdLocal(startStr);
+  var end = parseYmdLocal(endStr || startStr);
+  if (!d || !end) return dates;
+  if (end < d) { var tmp = d; d = end; end = tmp; }
+  while (d <= end) {
+    dates.push(fmt(d));
+    d.setDate(d.getDate() + 1);
+  }
+  return dates;
+}
+
+function groupContiguousDates(dates) {
+  if (!dates || !dates.length) return [];
+  var sorted = dates.slice().sort();
+  var segs = [[sorted[0]]];
+  for (var i = 1; i < sorted.length; i++) {
+    var prev = parseYmdLocal(sorted[i - 1]);
+    var curr = parseYmdLocal(sorted[i]);
+    var diff = prev && curr ? (curr - prev) / 86400000 : 0;
+    if (diff === 1) segs[segs.length - 1].push(sorted[i]);
+    else segs.push([sorted[i]]);
+  }
+  return segs;
+}
+
+/** Selected multi-pick dates for create modal (YYYY-MM-DD, unique) */
+var _bkPickDates = [];
+var _bkPickMonth = null; // Date at 1st of displayed month
+
+function getDateMode() {
+  var checked = document.querySelector('input[name="bk-date-mode"]:checked');
+  return checked ? checked.value : 'range';
+}
+
+/**
+ * Dates the create form will book (sorted unique Y-M-D).
+ * Range mode expands from~to; pick mode uses multi-select chips.
+ */
+window.getBookingDateList = function getBookingDateList() {
+  var modeEl = document.querySelector('input[name="bk-date-mode"]');
+  if (modeEl && getDateMode() === 'pick') {
+    return _bkPickDates.slice().sort();
+  }
+  var startEl = document.getElementById('bk-date-start');
+  var endEl = document.getElementById('bk-date-end');
+  if (!startEl || !startEl.value) return [];
+  return expandDateRange(startEl.value, (endEl && endEl.value) || startEl.value);
+};
+
+window.groupContiguousDates = groupContiguousDates;
+
 /* ---- Time fields for booking ---- */
 function buildTimeFields(dateVal, endDateVal, hoursVal, isEdit) {
+  var modeToggle = '';
+  var pickPanel = '';
+  if (!isEdit) {
+    modeToggle =
+      '<div class="bk-date-mode" role="radiogroup" aria-label="' + escAttr(t('schedule.date_mode')) + '">' +
+        '<label class="bk-date-mode-opt active">' +
+          '<input type="radio" name="bk-date-mode" value="range" checked>' +
+          '<span>' + t('schedule.date_mode_range') + '</span>' +
+        '</label>' +
+        '<label class="bk-date-mode-opt">' +
+          '<input type="radio" name="bk-date-mode" value="pick">' +
+          '<span>' + t('schedule.date_mode_pick') + '</span>' +
+        '</label>' +
+      '</div>';
+    pickPanel =
+      '<div class="bk-date-pick" id="bk-date-pick" hidden>' +
+        '<div class="bk-pick-cal" id="bk-pick-cal"></div>' +
+        '<div class="bk-pick-tools">' +
+          '<input type="date" id="bk-pick-add" class="text-input form-control form-control-sm" value="' + dateVal + '">' +
+          '<button type="button" class="btn btn-outline btn-sm" id="bk-pick-add-btn">' + t('schedule.add_date') + '</button>' +
+          '<button type="button" class="btn btn-outline btn-sm" id="bk-pick-clear">' + t('schedule.clear_dates') + '</button>' +
+        '</div>' +
+        '<div class="bk-pick-chips" id="bk-pick-chips"></div>' +
+        '<div class="bk-pick-hint">' + t('schedule.date_mode_pick_hint') + '</div>' +
+      '</div>';
+  }
+
   return '<div class="bk-field">' +
     '<svg class="bk-field-icon" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' +
     '<div class="bk-field-body">' +
@@ -552,15 +645,203 @@ function buildTimeFields(dateVal, endDateVal, hoursVal, isEdit) {
           '<input type="number" id="bk-hours" class="text-input form-control form-control-sm" value="' + hoursVal + '" min="0.5" max="24" step="0.5" onchange="window._updateBkTotal()" oninput="window._updateBkTotal()">' +
         '</div>' +
       '</div>' +
-      '<div class="bk-date-row">' +
+      modeToggle +
+      '<div class="bk-date-row" id="bk-date-range">' +
         '<label>' + t('common.from') + '</label>' +
         '<input type="date" id="bk-date-start" class="text-input form-control form-control-sm" value="' + dateVal + '" onchange="window._updateBkTotal()">' +
         '<label>' + t('common.to') + '</label>' +
         '<input type="date" id="bk-date-end" class="text-input form-control form-control-sm" value="' + (isEdit ? dateVal : endDateVal) + '" onchange="window._updateBkTotal()">' +
       '</div>' +
+      pickPanel +
       '<div class="bk-total" id="bk-total"></div>' +
     '</div>' +
   '</div>';
+}
+
+/**
+ * Init date mode toggle + multi-day picker (create modal only).
+ * Seeds pick-mode with the range that was opened (cell click / drag).
+ */
+function initDateModePicker(dateVal, endDateVal) {
+  _bkPickDates = [];
+  var seedStart = dateVal || fmt(new Date());
+  var seedEnd = endDateVal || seedStart;
+  expandDateRange(seedStart, seedEnd).forEach(function (d) {
+    if (_bkPickDates.indexOf(d) === -1) _bkPickDates.push(d);
+  });
+  var seed = parseYmdLocal(seedStart) || new Date();
+  _bkPickMonth = new Date(seed.getFullYear(), seed.getMonth(), 1);
+
+  var rangeEl = document.getElementById('bk-date-range');
+  var pickEl = document.getElementById('bk-date-pick');
+  if (!document.querySelector('input[name="bk-date-mode"]')) return;
+
+  function applyMode() {
+    var mode = getDateMode();
+    var isPick = mode === 'pick';
+    if (rangeEl) rangeEl.hidden = isPick;
+    if (pickEl) pickEl.hidden = !isPick;
+    document.querySelectorAll('.bk-date-mode-opt').forEach(function (lab) {
+      var input = lab.querySelector('input');
+      if (input && input.checked) lab.classList.add('active');
+      else lab.classList.remove('active');
+    });
+    if (isPick) {
+      // Sync range → pick when switching into pick
+      var s = document.getElementById('bk-date-start');
+      var e = document.getElementById('bk-date-end');
+      if (s && s.value) {
+        expandDateRange(s.value, (e && e.value) || s.value).forEach(function (d) {
+          if (_bkPickDates.indexOf(d) === -1) _bkPickDates.push(d);
+        });
+      }
+      renderPickCalendar();
+      renderPickChips();
+    } else if (_bkPickDates.length) {
+      // Sync pick → range bounds when switching back
+      var sorted = _bkPickDates.slice().sort();
+      var sEl = document.getElementById('bk-date-start');
+      var eEl = document.getElementById('bk-date-end');
+      if (sEl) sEl.value = sorted[0];
+      if (eEl) eEl.value = sorted[sorted.length - 1];
+    }
+    updateBookingTotal();
+  }
+
+  document.querySelectorAll('input[name="bk-date-mode"]').forEach(function (radio) {
+    radio.addEventListener('change', applyMode);
+  });
+
+  var addBtn = document.getElementById('bk-pick-add-btn');
+  var addInput = document.getElementById('bk-pick-add');
+  var clearBtn = document.getElementById('bk-pick-clear');
+  if (addBtn && addInput) {
+    addBtn.addEventListener('click', function () {
+      togglePickDate(addInput.value, true);
+    });
+    addInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        togglePickDate(addInput.value, true);
+      }
+    });
+  }
+  if (clearBtn) {
+    clearBtn.addEventListener('click', function () {
+      _bkPickDates = [];
+      renderPickCalendar();
+      renderPickChips();
+      updateBookingTotal();
+    });
+  }
+
+  applyMode();
+}
+
+function togglePickDate(ymd, forceAdd) {
+  if (!ymd || !/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return;
+  var idx = _bkPickDates.indexOf(ymd);
+  if (idx >= 0) {
+    if (!forceAdd) _bkPickDates.splice(idx, 1);
+  } else {
+    _bkPickDates.push(ymd);
+  }
+  renderPickCalendar();
+  renderPickChips();
+  updateBookingTotal();
+}
+
+function renderPickChips() {
+  var wrap = document.getElementById('bk-pick-chips');
+  if (!wrap) return;
+  var sorted = _bkPickDates.slice().sort();
+  if (!sorted.length) {
+    wrap.innerHTML = '<span class="bk-pick-empty">' + t('schedule.no_dates_selected') + '</span>';
+    return;
+  }
+  wrap.innerHTML = sorted.map(function (d) {
+    var label = d.length >= 10 ? d.slice(5) : d; // MM-DD
+    return '<button type="button" class="bk-pick-chip" data-date="' + d + '" title="' + d + '">' +
+      label +
+      '<span class="bk-pick-chip-x" aria-hidden="true">×</span>' +
+      '</button>';
+  }).join('');
+  wrap.querySelectorAll('.bk-pick-chip').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      togglePickDate(btn.getAttribute('data-date'), false);
+    });
+  });
+}
+
+function renderPickCalendar() {
+  var cal = document.getElementById('bk-pick-cal');
+  if (!cal || !_bkPickMonth) return;
+
+  var y = _bkPickMonth.getFullYear();
+  var m = _bkPickMonth.getMonth();
+  var firstDow = new Date(y, m, 1).getDay(); // 0=Sun
+  // Monday-first grid
+  var startPad = (firstDow + 6) % 7;
+  var daysInMonth = new Date(y, m + 1, 0).getDate();
+  var todayStr = fmt(new Date());
+  var monthLabel = y + '-' + String(m + 1).padStart(2, '0');
+
+  var weekHeaders = ['一', '二', '三', '四', '五', '六', '日'];
+  // EN: use short en if needed
+  try {
+    if (typeof getLang === 'function' && getLang() === 'en') {
+      weekHeaders = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+    } else if (window.state && window.state.lang === 'en') {
+      weekHeaders = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+    } else {
+      var lang = (localStorage.getItem('crewboard_lang') || '').toLowerCase();
+      if (lang === 'en') weekHeaders = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+    }
+  } catch (e) { /* ignore */ }
+
+  var html = '<div class="bk-pick-cal-head">' +
+    '<button type="button" class="bk-pick-nav" id="bk-pick-prev" aria-label="prev">‹</button>' +
+    '<span class="bk-pick-month">' + monthLabel + '</span>' +
+    '<button type="button" class="bk-pick-nav" id="bk-pick-next" aria-label="next">›</button>' +
+    '</div>';
+  html += '<div class="bk-pick-dow">';
+  weekHeaders.forEach(function (h) { html += '<span>' + h + '</span>'; });
+  html += '</div><div class="bk-pick-grid">';
+
+  for (var i = 0; i < startPad; i++) {
+    html += '<span class="bk-pick-day empty"></span>';
+  }
+  for (var day = 1; day <= daysInMonth; day++) {
+    var ymd = y + '-' + String(m + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+    var cls = ['bk-pick-day'];
+    if (_bkPickDates.indexOf(ymd) >= 0) cls.push('selected');
+    if (ymd === todayStr) cls.push('today');
+    var wd = new Date(y, m, day).getDay();
+    if (wd === 0 || wd === 6) cls.push('weekend');
+    html += '<button type="button" class="' + cls.join(' ') + '" data-date="' + ymd + '">' + day + '</button>';
+  }
+  html += '</div>';
+  cal.innerHTML = html;
+
+  var prev = document.getElementById('bk-pick-prev');
+  var next = document.getElementById('bk-pick-next');
+  if (prev) {
+    prev.addEventListener('click', function () {
+      _bkPickMonth = new Date(y, m - 1, 1);
+      renderPickCalendar();
+    });
+  }
+  if (next) {
+    next.addEventListener('click', function () {
+      _bkPickMonth = new Date(y, m + 1, 1);
+      renderPickCalendar();
+    });
+  }
+  cal.querySelectorAll('.bk-pick-day[data-date]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      togglePickDate(btn.getAttribute('data-date'), false);
+    });
+  });
 }
 
 /* ---- Date fields for time-off ---- */
@@ -926,14 +1207,20 @@ function updateBookingTotal() {
 
 window._updateBkTotal = function () {
   var hours = parseFloat((document.getElementById('bk-hours') || {}).value) || 0;
-  var startEl = document.getElementById('bk-date-start');
-  var endEl = document.getElementById('bk-date-end');
-  if (!startEl || !endEl) return;
-
   var totalHPerDay = hours;
-  var totalDays = countAllDays(startEl.value, endEl.value);
-  var totalH = totalHPerDay * totalDays;
+  var totalDays = 0;
 
+  var modeEl = document.querySelector('input[name="bk-date-mode"]');
+  if (modeEl && getDateMode() === 'pick') {
+    totalDays = _bkPickDates.length;
+  } else {
+    var startEl = document.getElementById('bk-date-start');
+    var endEl = document.getElementById('bk-date-end');
+    if (!startEl) return;
+    totalDays = countAllDays(startEl.value, (endEl && endEl.value) || startEl.value);
+  }
+
+  var totalH = totalHPerDay * totalDays;
   var el = document.getElementById('bk-total');
   if (el) {
     el.textContent = totalH.toFixed(1) + 'h (' + totalDays + 'd, ' + totalHPerDay.toFixed(1) + 'h/d)';
@@ -957,15 +1244,7 @@ window._updateToTotal = function () {
 };
 
 function countAllDays(startStr, endStr) {
-  if (!startStr || !endStr) return 0;
-  var d = new Date(startStr);
-  var end = new Date(endStr);
-  var count = 0;
-  while (d <= end) {
-    count++;
-    d.setDate(d.getDate() + 1);
-  }
-  return count;
+  return expandDateRange(startStr, endStr || startStr).length;
 }
 
 /* --------------------------------------------------
