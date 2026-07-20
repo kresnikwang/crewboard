@@ -97,12 +97,11 @@ module.exports = function register(router, ctx) {
     });
     const gate = shouldBlockConflicts(conflictResult, { force: !!force });
     if (gate.block) {
+      // Currently only leave conflicts block booking (overload is soft warning only)
       return res.status(409).json({
-        error: gate.reason === 'leave_conflict'
-          ? '所选日期与休假冲突，请调整日期或使用 force 确认'
-          : '所选日期工时将超过日产能，请确认后使用 force 继续',
+        error: '所选日期与休假冲突，请调整日期或使用 force 确认',
         code: 'booking_conflict',
-        reason: gate.reason,
+        reason: gate.reason || 'leave_conflict',
         conflicts: conflictResult.conflicts,
         capacity: conflictResult.capacity,
       });
@@ -233,12 +232,11 @@ module.exports = function register(router, ctx) {
 
     const gate = shouldBlockConflicts(conflictResult, { force: !!force });
     if (gate.block) {
+      // Only leave conflicts block; overload is returned as soft conflicts on success
       return res.status(409).json({
-        error: gate.reason === 'leave_conflict'
-          ? '目标日期与休假冲突'
-          : '更新后工时将超过日产能，请确认后使用 force 继续',
+        error: '目标日期与休假冲突',
         code: 'booking_conflict',
-        reason: gate.reason,
+        reason: gate.reason || 'leave_conflict',
         conflicts: conflictResult.conflicts,
         capacity: conflictResult.capacity,
       });

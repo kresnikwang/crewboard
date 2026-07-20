@@ -920,7 +920,7 @@
                    (b.split_after === 1 || b.split_after === true);
           });
           if (!alreadyBooked && !hasSplitAfter) {
-            promises.push(api('/api/bookings', {
+            promises.push((window.apiBookingWithConflictConfirm || api)('/api/bookings', {
               method: 'POST',
               body: {
                 resource_id: booking.resource_id,
@@ -1160,7 +1160,7 @@
                    (b.split_after === 1 || b.split_after === true);
           });
           if (!alreadyBooked && !hasSplitAfter) {
-            promises.push(api('/api/bookings', {
+            promises.push((window.apiBookingWithConflictConfirm || api)('/api/bookings', {
               method: 'POST',
               body: {
                 resource_id:  booking.resource_id,
@@ -1410,7 +1410,7 @@
             if (newIdx < 0 || newIdx >= dates.length) return Promise.resolve(null);
             var newDate = dates[newIdx];
             var orig = originalBookings[idx];
-            return api('/api/bookings', {
+            return (window.apiBookingWithConflictConfirm || api)('/api/bookings', {
               method: 'POST',
               body: {
                 resource_id:  orig.resource_id,

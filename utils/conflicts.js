@@ -86,15 +86,19 @@ function checkBookingConflicts(db, opts) {
     const projected = replaceDayHours ? bookHours : existing + bookHours;
 
     if (projected > capacity + 1e-9) {
+      const over = Math.round((projected - capacity) * 10) / 10;
+      const projectedR = Math.round(projected * 10) / 10;
+      const existingR = Math.round(existing * 10) / 10;
       conflicts.push({
         type: 'overload',
         severity: 'warning',
         date: dateStr,
-        existing_hours: existing,
+        existing_hours: existingR,
         added_hours: bookHours,
-        projected_hours: projected,
+        projected_hours: projectedR,
         capacity,
-        message: `${resource.name} 在 ${dateStr} 将排 ${projected}h，超过日产能 ${capacity}h`,
+        over_hours: over,
+        message: `${resource.name} 在 ${dateStr} 将排 ${projectedR}h（产能 ${capacity}h，超出 ${over}h）`,
       });
     }
 
@@ -116,7 +120,8 @@ function checkBookingConflicts(db, opts) {
 /**
  * Summarize whether request may proceed.
  * - leave conflicts always block unless force=true
- * - overload blocks only when force is not set (default require confirmation)
+ * - overload (over daily capacity) never blocks at booking time — still reported
+ *   in result.conflicts for UI warnings (clear overage hours)
  */
 function shouldBlockConflicts(result, { force = false } = {}) {
   if (!result || !result.conflicts || result.conflicts.length === 0) {
@@ -126,10 +131,7 @@ function shouldBlockConflicts(result, { force = false } = {}) {
   if (leave.length && !force) {
     return { block: true, reason: 'leave_conflict', conflicts: result.conflicts };
   }
-  const overload = result.conflicts.filter(c => c.type === 'overload');
-  if (overload.length && !force) {
-    return { block: true, reason: 'overload', conflicts: result.conflicts };
-  }
+  // overload: soft only — allow booking without force
   return { block: false, reason: null, conflicts: result.conflicts };
 }
 

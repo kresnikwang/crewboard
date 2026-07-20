@@ -302,7 +302,7 @@ async function main() {
     assert('休假冲突返回 409', conflictBook.status === 409 && conflictBook.body.code === 'booking_conflict',
       `status=${conflictBook.status} body=${JSON.stringify(conflictBook.body)}`);
 
-    // Overload: book 6h then another 6h without force
+    // Overload: book 6h then another 6h — no longer blocked (soft warning only)
     const day = '2030-03-11';
     const b1 = await request('POST', '/api/bookings', {
       resource_id: aRes.body.id, project_id: aProj.body.id, date: day, hours: 6,
@@ -313,12 +313,9 @@ async function main() {
     const b2 = await request('POST', '/api/bookings', {
       resource_id: aRes.body.id, project_id: aProj2.body.id, date: day, hours: 6,
     }, a.token);
-    assert('超产能返回 409', b2.status === 409 && b2.body.reason === 'overload',
-      `status=${b2.status} body=${JSON.stringify(b2.body)}`);
-    const b2force = await request('POST', '/api/bookings', {
-      resource_id: aRes.body.id, project_id: aProj2.body.id, date: day, hours: 6, force: true,
-    }, a.token);
-    assert('force 可覆盖超产能', b2force.status === 200, JSON.stringify(b2force.body));
+    assert('超产能仍可创建（不拦截）', b2.status === 200, JSON.stringify(b2.body));
+    const overloadWarn = (b2.body.conflicts || []).some(c => c.type === 'overload');
+    assert('响应含超产能提示', overloadWarn, JSON.stringify(b2.body.conflicts));
 
     // ── Audit logs ────────────────────────────────────────────────────
     console.log('\n📋 Audit logs');

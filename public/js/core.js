@@ -89,10 +89,60 @@ window.api = async function api(path, opts = {}) {
   return res.json();
 };
 
-/** POST/PUT booking with conflict handling — prompts user on 409 then retries with force */
+/**
+ * Soft warning when booking succeeds but days exceed daily capacity.
+ * Overload no longer blocks API — only leave conflicts still return 409.
+ * Debounced so multi-day extend (N POSTs) shows one toast.
+ */
+var _overloadToastBuf = [];
+var _overloadToastTimer = null;
+window.toastBookingOverload = function toastBookingOverload(resultOrList) {
+  var list = [];
+  if (!resultOrList) return;
+  if (Array.isArray(resultOrList)) {
+    // either conflict array or array of API results
+    if (resultOrList.length && resultOrList[0] && resultOrList[0].type === 'overload') {
+      list = resultOrList;
+    } else {
+      resultOrList.forEach(function (r) {
+        if (r && Array.isArray(r.conflicts)) list = list.concat(r.conflicts);
+      });
+    }
+  } else if (Array.isArray(resultOrList.conflicts)) {
+    list = resultOrList.conflicts;
+  }
+  var over = list.filter(function (c) { return c && c.type === 'overload'; });
+  if (!over.length) return;
+  _overloadToastBuf = _overloadToastBuf.concat(over);
+  if (_overloadToastTimer) clearTimeout(_overloadToastTimer);
+  _overloadToastTimer = setTimeout(function () {
+    var buf = _overloadToastBuf;
+    _overloadToastBuf = [];
+    _overloadToastTimer = null;
+    // de-dupe by date
+    var byDate = {};
+    buf.forEach(function (c) { if (c.date) byDate[c.date] = c; });
+    var unique = Object.keys(byDate).sort().map(function (d) { return byDate[d]; });
+    if (!unique.length) return;
+    var lines = unique.slice(0, 6).map(function (c) {
+      var overH = c.over_hours != null
+        ? c.over_hours
+        : (Math.round((Number(c.projected_hours) - Number(c.capacity)) * 10) / 10);
+      return (c.date || '') + '：' + c.projected_hours + 'h / 产能 ' + c.capacity + 'h（超出 ' + overH + 'h）';
+    });
+    if (unique.length > 6) lines.push('…共 ' + unique.length + ' 天超出');
+    var msg = (typeof t === 'function' ? t('schedule.overload_notice') : '已超出日产能') + '：' + lines.join('；');
+    if (typeof toast === 'function') toast(msg, 'warning');
+    else if (typeof window.showToast === 'function') window.showToast(msg, 'warning');
+  }, 80);
+};
+
+/** POST/PUT booking — 409 only for leave; overload is soft-toast on success */
 window.apiBookingWithConflictConfirm = async function apiBookingWithConflictConfirm(path, opts) {
   try {
-    return await window.api(path, opts);
+    var result = await window.api(path, opts);
+    window.toastBookingOverload(result);
+    return result;
   } catch (err) {
     if (err.status === 409 && err.code === 'booking_conflict' && err.body) {
       var conflicts = err.body.conflicts || [];
@@ -100,14 +150,14 @@ window.apiBookingWithConflictConfirm = async function apiBookingWithConflictConf
         return '• ' + (c.message || c.type + ' ' + (c.date || ''));
       });
       if (conflicts.length > 8) lines.push('• …共 ' + conflicts.length + ' 项');
-      var isLeave = err.body.reason === 'leave_conflict';
-      var title = isLeave
-        ? '与休假冲突，仍要强制创建/更新吗？'
-        : '工时将超过日产能，仍要继续吗？';
+      // Only leave conflicts still require confirmation + force
+      var title = '与休假冲突，仍要强制创建/更新吗？';
       var ok = window.confirm(title + '\n\n' + lines.join('\n'));
       if (!ok) throw err;
       var body = Object.assign({}, (opts && opts.body) || {}, { force: true });
-      return await window.api(path, Object.assign({}, opts, { body: body }));
+      var forced = await window.api(path, Object.assign({}, opts, { body: body }));
+      window.toastBookingOverload(forced);
+      return forced;
     }
     throw err;
   }
