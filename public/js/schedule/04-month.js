@@ -130,7 +130,7 @@ function buildMonthResourceRow(r, days, bMap, lMap) {
     var dateStr = fmt(d);
     var key = r.id + '_' + dateStr;
     var dayBookings = (bMap[key] || []).slice().sort(function (a, b) {
-      // Use sortIdx from spanInfo for consistent ordering with detectSpans
+      // sortIdx = stable lane across the whole resource row (no mid-week crossing)
       var idxA = (spanInfo[a.id] && spanInfo[a.id].sortIdx !== undefined) ? spanInfo[a.id].sortIdx : 999;
       var idxB = (spanInfo[b.id] && spanInfo[b.id].sortIdx !== undefined) ? spanInfo[b.id].sortIdx : 999;
       return idxA - idxB;

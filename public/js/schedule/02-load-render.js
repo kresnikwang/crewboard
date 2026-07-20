@@ -322,9 +322,11 @@ function buildBodyHTML(days, teams, bMap, lMap) {
 
 /* --------------------------------------------------
    Detect continuous booking spans for a resource.
-   Returns a map: bookingId -> { cls: 'span-s'|'span-m'|'span-e', showText: bool, spanLen: number, sortIdx: number }
+   Returns a map: bookingId -> { cls, showText, spanLen, sortIdx }
    A span is consecutive days with same (project_id, hours, is_tentative).
-   Bookings are sorted by spanLen (desc) so longer spans appear on top.
+
+   Vertical order uses a STABLE LANE across the whole row (not per-day sort),
+   so two concurrent projects stay on fixed tracks and do not "cross" mid-week.
    -------------------------------------------------- */
 function detectSpans(resourceId, days, bMap) {
   var info = {};
@@ -357,6 +359,8 @@ function detectSpans(resourceId, days, bMap) {
   var spanLengths = {}; // bookingId -> span length (in days)
   var spanStartDate = {}; // bookingId -> start date of span
   var spanEndDate = {}; // bookingId -> end date of span
+  var spanMembers = {}; // spanKey -> span meta
+  var bookingToSpanKey = {}; // bookingId -> spanKey
   var processed = {}; // track which booking ids have been processed
 
   for (var di = 0; di < dateFmts.length; di++) {
@@ -409,20 +413,33 @@ function detectSpans(resourceId, days, bMap) {
         nextDate.setDate(nextDate.getDate() + 1);
       }
 
+      // Stable key for this contiguous segment
+      var spanKey = spanIds[0];
+      spanMembers[spanKey] = {
+        ids: spanIds,
+        start: startDate,
+        end: endDate,
+        len: spanIds.length,
+        project_id: b.project_id,
+        hours: parseFloat(b.hours),
+        is_tentative: !!b.is_tentative
+      };
+
       // Record span info for all bookings in this span
       spanIds.forEach(function (id) {
         spanLengths[id] = spanIds.length;
         spanStartDate[id] = startDate;
         spanEndDate[id] = endDate;
+        bookingToSpanKey[id] = spanKey;
+        processed[id] = true;
       });
-      processed[b.id] = true;
     });
   }
 
   // Second pass: detect group bookings (same project + same dates, multiple resources)
   var isGroupBooking = {}; // bookingId -> boolean
-  for (var di = 0; di < dateFmts.length; di++) {
-    rawDayLists[di].forEach(function (b) {
+  for (var di2 = 0; di2 < dateFmts.length; di2++) {
+    rawDayLists[di2].forEach(function (b) {
       if (isGroupBooking[b.id] !== undefined) return; // already computed
 
       var start = spanStartDate[b.id] || b.date;
@@ -442,25 +459,47 @@ function detectSpans(resourceId, days, bMap) {
     });
   }
 
-  // Third pass: sort each day by group booking first, then by spanLen (desc)
-  var dayLists = rawDayLists.map(function (list, di) {
-    return list.slice().sort(function (a, b) {
-      var groupA = isGroupBooking[a.id] ? 1 : 0;
-      var groupB = isGroupBooking[b.id] ? 1 : 0;
-      var lenA = spanLengths[a.id] || 1;
-      var lenB = spanLengths[b.id] || 1;
-      // Group booking first, then longer spans on top
-      return groupB - groupA || lenB - lenA || a.project_id - b.project_id || a.hours - b.hours || a.id - b.id;
-    });
+  // Third pass: assign a STABLE vertical lane for each span across the whole row.
+  // Greedy packing: place each span in the lowest free lane so concurrent projects
+  // keep a fixed track and never "cross" mid-week.
+  var spanList = Object.keys(spanMembers).map(function (k) {
+    var s = spanMembers[k];
+    s.key = k;
+    s.isGroup = s.ids.some(function (id) { return isGroupBooking[id]; });
+    return s;
+  });
+  spanList.sort(function (a, b) {
+    // Earlier start first, then longer, then group, then project, hours, id
+    if (a.start !== b.start) return a.start < b.start ? -1 : 1;
+    if (b.len !== a.len) return b.len - a.len;
+    if (a.isGroup !== b.isGroup) return (b.isGroup ? 1 : 0) - (a.isGroup ? 1 : 0);
+    if (a.project_id !== b.project_id) return a.project_id - b.project_id;
+    if (a.hours !== b.hours) return a.hours - b.hours;
+    return Number(a.key) - Number(b.key);
   });
 
-  // Fourth pass: assign span classes based on full span info (not just current view)
-  for (var di = 0; di < dateFmts.length; di++) {
-    dayLists[di].forEach(function (b, sortIdx) {
+  var laneEnds = []; // lane index -> last end date (YYYY-MM-DD) occupying this lane
+  var spanLane = {}; // spanKey -> lane
+  spanList.forEach(function (s) {
+    var lane = 0;
+    for (; lane < laneEnds.length; lane++) {
+      // Free if previous span on this lane ends before this one starts
+      if (laneEnds[lane] < s.start) break;
+    }
+    if (lane === laneEnds.length) laneEnds.push(s.end);
+    else laneEnds[lane] = s.end;
+    spanLane[s.key] = lane;
+  });
+
+  // Fourth pass: assign span classes; sortIdx = stable lane (same every day)
+  for (var di3 = 0; di3 < dateFmts.length; di3++) {
+    rawDayLists[di3].forEach(function (b) {
       var matchFn = matchFnBuilder(b);
       var bDate = b.date;
       var startDate = spanStartDate[b.id] || bDate;
       var endDate = spanEndDate[b.id] || bDate;
+      var sk = bookingToSpanKey[b.id];
+      var lane = (sk != null && spanLane[sk] != null) ? spanLane[sk] : 999;
 
       // Check if there's a previous day in the span (outside view if needed)
       var prevDate = new Date(bDate);
@@ -504,13 +543,13 @@ function detectSpans(resourceId, days, bMap) {
       } else if (!effectiveHasPrev && effectiveHasNext) {
         cls = 'span-s';
       }
-      // else: solo booking (cls = null), has both left and right resize handles
+      // else: solo booking (cls is null), has both left and right resize handles
 
       info[b.id] = {
         cls: cls,
         showText: true, // every day cell shows project name
         spanLen: spanLengths[b.id] || 1,
-        sortIdx: sortIdx  // Store the sort index for consistent ordering
+        sortIdx: lane  // stable lane across all days of this resource row
       };
     });
   }
@@ -617,7 +656,7 @@ function buildResourceRow(r, days, bMap, lMap) {
     var dateStr = fmt(d);
     var key = r.id + '_' + dateStr;
     var dayBookings = (bMap[key] || []).slice().sort(function (a, b) {
-      // Use sortIdx from spanInfo: longer spans appear on top
+      // sortIdx = stable lane across the whole resource row (no mid-week crossing)
       var idxA = (spanInfo[a.id] && spanInfo[a.id].sortIdx !== undefined) ? spanInfo[a.id].sortIdx : 999;
       var idxB = (spanInfo[b.id] && spanInfo[b.id].sortIdx !== undefined) ? spanInfo[b.id].sortIdx : 999;
       return idxA - idxB;
