@@ -310,10 +310,11 @@ window.saveBatchBooking = async function (bookingIds) {
       });
     });
     await Promise.all(promises.filter(Boolean));
+    var brSample = _allBookings.find(function (x) { return bookingIds.indexOf(x.id) >= 0; });
     document.getElementById('modal').classList.remove('bk-modal');
     closeModal();
     toast(t('schedule.batch_updated'), 'success');
-    reloadAfterMutation();
+    reloadAfterMutation(brSample ? brSample.resource_id : null);
   } catch (err) {
     toast(err.message || t('common.update_failed'), 'error');
   }
@@ -323,13 +324,12 @@ window.saveBatchBooking = async function (bookingIds) {
 window.deleteBatchBooking = async function (bookingIds) {
   if (!confirm(t('schedule.confirm_delete_batch'))) return;
   try {
-    await Promise.all(bookingIds.map(function (id) {
-      return api('/api/bookings/' + id, { method: 'DELETE' });
-    }));
+    var sample = _allBookings.find(function (b) { return bookingIds.indexOf(b.id) >= 0; });
+    await api('/api/bookings/batch-delete', { method: 'POST', body: { ids: bookingIds } });
     document.getElementById('modal').classList.remove('bk-modal');
     closeModal();
     toast(t('schedule.batch_deleted'), 'success');
-    reloadAfterMutation();
+    reloadAfterMutation(sample ? sample.resource_id : null);
   } catch (err) {
     toast(err.message || t('common.delete_failed'), 'error');
   }

@@ -139,80 +139,52 @@ function initResizeBooking(blockElement, booking, startEvent) {
     if (!hasMoved) return; // 没有移动，不操作
 
     if (currentHoverIndex > originalIndex) {
-      // ── 向右：延长 ──
-      // 在 originalIndex+1 ~ currentHoverIndex 的每一天创建相同项目的 booking
-      var promises = [];
-      for (var i = originalIndex + 1; i <= currentHoverIndex; i++) {
-        var d = dates[i];
-        // 跳过已有同项目 booking 的日期（避免重复）
-        var existingKey = booking.resource_id + '_' + d;
-        var alreadyBooked = _allBookings.some(function (b) {
-          return b.resource_id === booking.resource_id &&
-                 b.project_id === booking.project_id &&
-                 b.date === d;
-        });
-        // 检查目标日期是否有 split_after 标记的 booking（避免跨越分割点）
-        var hasSplitAfter = _allBookings.some(function (b) {
-          return b.resource_id === booking.resource_id &&
-                 b.date === d &&
-                 (b.split_after === 1 || b.split_after === true);
-        });
-        if (!alreadyBooked && !hasSplitAfter) {
-          promises.push((window.apiBookingWithConflictConfirm || api)('/api/bookings', {
-            method: 'POST',
-            body: {
-              resource_id: booking.resource_id,
-              project_id:  booking.project_id,
-              date:        d,
-              hours:       booking.hours,
-              notes:       booking.notes || '',
-              is_tentative: booking.is_tentative ? 1 : 0
-            }
-          }));
+      // ── 向右：延长 —— 一次 POST date~end_date ──
+      var extendStart = dates[originalIndex + 1];
+      var extendEnd = dates[currentHoverIndex];
+      if (!extendStart || !extendEnd) return;
+      (window.apiBookingWithConflictConfirm || api)('/api/bookings', {
+        method: 'POST',
+        body: {
+          resource_id: booking.resource_id,
+          project_id: booking.project_id,
+          project_scope_id: booking.project_scope_id || null,
+          date: extendStart,
+          end_date: extendEnd,
+          hours: booking.hours,
+          notes: booking.notes || '',
+          is_tentative: booking.is_tentative ? 1 : 0
         }
-      }
-      if (promises.length === 0) {
-        toast(t('schedule.duplicate_booking'), 'info');
-        return;
-      }
-      Promise.all(promises)
+      })
         .then(function () {
           toast(t('schedule.booking_extended'), 'success');
-          reloadAfterMutation();
+          reloadAfterMutation(booking.resource_id);
         })
         .catch(function (err) {
           toast(t('schedule.extend_failed') + (err.message ? ': ' + err.message : ''), 'error');
         });
 
     } else {
-      // ── 向左：缩短 ──
-      // 删除 hoverDate+1 ~ endDate 范围内同资源同项目的 bookings
+      // ── 向左：缩短 —— 批量 DELETE ──
       var hoverDate = dates[currentHoverIndex];
       var toDelete;
 
       if (currentHoverIndex === originalIndex && movedLeft) {
-        // 向左缩短但还在同一格子（视图边界）
-        // 只有 solo booking（endDate === booking.date）才删除当前 booking
-        // 连续 booking 需要把鼠标拖到前一个格子才能缩短
         if (endDate === booking.date) {
-          // Solo booking：删除当前 booking
           toDelete = _allBookings.filter(function (b) {
             if (b.resource_id !== booking.resource_id) return false;
             if (b.project_id  !== booking.project_id)  return false;
             return b.date === booking.date;
           });
         } else {
-          // 连续 booking：鼠标还在同一格子，不执行操作
           toast(t('schedule.drag_further_to_shorten'), 'info');
           return;
         }
       } else {
-        // 正常缩短：删除从 hoverDate 之后到 endDate，但要检查 split_after
         toDelete = _allBookings.filter(function (b) {
           if (b.resource_id !== booking.resource_id) return false;
           if (b.project_id  !== booking.project_id)  return false;
           if (b.date <= hoverDate || b.date > endDate) return false;
-          // 不要删除有 split_after 标记的 booking（用户手动分割点）
           if (b.split_after === 1 || b.split_after === true) return false;
           return true;
         });
@@ -222,12 +194,11 @@ function initResizeBooking(blockElement, booking, startEvent) {
         toast(t('schedule.booking_shortened'), 'info');
         return;
       }
-      Promise.all(toDelete.map(function (b) {
-        return api('/api/bookings/' + b.id, { method: 'DELETE' });
-      }))
+      var delIds = toDelete.map(function (b) { return b.id; });
+      api('/api/bookings/batch-delete', { method: 'POST', body: { ids: delIds } })
         .then(function () {
-        toast(t('schedule.booking_shortened'), 'success');
-          reloadAfterMutation();
+          toast(t('schedule.booking_shortened'), 'success');
+          reloadAfterMutation(booking.resource_id);
         })
         .catch(function (err) {
           toast(t('schedule.shorten_failed') + (err.message ? ': ' + err.message : ''), 'error');
@@ -382,73 +353,54 @@ function initResizeBookingLeft(blockElement, booking, startEvent) {
     if (currentHoverIndex === originalIndex) return;
 
     if (currentHoverIndex < originalIndex) {
-      // 左拖：延长（在 currentHoverIndex ~ originalIndex-1 创建 booking）
-      var promises = [];
-      for (var i = currentHoverIndex; i < originalIndex; i++) {
-        var d = dates[i];
-        var alreadyBooked = _allBookings.some(function (b) {
-          return b.resource_id === booking.resource_id &&
-                 b.project_id  === booking.project_id &&
-                 b.date === d;
-        });
-        // 检查目标日期是否有 split_after 标记
-        var hasSplitAfter = _allBookings.some(function (b) {
-          return b.resource_id === booking.resource_id &&
-                 b.date === d &&
-                 (b.split_after === 1 || b.split_after === true);
-        });
-        if (!alreadyBooked && !hasSplitAfter) {
-          promises.push((window.apiBookingWithConflictConfirm || api)('/api/bookings', {
-            method: 'POST',
-            body: {
-              resource_id:  booking.resource_id,
-              project_id:   booking.project_id,
-              date:         d,
-              hours:        booking.hours,
-              notes:        booking.notes || '',
-              is_tentative: booking.is_tentative ? 1 : 0
-            }
-          }));
+      // 左拖：延长 —— 一次 POST 覆盖新日期区间
+      var leftStart = dates[currentHoverIndex];
+      var leftEnd = dates[originalIndex - 1];
+      if (!leftStart || !leftEnd) return;
+      (window.apiBookingWithConflictConfirm || api)('/api/bookings', {
+        method: 'POST',
+        body: {
+          resource_id: booking.resource_id,
+          project_id: booking.project_id,
+          project_scope_id: booking.project_scope_id || null,
+          date: leftStart,
+          end_date: leftEnd,
+          hours: booking.hours,
+          notes: booking.notes || '',
+          is_tentative: booking.is_tentative ? 1 : 0
         }
-      }
-      if (promises.length === 0) {
-        toast(t('schedule.duplicate_booking'), 'info');
-        return;
-      }
-      Promise.all(promises)
+      })
         .then(function () {
           toast(t('schedule.booking_extended'), 'success');
-          reloadAfterMutation();
+          reloadAfterMutation(booking.resource_id);
         })
         .catch(function (err) {
           toast(t('schedule.extend_failed') + (err.message ? ': ' + err.message : ''), 'error');
         });
 
     } else {
-      // 右拖：缩短（删除 startDate ~ hoverDate 之前的 booking）
-      // 使用日期字符串比较，避免依赖视图内的索引（处理跨周边界的情况）
-      var hoverDate = dates[currentHoverIndex];
-      var toDelete = _allBookings.filter(function (b) {
+      // 右拖：缩短 —— 批量 DELETE
+      var hoverDateL = dates[currentHoverIndex];
+      var toDeleteL = _allBookings.filter(function (b) {
         if (b.resource_id !== booking.resource_id) return false;
         if (b.project_id  !== booking.project_id)  return false;
-        // 删除从 startDate（包含）到 hoverDate（不包含）之间的所有 booking
-        if (b.date >= startDate && b.date < hoverDate) {
-          // 不要删除有 split_after 标记的 booking（用户手动分割点）
+        if (b.date >= startDate && b.date < hoverDateL) {
           if (b.split_after === 1 || b.split_after === true) return false;
           return true;
         }
         return false;
       });
-      if (toDelete.length === 0) {
+      if (toDeleteL.length === 0) {
         toast(t('schedule.booking_shortened'), 'info');
         return;
       }
-      Promise.all(toDelete.map(function (b) {
-        return api('/api/bookings/' + b.id, { method: 'DELETE' });
-      }))
+      api('/api/bookings/batch-delete', {
+        method: 'POST',
+        body: { ids: toDeleteL.map(function (b) { return b.id; }) }
+      })
         .then(function () {
-        toast(t('schedule.booking_shortened'), 'success');
-          reloadAfterMutation();
+          toast(t('schedule.booking_shortened'), 'success');
+          reloadAfterMutation(booking.resource_id);
         })
         .catch(function (err) {
           toast(t('schedule.shorten_failed') + (err.message ? ': ' + err.message : ''), 'error');
@@ -620,77 +572,19 @@ function initMoveBooking(blockElement, booking, startEvent) {
       return;
     }
 
-    // Delete original bookings, then create at new dates
-    var originalBookings = groupSegment.map(function (b) {
-      return {
-        resource_id: b.resource_id,
-        project_id: b.project_id,
-        date: b.date,
-        hours: b.hours,
-        notes: b.notes || '',
-        is_tentative: b.is_tentative ? 1 : 0
-      };
-    });
-    // Preserve split_after flags (POST does not accept them; re-apply via PUT after create)
-    var splitAfterFlags = groupSegment.map(function (b) {
-      return (b.split_after === 1 || b.split_after === true) ? 1 : 0;
-    });
-
-    var deletePromises = groupSegment.map(function (b) {
-      return api('/api/bookings/' + b.id, { method: 'DELETE' });
-    });
-
-    Promise.all(deletePromises)
-      .then(function () {
-        var createPromises = groupSegment.map(function (b, idx) {
-          var oldIdx = dates.indexOf(b.date);
-          var newIdx = oldIdx + currentDelta;
-          if (newIdx < 0 || newIdx >= dates.length) return Promise.resolve(null);
-          var newDate = dates[newIdx];
-          var orig = originalBookings[idx];
-          return (window.apiBookingWithConflictConfirm || api)('/api/bookings', {
-            method: 'POST',
-            body: {
-              resource_id:  orig.resource_id,
-              project_id:   orig.project_id,
-              date:         newDate,
-              hours:        orig.hours,
-              notes:        orig.notes,
-              is_tentative: orig.is_tentative
-            }
-          }).then(function (created) {
-            // Restore split_after if the original day had one
-            if (splitAfterFlags[idx] && created) {
-              var newId = Array.isArray(created.ids) ? created.ids[0] : (created.id || null);
-              if (newId) {
-                return api('/api/bookings/' + newId, {
-                  method: 'PUT',
-                  body: { split_after: 1 }
-                }).then(function () { return created; }).catch(function () { return created; });
-              }
-            }
-            return created;
-          });
-        });
-        return Promise.all(createPromises);
-      })
+    // One transactional shift — keeps ids and split_after
+    var moveIds = groupSegment.map(function (b) { return b.id; });
+    var rid = booking.resource_id;
+    (window.apiBookingWithConflictConfirm || api)('/api/bookings/shift', {
+      method: 'POST',
+      body: { ids: moveIds, day_delta: currentDelta }
+    })
       .then(function () {
         toast(t('schedule.move') + ' ' + Math.abs(currentDelta) + 'd', 'success');
-        reloadAfterMutation();
+        reloadAfterMutation(rid);
       })
       .catch(function (err) {
         toast(t('schedule.move_failed') + (err.message ? ': ' + err.message : ''), 'error');
-        // Attempt to restore original bookings if move failed
-        console.error('Move failed, attempting to restore original bookings:', originalBookings);
-        var restorePromises = originalBookings.map(function (b) {
-          return api('/api/bookings', {
-            method: 'POST',
-            body: b
-          }).catch(function () { return null; }); // Ignore restore failures
-        });
-        Promise.all(restorePromises).finally(function () {
-          reloadAfterMutation();
-        });
       });
   }
 

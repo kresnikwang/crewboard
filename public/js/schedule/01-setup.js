@@ -5,17 +5,32 @@ var state = window.state;
 var api   = window.api;
 var cachedApi = window.cachedApi;
 
-/** Invalidate schedule caches and reload. Call after any booking/leave mutation.
- *  Resets the _isLoading lock so a concurrent background fetch can't block
- *  the post-mutation reload from showing the newly created booking. */
-function reloadAfterMutation() {
+/**
+ * Invalidate schedule caches and refresh UI after mutation.
+ * @param {number|number[]|null} resourceIds - when set, patch only those resource rows
+ *   (much faster than full grid rebuild). Falls back to full reload on failure.
+ */
+function reloadAfterMutation(resourceIds) {
   if (window.apiCache) {
     window.apiCache.invalidatePrefix('/api/schedule-data');
     window.apiCache.invalidatePrefix('/api/bookings');
   }
-  // Force-unlock in case a background SWR revalidation is mid-flight
   if (window.loadSchedule) window.loadSchedule._isLoading = false;
-  // Immediate reload after local mutations (no debounce)
+
+  var rids = null;
+  if (resourceIds != null) {
+    rids = (Array.isArray(resourceIds) ? resourceIds : [resourceIds])
+      .map(function (x) { return parseInt(x, 10); })
+      .filter(function (x) { return !!x; });
+  }
+
+  if (rids && rids.length && typeof window.refreshScheduleRows === 'function') {
+    window.refreshScheduleRows(rids).catch(function (err) {
+      console.warn('[reloadAfterMutation] partial refresh failed, full reload', err);
+      scheduleLoadSchedule({ immediate: true });
+    });
+    return;
+  }
   scheduleLoadSchedule({ immediate: true });
 }
 

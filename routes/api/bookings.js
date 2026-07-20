@@ -63,6 +63,184 @@ module.exports = function register(router, ctx) {
     res.json(db.prepare(sql).all(...params));
   });
 
+  /** Add calendar days to YYYY-MM-DD (local). */
+  function addDaysYmd(ymd, delta) {
+    const d = new Date(ymd + 'T00:00:00');
+    d.setDate(d.getDate() + delta);
+    return (
+      d.getFullYear() +
+      '-' +
+      String(d.getMonth() + 1).padStart(2, '0') +
+      '-' +
+      String(d.getDate()).padStart(2, '0')
+    );
+  }
+
+  /**
+   * Shift many bookings by day_delta in one transaction (preserves ids + split_after).
+   * Body: { ids: number[], day_delta: number, force?: boolean }
+   */
+  router.post('/bookings/shift', (req, res) => {
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
+    if (!canBookResource(req.user)) return res.status(403).json({ error: '无权限' });
+
+    const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Boolean) : [];
+    const dayDelta = parseInt(req.body.day_delta, 10);
+    const force = !!req.body.force;
+    if (!ids.length) return res.status(400).json({ error: '缺少 ids' });
+    if (!Number.isFinite(dayDelta) || dayDelta === 0) {
+      return res.status(400).json({ error: 'day_delta 必须为非零整数' });
+    }
+
+    const getBk = db.prepare(`
+      SELECT b.* FROM bookings b
+      JOIN resources r ON b.resource_id = r.id
+      WHERE b.id = ? AND r.enterprise_id = ?
+    `);
+    const bookings = [];
+    for (const id of ids) {
+      const b = getBk.get(id, entId);
+      if (!b) return res.status(404).json({ error: '预订不存在: ' + id });
+      if (!canEditBooking(req.user, b)) {
+        return res.status(403).json({ error: '您只能移动自己创建的排程' });
+      }
+      bookings.push(b);
+    }
+
+    const movingIds = new Set(bookings.map((b) => b.id));
+    const planned = bookings.map((b) => ({
+      ...b,
+      new_date: addDaysYmd(b.date, dayDelta),
+    }));
+
+    // Duplicate: another booking (not in moving set) already on target day for same project/scope
+    const dupCheck = db.prepare(`
+      SELECT id FROM bookings
+      WHERE resource_id = ? AND project_id = ? AND date = ?
+        AND (
+          (project_scope_id IS NULL AND ? IS NULL) OR project_scope_id = ?
+        )
+        AND id NOT IN (${ids.map(() => '?').join(',')})
+      LIMIT 1
+    `);
+    const conflictDates = [];
+    for (const p of planned) {
+      const scopeId = p.project_scope_id != null ? p.project_scope_id : null;
+      const hit = dupCheck.get(
+        p.resource_id,
+        p.project_id,
+        p.new_date,
+        scopeId,
+        scopeId,
+        ...ids
+      );
+      if (hit) conflictDates.push(p.new_date);
+    }
+
+    // Leave conflicts on new dates (hard block unless force)
+    const leaveOn = db.prepare(
+      'SELECT date FROM leave_entries WHERE resource_id = ? AND date = ? LIMIT 1'
+    );
+    const leaveConflicts = [];
+    for (const p of planned) {
+      if (leaveOn.get(p.resource_id, p.new_date)) {
+        leaveConflicts.push({
+          type: 'leave_conflict',
+          date: p.new_date,
+          message: `目标日期 ${p.new_date} 有休假`,
+        });
+      }
+    }
+
+    if (leaveConflicts.length && !force) {
+      return res.status(409).json({
+        error: '目标日期与休假冲突',
+        code: 'booking_conflict',
+        reason: 'leave_conflict',
+        conflicts: leaveConflicts,
+      });
+    }
+
+    if (conflictDates.length) {
+      const uniq = [...new Set(conflictDates)];
+      return res.status(400).json({
+        error: '目标日期已有同项目排程: ' + uniq.slice(0, 5).join(', '),
+        code: 'move_conflict',
+        dates: uniq,
+      });
+    }
+
+    const upd = db.prepare('UPDATE bookings SET date = ? WHERE id = ?');
+    const run = db.transaction(() => {
+      for (const p of planned) {
+        upd.run(p.new_date, p.id);
+      }
+    });
+    run();
+
+    logAudit(db, {
+      enterpriseId: entId,
+      user: req.user,
+      action: 'booking.shift',
+      entityType: 'booking',
+      entityId: ids[0],
+      details: { ids, day_delta: dayDelta },
+    });
+
+    const resourceIds = [...new Set(bookings.map((b) => b.resource_id))];
+    res.json({ ok: true, ids, day_delta: dayDelta, resource_ids: resourceIds });
+    sseBroadcast(entId, 'schedule-change', { action: 'shift', ids, resource_ids: resourceIds }, req.user?.id);
+  });
+
+  /**
+   * Delete many bookings in one transaction.
+   * Body: { ids: number[] }
+   */
+  router.post('/bookings/batch-delete', (req, res) => {
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
+    if (!canBookResource(req.user)) return res.status(403).json({ error: '无权限' });
+
+    const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Boolean) : [];
+    if (!ids.length) return res.status(400).json({ error: '缺少 ids' });
+
+    const getBk = db.prepare(`
+      SELECT b.*, r.name as rname, p.name as pname FROM bookings b
+      JOIN resources r ON b.resource_id = r.id
+      JOIN projects p ON b.project_id = p.id
+      WHERE b.id = ? AND r.enterprise_id = ?
+    `);
+    const rows = [];
+    for (const id of ids) {
+      const b = getBk.get(id, entId);
+      if (!b) return res.status(404).json({ error: '预订不存在: ' + id });
+      if (!canEditBooking(req.user, b)) {
+        return res.status(403).json({ error: '您只能删除自己创建的排程' });
+      }
+      rows.push(b);
+    }
+
+    const del = db.prepare('DELETE FROM bookings WHERE id = ?');
+    const run = db.transaction(() => {
+      for (const id of ids) del.run(id);
+    });
+    run();
+
+    const resourceIds = [...new Set(rows.map((b) => b.resource_id))];
+    logAudit(db, {
+      enterpriseId: entId,
+      user: req.user,
+      action: 'booking.batch_delete',
+      entityType: 'booking',
+      entityId: ids[0],
+      details: { ids, count: ids.length },
+    });
+
+    res.json({ ok: true, deleted: ids.length, ids, resource_ids: resourceIds });
+    sseBroadcast(entId, 'schedule-change', { action: 'batch-delete', ids, resource_ids: resourceIds }, req.user?.id);
+  });
+
   router.post('/bookings', (req, res) => {
     const {
       resource_id, project_id, project_scope_id, date, end_date, hours,

@@ -41,11 +41,12 @@ window.saveBooking = async function (id) {
         });
       });
       await Promise.all(promises.filter(Boolean));
+      var batchRid = resourceIds[0];
       _editSpanContext = null;
       document.getElementById('modal').classList.remove('bk-modal');
       closeModal();
       toast(t('schedule.batch_updated'), 'success');
-      reloadAfterMutation();
+      reloadAfterMutation(batchRid);
     } catch (err) {
       toast(err.message || t('common.update_failed'), 'error');
     }
@@ -271,7 +272,7 @@ window.saveBooking = async function (id) {
     document.getElementById('modal').classList.remove('bk-modal');
     closeModal();
     toast(id ? t('schedule.booking_updated') : t('schedule.booking_created'), 'success');
-    reloadAfterMutation();
+    reloadAfterMutation(resourceIds);
   } catch (err) {
     toast(err.message || t('schedule.update_failed'), 'error');
   }
@@ -312,7 +313,7 @@ async function saveTimeOff() {
     document.getElementById('modal').classList.remove('bk-modal');
     closeModal();
     toast(t('schedule.leave_added'), 'success');
-    reloadAfterMutation();
+    reloadAfterMutation(resourceIds);
   } catch (err) {
     toast(err.message || t('schedule.add_leave_failed'), 'error');
   }
@@ -461,7 +462,7 @@ window.splitBooking = function (id) {
     var bk = _allBookings.find(function (b) { return b.id === clickedId; });
     if (bk) bk.split_after = 1;
     if (typeof markIgnoreBookingEdit === 'function') markIgnoreBookingEdit(800);
-    loadSchedule();
+    reloadAfterMutation(booking.resource_id);
     toast(t('schedule.split_ready'), 'success');
   }).catch(function (err) {
     console.error('Split failed:', err);
@@ -503,14 +504,15 @@ window.deleteBooking = async function (id) {
   if (deleteAll) {
     if (!confirm(t('schedule.confirm_delete_batch'))) return;
     try {
-      await Promise.all(_editSpanContext.ids.map(function (bid) {
-        return api('/api/bookings/' + bid, { method: 'DELETE' });
-      }));
+      var delRid = null;
+      var firstBk = _allBookings.find(function (b) { return b.id === _editSpanContext.ids[0]; });
+      if (firstBk) delRid = firstBk.resource_id;
+      await api('/api/bookings/batch-delete', { method: 'POST', body: { ids: _editSpanContext.ids } });
       _editSpanContext = null;
       document.getElementById('modal').classList.remove('bk-modal');
       closeModal();
       toast(t('schedule.batch_deleted'), 'success');
-      reloadAfterMutation();
+      reloadAfterMutation(delRid);
     } catch (err) {
       toast(err.message || t('common.delete_failed'), 'error');
     }
@@ -519,12 +521,14 @@ window.deleteBooking = async function (id) {
 
   if (!confirm(t('schedule.confirm_delete_booking'))) return;
   try {
+    var delOne = _allBookings.find(function (b) { return b.id === id; });
+    var delOneRid = delOne ? delOne.resource_id : null;
     await api('/api/bookings/' + id, { method: 'DELETE' });
     _editSpanContext = null;
     document.getElementById('modal').classList.remove('bk-modal');
     closeModal();
     toast(t('schedule.booking_deleted'), 'success');
-    reloadAfterMutation();
+    reloadAfterMutation(delOneRid);
   } catch (err) {
     toast(err.message || t('common.delete_failed'), 'error');
   }
@@ -619,8 +623,9 @@ window._saveLeave = async function (id) {
     });
     document.getElementById('modal').classList.remove('bk-modal');
     closeModal();
+    var leaveRow = _allLeave.find(function (l) { return l.id === id; });
     toast(t('schedule.leave_updated'), 'success');
-    reloadAfterMutation();
+    reloadAfterMutation(leaveRow ? leaveRow.resource_id : null);
   } catch (err) {
     toast(err.message || t('schedule.update_failed'), 'error');
   }
@@ -629,11 +634,13 @@ window._saveLeave = async function (id) {
 window._deleteLeave = async function (id) {
   if (!confirm(t('schedule.confirm_delete_leave'))) return;
   try {
+    var leaveRow = _allLeave.find(function (l) { return l.id === id; });
+    var lrid = leaveRow ? leaveRow.resource_id : null;
     await api('/api/leave/' + id, { method: 'DELETE' });
     document.getElementById('modal').classList.remove('bk-modal');
     closeModal();
     toast(t('schedule.leave_deleted'), 'success');
-    reloadAfterMutation();
+    reloadAfterMutation(lrid);
   } catch (err) {
     toast(err.message || t('common.delete_failed'), 'error');
   }

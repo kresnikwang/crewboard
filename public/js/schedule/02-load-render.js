@@ -156,6 +156,91 @@ window.loadSchedule = async function loadSchedule() {
   loadSchedule._isLoading = false;
 };
 
+/**
+ * Fetch fresh schedule-data and re-render only the given resource rows.
+ * Event handlers stay on #schedule-grid (delegation) — no rebind needed.
+ */
+window.refreshScheduleRows = async function refreshScheduleRows(resourceIds) {
+  if (!resourceIds || !resourceIds.length) {
+    scheduleLoadSchedule({ immediate: true });
+    return;
+  }
+  if (!state.scheduleWeekStart) {
+    state.scheduleWeekStart = getMonday(new Date());
+  }
+  var isMonth = state.scheduleView === 'month';
+  var days;
+  if (isMonth) {
+    days = [];
+    for (var w = 0; w < MONTH_WEEKS; w++) {
+      for (var d = 0; d < 7; d++) days.push(addDays(state.scheduleWeekStart, w * 7 + d));
+    }
+  } else {
+    days = weekDates(state.scheduleWeekStart);
+  }
+  var startStr = fmt(days[0]);
+  var endStr = fmt(days[days.length - 1]);
+  var url = '/api/schedule-data?start=' + startStr + '&end=' + endStr;
+
+  var schedData = await api(url);
+  // Keep SWR cache warm with fresh data
+  if (window.apiCache && window.apiCache._set) {
+    /* optional */
+  }
+
+  var resources = schedData.resources;
+  var bookings = schedData.bookings;
+  var leave = schedData.leave;
+  var holidays = schedData.holidays || {};
+
+  state.resources = resources;
+  _allBookings = bookings;
+  _allLeave = leave;
+  rebuildBookingIndex(bookings);
+
+  var bMap = {};
+  bookings.forEach(function (b) {
+    var key = b.resource_id + '_' + b.date;
+    if (!bMap[key]) bMap[key] = [];
+    bMap[key].push(b);
+  });
+  var lMap = {};
+  leave.forEach(function (l) {
+    lMap[l.resource_id + '_' + l.date] = l;
+  });
+
+  var uniq = {};
+  resourceIds.forEach(function (id) { uniq[id] = true; });
+  var rids = Object.keys(uniq).map(Number);
+
+  var missing = false;
+  rids.forEach(function (rid) {
+    var r = resources.find(function (x) { return x.id === rid; });
+    if (!r) {
+      missing = true;
+      return;
+    }
+    var rowHtml = isMonth
+      ? buildMonthResourceRow(r, days, bMap, lMap)
+      : buildResourceRow(r, days, bMap, lMap);
+
+    var sel = isMonth
+      ? '.m-day-cell[data-resource="' + rid + '"]'
+      : '.booking-cell[data-resource="' + rid + '"]';
+    var cell = document.querySelector(sel);
+    var tr = cell && cell.closest('tr');
+    if (!tr) {
+      missing = true;
+      return;
+    }
+    tr.outerHTML = rowHtml;
+  });
+
+  if (missing) {
+    // Row not in DOM (filtered out / view changed) — full reload
+    scheduleLoadSchedule({ immediate: true });
+  }
+};
 
 /* --------------------------------------------------
    Table header builder
