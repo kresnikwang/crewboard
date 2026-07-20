@@ -115,12 +115,18 @@ function initEditRangeToggle(booking, spanGroup) {
 }
 
 async function showBookingModal(bookingId, resourceId, date, endDate) {
-  var fetched = await Promise.all([
-    api('/api/resources'),
-    api('/api/projects')
-  ]);
+  // Prefer short-lived cache — multi-tenant orgs reopen the modal often
+  var fetchRes = typeof cachedApi === 'function'
+    ? cachedApi('/api/resources', { maxAge: 60000 })
+    : api('/api/resources');
+  var fetchProj = typeof cachedApi === 'function'
+    ? cachedApi('/api/projects', { maxAge: 60000 })
+    : api('/api/projects');
+  var fetched = await Promise.all([fetchRes, fetchProj]);
   var resources = fetched[0];
   var projects  = fetched[1];
+  // Keep state in sync for other screens
+  if (resources && resources.length) state.resources = resources;
 
   var booking = null;
   if (bookingId) {

@@ -24,12 +24,103 @@
     }
     // Force-unlock in case a background SWR revalidation is mid-flight
     if (window.loadSchedule) window.loadSchedule._isLoading = false;
-    window.loadSchedule();
+    // Immediate reload after local mutations (no debounce)
+    scheduleLoadSchedule({ immediate: true });
   }
 
   /* ---- cached bookings & leave used by edit lookup ---- */
   var _allBookings = [];
   var _allLeave    = [];
+
+  /* ---- O(1) indexes for multi-tenant scale (rebuild after each load) ----
+   *  _bookingById[id] = booking
+   *  _bookingByResDate[resourceId][date] = booking[]
+   *  _bookingsByProject[projectId] = booking[]  (for group-booking checks)
+   */
+  var _bookingById = Object.create(null);
+  var _bookingByResDate = Object.create(null);
+  var _bookingsByProject = Object.create(null);
+
+  function rebuildBookingIndex(bookings) {
+    _bookingById = Object.create(null);
+    _bookingByResDate = Object.create(null);
+    _bookingsByProject = Object.create(null);
+    if (!bookings || !bookings.length) return;
+    for (var i = 0; i < bookings.length; i++) {
+      var b = bookings[i];
+      _bookingById[b.id] = b;
+
+      var rid = b.resource_id;
+      if (!_bookingByResDate[rid]) _bookingByResDate[rid] = Object.create(null);
+      var dmap = _bookingByResDate[rid];
+      if (!dmap[b.date]) dmap[b.date] = [];
+      dmap[b.date].push(b);
+
+      var pid = b.project_id;
+      if (!_bookingsByProject[pid]) _bookingsByProject[pid] = [];
+      _bookingsByProject[pid].push(b);
+    }
+  }
+
+  /** Find first booking on resource+date matching matchFn (uses index). */
+  function findBookingOnDate(resourceId, dateStr, matchFn) {
+    var dmap = _bookingByResDate[resourceId];
+    if (!dmap) return null;
+    var list = dmap[dateStr];
+    if (!list || !list.length) return null;
+    for (var i = 0; i < list.length; i++) {
+      if (matchFn(list[i])) return list[i];
+    }
+    return null;
+  }
+
+  /** Lightweight signature for SWR revalidate (avoids huge string concat). */
+  function scheduleDataSignature(bookings, leave) {
+    var bl = bookings ? bookings.length : 0;
+    var ll = leave ? leave.length : 0;
+    var h = (bl * 1000003 + ll) | 0;
+    var i;
+    if (bookings) {
+      for (i = 0; i < bookings.length; i++) {
+        var b = bookings[i];
+        h = (Math.imul(h, 33) + (b.id | 0) + ((b.hours * 10) | 0) * 7 +
+          (b.is_tentative ? 3 : 0) + (b.split_after ? 5 : 0) +
+          ((b.project_id | 0) * 11) + ((b.resource_id | 0) * 13)) | 0;
+      }
+    }
+    if (leave) {
+      for (i = 0; i < leave.length; i++) {
+        h = (Math.imul(h, 33) + (leave[i].id | 0) + ((leave[i].resource_id | 0) * 17)) | 0;
+      }
+    }
+    return String(h) + ':' + bl + ':' + ll;
+  }
+
+  /**
+   * Debounced schedule reload — coalesces SSE storms when many tenants/users edit.
+   * opts.immediate: skip debounce (local mutations).
+   * opts.delay: ms (default 280 for SSE).
+   */
+  var _loadScheduleTimer = null;
+  function scheduleLoadSchedule(opts) {
+    opts = opts || {};
+    var delay = opts.delay != null ? opts.delay : 280;
+    if (opts.immediate) {
+      if (_loadScheduleTimer) {
+        clearTimeout(_loadScheduleTimer);
+        _loadScheduleTimer = null;
+      }
+      if (typeof window.loadSchedule === 'function') window.loadSchedule();
+      return;
+    }
+    if (_loadScheduleTimer) clearTimeout(_loadScheduleTimer);
+    _loadScheduleTimer = setTimeout(function () {
+      _loadScheduleTimer = null;
+      if (typeof window.loadSchedule === 'function') window.loadSchedule();
+    }, delay);
+  }
+  window.scheduleLoadSchedule = scheduleLoadSchedule;
+
   /* expose to window so saveBooking (outside IIFE) can access */
   Object.defineProperty(window, '_allLeave', {
     get: function () { return _allLeave; },
@@ -102,11 +193,11 @@
       schedData = await cachedApi(_scheduleUrl, {
         maxAge: 30000,
         onRevalidate: function (freshData) {
-          // Background refresh complete — only re-render if data actually changed
-          var oldSig = _allBookings.reduce(function (s, b) { return s + b.id + ':' + b.hours + ':' + (b.is_tentative ? 1 : 0) + ','; }, '') + '|' + _allLeave.length;
-          var newSig = freshData.bookings.reduce(function (s, b) { return s + b.id + ':' + b.hours + ':' + (b.is_tentative ? 1 : 0) + ','; }, '') + '|' + freshData.leave.length;
+          // Background refresh — cheap signature; full reload only if data changed
+          var oldSig = scheduleDataSignature(_allBookings, _allLeave);
+          var newSig = scheduleDataSignature(freshData.bookings, freshData.leave);
           if (oldSig !== newSig) {
-            window.loadSchedule();
+            scheduleLoadSchedule({ immediate: true });
           }
         }
       });
@@ -125,6 +216,7 @@
     state.resources = resources;
     _allBookings = bookings;
     _allLeave    = leave;
+    rebuildBookingIndex(bookings);
 
     var teams = {};
     resources.forEach(function (r) {
@@ -191,134 +283,17 @@
       addBtn.style.display = perms.book_others ? '' : 'none';
     }
 
-    /* attach click on empty areas of booking cells */
-    document.querySelectorAll('.booking-cell, .m-day-cell').forEach(function (cell) {
-      cell.addEventListener('click', function (e) {
-        if (e.target.closest('.booking-block')) return;
-        if (e.target.closest('.leave-block')) return;
-        if (e.target.closest('.m-booking')) return;
-        if (e.target.closest('.m-leave')) return;
-        var rid  = parseInt(cell.dataset.resource, 10);
-        var date = cell.dataset.date;
-        if (!rid || !date) return;
-        if (!canBookForResource(rid)) return;
-        showBookingModal(null, rid, date);
-      });
-    });
-
-    /* Mouse drag selection for multiple days */
+    /* One-time event delegation on the grid (cells / leave / resize / move / split / edit).
+       Multi-tenant: avoid O(cells+bookings) addEventListener on every full re-render. */
     var scheduleGrid = document.getElementById('schedule-grid');
     if (scheduleGrid) {
       initDragSelection(scheduleGrid);
+      ensureSchedulePointerDelegation(scheduleGrid);
     }
-
-    /* attach click on leave blocks for editing */
-    document.querySelectorAll('.leave-block[data-leave-id], .m-leave[data-leave-id]').forEach(function (el) {
-      el.addEventListener('click', function (e) {
-        e.stopPropagation();
-        var leaveId = parseInt(el.dataset.leaveId, 10);
-        var leaveEntry = _allLeave.find(function (l) { return l.id === leaveId; });
-        if (leaveEntry) {
-          showEditLeaveModal(leaveEntry);
-        }
-      });
-    });
-
-    /* attach RIGHT resize handlers to booking blocks */
-    document.querySelectorAll('.booking-block .resize-handle, .m-booking .resize-handle').forEach(function (handle) {
-      handle.addEventListener('mousedown', function (e) {
-        e.stopPropagation();
-        e.preventDefault();
-        var block = e.target.closest('.booking-block, .m-booking');
-        if (!block) return;
-
-        var bookingId = parseInt(block.dataset.bookingId, 10);
-        var booking = _allBookings.find(function (b) { return b.id === bookingId; });
-        if (!booking) return;
-
-        if (!canBookForResource(booking.resource_id)) {
-          toast(t('schedule.no_edit_permission'), 'error');
-          return;
-        }
-
-        initResizeBooking(block, booking, e);
-      });
-    });
-
-    /* attach LEFT resize handlers to booking blocks */
-    document.querySelectorAll('.booking-block .resize-handle-left, .m-booking .resize-handle-left').forEach(function (handle) {
-      handle.addEventListener('mousedown', function (e) {
-        e.stopPropagation();
-        e.preventDefault();
-        var block = e.target.closest('.booking-block, .m-booking');
-        if (!block) return;
-
-        var bookingId = parseInt(block.dataset.bookingId, 10);
-        var booking = _allBookings.find(function (b) { return b.id === bookingId; });
-        if (!booking) return;
-
-        if (!canBookForResource(booking.resource_id)) {
-          toast(t('schedule.no_edit_permission'), 'error');
-          return;
-        }
-
-        initResizeBookingLeft(block, booking, e);
-      });
-    });
-
-    /* Split + edit: geometric hit-test (scissors overflow under next-day cell) */
-    ensureSchedulePointerDelegation(scheduleGrid);
-
-    /* attach move (drag) handlers to booking block bodies */
-    document.querySelectorAll('.booking-block, .m-booking').forEach(function (block) {
-      block.addEventListener('mousedown', function (e) {
-        // Ignore resize / split (geometry: next-day cell may be e.target)
-        if (e.target.closest('.resize-handle') || e.target.closest('.resize-handle-left')) return;
-        if (e.target.closest('.split-handle') || hitTestSplitHandle(e.clientX, e.clientY)) return;
-        if (isIgnoringBookingEdit()) return;
-        // Only primary mouse button
-        if (e.button !== 0) return;
-
-        var bookingId = parseInt(block.dataset.bookingId, 10);
-        var booking = _allBookings.find(function (b) { return b.id === bookingId; });
-        if (!booking) return;
-
-        if (!canBookForResource(booking.resource_id)) return;
-
-        // Prevent browser text-selection during drag without blocking the click event
-        e.preventDefault();
-
-        // We start a potential move — but only commit if mouse moves > 5px
-        var startX = e.clientX;
-        var startY = e.clientY;
-        var moveStarted = false;
-
-        function onMoveStart(ev) {
-          var dx = Math.abs(ev.clientX - startX);
-          var dy = Math.abs(ev.clientY - startY);
-          if (dx > 5 || dy > 5) {
-            // Threshold crossed — start real move
-            document.removeEventListener('mousemove', onMoveStart);
-            document.removeEventListener('mouseup',   onMoveCancel);
-            moveStarted = true;
-            e.preventDefault();
-            e.stopPropagation();
-            initMoveBooking(block, booking, ev);
-          }
-        }
-
-        function onMoveCancel() {
-          document.removeEventListener('mousemove', onMoveStart);
-          document.removeEventListener('mouseup',   onMoveCancel);
-        }
-
-        document.addEventListener('mousemove', onMoveStart);
-        document.addEventListener('mouseup',   onMoveCancel);
-      });
-    });
 
     loadSchedule._isLoading = false;
   };
+
 
   /* --------------------------------------------------
      Table header builder
@@ -396,9 +371,7 @@
 
     // Helper: check if there's a booking on a specific date (from _allBookings, not just current view)
     var hasBookingOnDate = function (dateStr, matchFn) {
-      return _allBookings.some(function (b) {
-        return b.resource_id === resourceId && b.date === dateStr && matchFn(b);
-      });
+      return !!findBookingOnDate(resourceId, dateStr, matchFn);
     };
 
     /** Stable vertical order key — same for every day this booking appears. */
@@ -439,11 +412,7 @@
         prevDate.setDate(prevDate.getDate() - 1);
         while (true) {
           var prevDateStr = fmt(prevDate);
-          var prevBooking = _allBookings.find(function (ob) {
-            return ob.resource_id === resourceId &&
-                   ob.date === prevDateStr &&
-                   matchFn(ob);
-          });
+          var prevBooking = findBookingOnDate(resourceId, prevDateStr, matchFn);
           if (!prevBooking) break;
           if (prevBooking.split_after === 1 || prevBooking.split_after === true) break;
           spanIds.unshift(prevBooking.id);
@@ -455,15 +424,9 @@
         nextDate.setDate(nextDate.getDate() + 1);
         while (true) {
           var nextDateStr = fmt(nextDate);
-          var nextBooking = _allBookings.find(function (ob) {
-            return ob.resource_id === resourceId &&
-                   ob.date === nextDateStr &&
-                   matchFn(ob);
-          });
+          var nextBooking = findBookingOnDate(resourceId, nextDateStr, matchFn);
           if (!nextBooking) break;
-          var currBooking = _allBookings.find(function (ob) {
-            return ob.id === spanIds[spanIds.length - 1];
-          });
+          var currBooking = _bookingById[spanIds[spanIds.length - 1]];
           if (currBooking && (currBooking.split_after === 1 || currBooking.split_after === true)) break;
           spanIds.push(nextBooking.id);
           endDate = nextDateStr;
@@ -527,11 +490,7 @@
 
         var isAfterSplit = false;
         if (hasPrev) {
-          var prevBooking = _allBookings.find(function (ob) {
-            return ob.resource_id === resourceId &&
-                   ob.date === prevDateStr &&
-                   matchFn(ob);
-          });
+          var prevBooking = findBookingOnDate(resourceId, prevDateStr, matchFn);
           isAfterSplit = prevBooking && (prevBooking.split_after === 1 || prevBooking.split_after === true);
         }
 
@@ -575,21 +534,19 @@
     var targetHours = parseFloat(booking.hours);
     var targetTentative = !!booking.is_tentative;
     var matchFn = function (b) {
-      return b.resource_id === resourceId &&
-             b.project_id === targetProject &&
+      return b.project_id === targetProject &&
              parseFloat(b.hours) === targetHours &&
              !!b.is_tentative === targetTentative;
     };
 
-    // Walk backward to span start
+    // Walk backward to span start (indexed by resource+date)
     var spanStart = new Date(booking.date);
     while (true) {
       var prevD = new Date(spanStart);
       prevD.setDate(prevD.getDate() - 1);
       var prevStr = fmt(prevD);
-      var prevBk = _allBookings.find(function (b) { return b.date === prevStr && matchFn(b); });
+      var prevBk = findBookingOnDate(resourceId, prevStr, matchFn);
       if (!prevBk) break;
-      // Cannot extend past a split point on the previous day
       if (prevBk.split_after === 1 || prevBk.split_after === true) break;
       spanStart = prevD;
     }
@@ -599,14 +556,13 @@
     var cur = new Date(spanStart);
     while (true) {
       var curStr = fmt(cur);
-      var curBk = _allBookings.find(function (b) { return b.date === curStr && matchFn(b); });
+      var curBk = findBookingOnDate(resourceId, curStr, matchFn);
       if (!curBk) break;
       segment.push(curBk);
       if (curBk.split_after === 1 || curBk.split_after === true) break;
       cur.setDate(cur.getDate() + 1);
     }
 
-    // Safety: ensure the original booking is included
     if (segment.length === 0) return [booking];
     if (!segment.some(function (b) { return b.id === booking.id; })) return [booking];
     return segment;
@@ -619,7 +575,7 @@
      Only returns multi-day groups (null for solo bookings) — used by edit modal.
      -------------------------------------------------- */
   function getSpanGroup(bookingId, bMap, days) {
-    var target = _allBookings.find(function (b) { return b.id === bookingId; });
+    var target = _bookingById[bookingId] || _allBookings.find(function (b) { return b.id === bookingId; });
     if (!target) return null;
 
     var group = findBookingSpanSegment(target);
@@ -2009,7 +1965,8 @@
       }
 
       var bid = block.dataset.bookingId;
-      var booking = _allBookings.find(function (b) { return String(b.id) === String(bid); });
+      var booking = (_bookingById && _bookingById[bid]) ||
+        _allBookings.find(function (b) { return String(b.id) === String(bid); });
       if (!booking) return null;
 
       var seg = lastSpanSegment;
@@ -2058,7 +2015,8 @@
 
     function highlightBookingSegments(bookingId) {
       var ids = [String(bookingId)];
-      var booking = _allBookings.find(function (b) { return String(b.id) === String(bookingId); });
+      var booking = (_bookingById && _bookingById[bookingId]) ||
+        _allBookings.find(function (b) { return String(b.id) === String(bookingId); });
       var seg = null;
       if (booking) {
         seg = findBookingSpanSegment(booking);
@@ -2067,13 +2025,17 @@
         }
       }
       lastSpanSegment = seg;
-      ids.forEach(function (id) {
+      // Single query for all span days via attribute selector list
+      if (ids.length === 1) {
         document.querySelectorAll(
-          '.booking-block[data-booking-id="' + id + '"], .m-booking[data-booking-id="' + id + '"]'
-        ).forEach(function (el) {
-          el.classList.add('hover-highlight');
-        });
-      });
+          '.booking-block[data-booking-id="' + ids[0] + '"], .m-booking[data-booking-id="' + ids[0] + '"]'
+        ).forEach(function (el) { el.classList.add('hover-highlight'); });
+      } else {
+        var sel = ids.map(function (id) {
+          return '.booking-block[data-booking-id="' + id + '"], .m-booking[data-booking-id="' + id + '"]';
+        }).join(', ');
+        document.querySelectorAll(sel).forEach(function (el) { el.classList.add('hover-highlight'); });
+      }
       return ids;
     }
 
@@ -2278,12 +2240,18 @@
   }
 
   async function showBookingModal(bookingId, resourceId, date, endDate) {
-    var fetched = await Promise.all([
-      api('/api/resources'),
-      api('/api/projects')
-    ]);
+    // Prefer short-lived cache — multi-tenant orgs reopen the modal often
+    var fetchRes = typeof cachedApi === 'function'
+      ? cachedApi('/api/resources', { maxAge: 60000 })
+      : api('/api/resources');
+    var fetchProj = typeof cachedApi === 'function'
+      ? cachedApi('/api/projects', { maxAge: 60000 })
+      : api('/api/projects');
+    var fetched = await Promise.all([fetchRes, fetchProj]);
     var resources = fetched[0];
     var projects  = fetched[1];
+    // Keep state in sync for other screens
+    if (resources && resources.length) state.resources = resources;
 
     var booking = null;
     if (bookingId) {
@@ -3834,7 +3802,6 @@
       document.removeEventListener('click', handler, true);
     }
     document.addEventListener('click', handler, true);
-    // Safety: remove listener if click never arrives (e.g. mouse left window)
     setTimeout(function () {
       if (active) {
         active = false;
@@ -3900,30 +3867,18 @@
   }
 
   /**
-   * Find the visible split handle under (clientX, clientY), expanding the rect
-   * slightly for easier aiming. Prefers the nearest handle center if several match.
+   * Find the visible split handle under (clientX, clientY).
+   * Prefer the single hover-active handle (O(1) common case).
    */
   function hitTestSplitHandle(clientX, clientY) {
     var nodes = document.querySelectorAll(
       '.booking-block.hover-active .split-handle, .m-booking.hover-active .split-handle'
     );
-    if (!nodes.length) {
-      // Fallback: any currently rendered handle with a non-zero box (opacity may lag)
-      nodes = document.querySelectorAll('.split-handle');
-    }
     var pad = 8;
     var best = null;
     var bestDist = Infinity;
     for (var i = 0; i < nodes.length; i++) {
       var h = nodes[i];
-      var parent = h.closest('.booking-block, .m-booking');
-      // Only consider handles that belong to an active or highlighted span day
-      if (parent && !parent.classList.contains('hover-active') && !parent.classList.contains('hover-highlight')) {
-        continue;
-      }
-      // Skip fully inactive (no hover at all)
-      if (parent && !parent.classList.contains('hover-active')) continue;
-
       var r = h.getBoundingClientRect();
       if (r.width < 2 && r.height < 2) continue;
       if (
@@ -3942,9 +3897,20 @@
     return best;
   }
 
+  function lookupBookingById(bookingId) {
+    if (_bookingById && _bookingById[bookingId]) return _bookingById[bookingId];
+    return _allBookings.find(function (b) { return b.id === bookingId; });
+  }
+
   /**
-   * Install one-shot capture handlers on the schedule grid for split + edit.
-   * Safe to call after every render; binds only once per grid element.
+   * One-time event delegation on #schedule-grid for:
+   *  - split scissors (geometry)
+   *  - edit booking click
+   *  - empty cell create
+   *  - leave edit
+   *  - resize L/R
+   *  - move (drag threshold)
+   * Multi-tenant: O(1) bind cost per render instead of O(cells+bookings).
    */
   function ensureSchedulePointerDelegation(scheduleGrid) {
     if (!scheduleGrid || scheduleGrid._pointerDelegationBound) return;
@@ -3953,8 +3919,7 @@
     var lastSplitTs = 0;
     var lastSplitId = null;
 
-    function trySplitAtEvent(e, opts) {
-      opts = opts || {};
+    function trySplitAtEvent(e) {
       if (e.button != null && e.button !== 0) return false;
       var handle = hitTestSplitHandle(e.clientX, e.clientY);
       if (!handle) return false;
@@ -3967,56 +3932,129 @@
       var id = parseInt(handle.dataset.bookingId, 10);
       if (!id) return true;
 
-      // Deduplicate pointerdown + mousedown + click for the same press
       var now = Date.now();
-      if (opts.execute !== false) {
-        if (id === lastSplitId && now - lastSplitTs < 500) return true;
-        lastSplitTs = now;
-        lastSplitId = id;
-        window.splitBooking(id);
-      }
+      if (id === lastSplitId && now - lastSplitTs < 500) return true;
+      lastSplitTs = now;
+      lastSplitId = id;
+      window.splitBooking(id);
       return true;
     }
 
-    // Prefer pointerdown; also bind mousedown for older browsers. Split runs once
-    // per press thanks to lastSplitTs dedupe.
+    // --- Capture: split wins first ---
     scheduleGrid.addEventListener('pointerdown', function (e) {
       trySplitAtEvent(e);
     }, true);
 
     scheduleGrid.addEventListener('mousedown', function (e) {
-      trySplitAtEvent(e);
+      if (trySplitAtEvent(e)) return;
+
+      if (e.button !== 0) return;
+      var t = e.target;
+      if (!t || !t.closest) return;
+
+      // Resize handles
+      var rightH = t.closest('.resize-handle');
+      var leftH = t.closest('.resize-handle-left');
+      if (rightH || leftH) {
+        e.stopPropagation();
+        e.preventDefault();
+        var block = t.closest('.booking-block, .m-booking');
+        if (!block) return;
+        var bookingId = parseInt(block.dataset.bookingId, 10);
+        var booking = lookupBookingById(bookingId);
+        if (!booking) return;
+        if (!canBookForResource(booking.resource_id)) {
+          toast(t('schedule.no_edit_permission'), 'error');
+          return;
+        }
+        if (rightH) initResizeBooking(block, booking, e);
+        else initResizeBookingLeft(block, booking, e);
+        return;
+      }
+
+      // Move drag on booking body
+      var moveBlock = t.closest('.booking-block, .m-booking');
+      if (!moveBlock) return;
+      if (moveBlock.classList.contains('leave-block') || moveBlock.classList.contains('m-leave')) return;
+      if (t.closest('.split-handle')) return;
+      if (isIgnoringBookingEdit()) return;
+
+      var mid = parseInt(moveBlock.dataset.bookingId, 10);
+      var mb = lookupBookingById(mid);
+      if (!mb) return;
+      if (!canBookForResource(mb.resource_id)) return;
+
+      e.preventDefault();
+      var startX = e.clientX;
+      var startY = e.clientY;
+
+      function onMoveStart(ev) {
+        var dx = Math.abs(ev.clientX - startX);
+        var dy = Math.abs(ev.clientY - startY);
+        if (dx > 5 || dy > 5) {
+          document.removeEventListener('mousemove', onMoveStart);
+          document.removeEventListener('mouseup', onMoveCancel);
+          initMoveBooking(moveBlock, mb, ev);
+        }
+      }
+      function onMoveCancel() {
+        document.removeEventListener('mousemove', onMoveStart);
+        document.removeEventListener('mouseup', onMoveCancel);
+      }
+      document.addEventListener('mousemove', onMoveStart);
+      document.addEventListener('mouseup', onMoveCancel);
     }, true);
 
+    // --- Click: edit / leave / empty cell ---
     scheduleGrid.addEventListener('click', function (e) {
-      // After a successful split, swallow the trailing click that would open edit
       if (isIgnoringBookingEdit()) {
         e.preventDefault();
         e.stopPropagation();
         if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
         return;
       }
-      // Geometry again — if user clicked on seam but event target is the next day
-      // execute:false if already split on pointerdown; still block edit path
       if (hitTestSplitHandle(e.clientX, e.clientY)) {
         e.preventDefault();
         e.stopPropagation();
         if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
         markIgnoreBookingEdit(800);
-        // Only run split if pointerdown didn't (e.g. pure click without prior down on grid)
         trySplitAtEvent(e);
         return;
       }
 
-      if (e.target.closest && e.target.closest('.resize-handle, .resize-handle-left')) return;
+      var t = e.target;
+      if (!t || !t.closest) return;
 
-      var block = e.target.closest && e.target.closest('.booking-block, .m-booking');
-      if (!block || !scheduleGrid.contains(block)) return;
-      if (block.classList.contains('leave-block') || block.classList.contains('m-leave')) return;
+      if (t.closest('.resize-handle, .resize-handle-left')) return;
 
-      e.stopPropagation();
-      var bookingId = parseInt(block.dataset.bookingId, 10);
-      if (bookingId) window.editBooking(bookingId);
+      // Leave edit
+      var leaveEl = t.closest('.leave-block[data-leave-id], .m-leave[data-leave-id]');
+      if (leaveEl) {
+        e.stopPropagation();
+        var leaveId = parseInt(leaveEl.dataset.leaveId, 10);
+        var leaveEntry = _allLeave.find(function (l) { return l.id === leaveId; });
+        if (leaveEntry) showEditLeaveModal(leaveEntry);
+        return;
+      }
+
+      // Booking edit
+      var block = t.closest('.booking-block, .m-booking');
+      if (block && !block.classList.contains('leave-block') && !block.classList.contains('m-leave')) {
+        e.stopPropagation();
+        var bookingId = parseInt(block.dataset.bookingId, 10);
+        if (bookingId) window.editBooking(bookingId);
+        return;
+      }
+
+      // Empty cell → create
+      var cell = t.closest('.booking-cell, .m-day-cell');
+      if (!cell || !scheduleGrid.contains(cell)) return;
+      if (t.closest('.booking-block, .leave-block, .m-booking, .m-leave')) return;
+      var rid = parseInt(cell.dataset.resource, 10);
+      var date = cell.dataset.date;
+      if (!rid || !date) return;
+      if (!canBookForResource(rid)) return;
+      showBookingModal(null, rid, date);
     }, true);
   }
 

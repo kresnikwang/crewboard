@@ -357,7 +357,8 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     var bid = block.dataset.bookingId;
-    var booking = _allBookings.find(function (b) { return String(b.id) === String(bid); });
+    var booking = (_bookingById && _bookingById[bid]) ||
+      _allBookings.find(function (b) { return String(b.id) === String(bid); });
     if (!booking) return null;
 
     var seg = lastSpanSegment;
@@ -406,7 +407,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function highlightBookingSegments(bookingId) {
     var ids = [String(bookingId)];
-    var booking = _allBookings.find(function (b) { return String(b.id) === String(bookingId); });
+    var booking = (_bookingById && _bookingById[bookingId]) ||
+      _allBookings.find(function (b) { return String(b.id) === String(bookingId); });
     var seg = null;
     if (booking) {
       seg = findBookingSpanSegment(booking);
@@ -415,13 +417,17 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     }
     lastSpanSegment = seg;
-    ids.forEach(function (id) {
+    // Single query for all span days via attribute selector list
+    if (ids.length === 1) {
       document.querySelectorAll(
-        '.booking-block[data-booking-id="' + id + '"], .m-booking[data-booking-id="' + id + '"]'
-      ).forEach(function (el) {
-        el.classList.add('hover-highlight');
-      });
-    });
+        '.booking-block[data-booking-id="' + ids[0] + '"], .m-booking[data-booking-id="' + ids[0] + '"]'
+      ).forEach(function (el) { el.classList.add('hover-highlight'); });
+    } else {
+      var sel = ids.map(function (id) {
+        return '.booking-block[data-booking-id="' + id + '"], .m-booking[data-booking-id="' + id + '"]';
+      }).join(', ');
+      document.querySelectorAll(sel).forEach(function (el) { el.classList.add('hover-highlight'); });
+    }
     return ids;
   }
 

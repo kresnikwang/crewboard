@@ -51,12 +51,17 @@ router.get('/schedule-data', (req, res) => {
     WHERE r.enterprise_id = ? AND l.date >= ? AND l.date <= ?
   `).all(entId, start, end);
 
-  /* Holidays */
+  /* Holidays — use local Y-M-D (toISOString is UTC and can shift the day) */
   const holidayResult = {};
-  const d = new Date(start);
-  const endDate = new Date(end);
+  const d = new Date(start + 'T00:00:00');
+  const endDate = new Date(end + 'T00:00:00');
   while (d <= endDate) {
-    const dateStr = d.toISOString().split('T')[0];
+    const dateStr =
+      d.getFullYear() +
+      '-' +
+      String(d.getMonth() + 1).padStart(2, '0') +
+      '-' +
+      String(d.getDate()).padStart(2, '0');
     const h = getHoliday(dateStr);
     if (h) holidayResult[dateStr] = h;
     d.setDate(d.getDate() + 1);

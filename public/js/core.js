@@ -282,9 +282,12 @@ window.apiBookingWithConflictConfirm = async function apiBookingWithConflictConf
       apiCache.invalidatePrefix('/api/bookings');
       apiCache.invalidatePrefix('/api/resources');
 
-      // Re-render if user is on schedule or timesheets page
+      // Debounce re-render: multi-user / multi-tenant SSE bursts would otherwise
+      // force full schedule DOM rebuilds back-to-back.
       var page = window.state.currentPage;
-      if (page === 'schedule' && typeof window.loadSchedule === 'function') {
+      if (page === 'schedule' && typeof window.scheduleLoadSchedule === 'function') {
+        window.scheduleLoadSchedule({ delay: 280 });
+      } else if (page === 'schedule' && typeof window.loadSchedule === 'function') {
         window.loadSchedule();
       } else if (page === 'timesheets' && typeof window.loadTimesheets === 'function') {
         window.loadTimesheets();

@@ -55,11 +55,11 @@ window.loadSchedule = async function loadSchedule() {
     schedData = await cachedApi(_scheduleUrl, {
       maxAge: 30000,
       onRevalidate: function (freshData) {
-        // Background refresh complete — only re-render if data actually changed
-        var oldSig = _allBookings.reduce(function (s, b) { return s + b.id + ':' + b.hours + ':' + (b.is_tentative ? 1 : 0) + ','; }, '') + '|' + _allLeave.length;
-        var newSig = freshData.bookings.reduce(function (s, b) { return s + b.id + ':' + b.hours + ':' + (b.is_tentative ? 1 : 0) + ','; }, '') + '|' + freshData.leave.length;
+        // Background refresh — cheap signature; full reload only if data changed
+        var oldSig = scheduleDataSignature(_allBookings, _allLeave);
+        var newSig = scheduleDataSignature(freshData.bookings, freshData.leave);
         if (oldSig !== newSig) {
-          window.loadSchedule();
+          scheduleLoadSchedule({ immediate: true });
         }
       }
     });
@@ -78,6 +78,7 @@ window.loadSchedule = async function loadSchedule() {
   state.resources = resources;
   _allBookings = bookings;
   _allLeave    = leave;
+  rebuildBookingIndex(bookings);
 
   var teams = {};
   resources.forEach(function (r) {
@@ -144,134 +145,17 @@ window.loadSchedule = async function loadSchedule() {
     addBtn.style.display = perms.book_others ? '' : 'none';
   }
 
-  /* attach click on empty areas of booking cells */
-  document.querySelectorAll('.booking-cell, .m-day-cell').forEach(function (cell) {
-    cell.addEventListener('click', function (e) {
-      if (e.target.closest('.booking-block')) return;
-      if (e.target.closest('.leave-block')) return;
-      if (e.target.closest('.m-booking')) return;
-      if (e.target.closest('.m-leave')) return;
-      var rid  = parseInt(cell.dataset.resource, 10);
-      var date = cell.dataset.date;
-      if (!rid || !date) return;
-      if (!canBookForResource(rid)) return;
-      showBookingModal(null, rid, date);
-    });
-  });
-
-  /* Mouse drag selection for multiple days */
+  /* One-time event delegation on the grid (cells / leave / resize / move / split / edit).
+     Multi-tenant: avoid O(cells+bookings) addEventListener on every full re-render. */
   var scheduleGrid = document.getElementById('schedule-grid');
   if (scheduleGrid) {
     initDragSelection(scheduleGrid);
+    ensureSchedulePointerDelegation(scheduleGrid);
   }
-
-  /* attach click on leave blocks for editing */
-  document.querySelectorAll('.leave-block[data-leave-id], .m-leave[data-leave-id]').forEach(function (el) {
-    el.addEventListener('click', function (e) {
-      e.stopPropagation();
-      var leaveId = parseInt(el.dataset.leaveId, 10);
-      var leaveEntry = _allLeave.find(function (l) { return l.id === leaveId; });
-      if (leaveEntry) {
-        showEditLeaveModal(leaveEntry);
-      }
-    });
-  });
-
-  /* attach RIGHT resize handlers to booking blocks */
-  document.querySelectorAll('.booking-block .resize-handle, .m-booking .resize-handle').forEach(function (handle) {
-    handle.addEventListener('mousedown', function (e) {
-      e.stopPropagation();
-      e.preventDefault();
-      var block = e.target.closest('.booking-block, .m-booking');
-      if (!block) return;
-
-      var bookingId = parseInt(block.dataset.bookingId, 10);
-      var booking = _allBookings.find(function (b) { return b.id === bookingId; });
-      if (!booking) return;
-
-      if (!canBookForResource(booking.resource_id)) {
-        toast(t('schedule.no_edit_permission'), 'error');
-        return;
-      }
-
-      initResizeBooking(block, booking, e);
-    });
-  });
-
-  /* attach LEFT resize handlers to booking blocks */
-  document.querySelectorAll('.booking-block .resize-handle-left, .m-booking .resize-handle-left').forEach(function (handle) {
-    handle.addEventListener('mousedown', function (e) {
-      e.stopPropagation();
-      e.preventDefault();
-      var block = e.target.closest('.booking-block, .m-booking');
-      if (!block) return;
-
-      var bookingId = parseInt(block.dataset.bookingId, 10);
-      var booking = _allBookings.find(function (b) { return b.id === bookingId; });
-      if (!booking) return;
-
-      if (!canBookForResource(booking.resource_id)) {
-        toast(t('schedule.no_edit_permission'), 'error');
-        return;
-      }
-
-      initResizeBookingLeft(block, booking, e);
-    });
-  });
-
-  /* Split + edit: geometric hit-test (scissors overflow under next-day cell) */
-  ensureSchedulePointerDelegation(scheduleGrid);
-
-  /* attach move (drag) handlers to booking block bodies */
-  document.querySelectorAll('.booking-block, .m-booking').forEach(function (block) {
-    block.addEventListener('mousedown', function (e) {
-      // Ignore resize / split (geometry: next-day cell may be e.target)
-      if (e.target.closest('.resize-handle') || e.target.closest('.resize-handle-left')) return;
-      if (e.target.closest('.split-handle') || hitTestSplitHandle(e.clientX, e.clientY)) return;
-      if (isIgnoringBookingEdit()) return;
-      // Only primary mouse button
-      if (e.button !== 0) return;
-
-      var bookingId = parseInt(block.dataset.bookingId, 10);
-      var booking = _allBookings.find(function (b) { return b.id === bookingId; });
-      if (!booking) return;
-
-      if (!canBookForResource(booking.resource_id)) return;
-
-      // Prevent browser text-selection during drag without blocking the click event
-      e.preventDefault();
-
-      // We start a potential move — but only commit if mouse moves > 5px
-      var startX = e.clientX;
-      var startY = e.clientY;
-      var moveStarted = false;
-
-      function onMoveStart(ev) {
-        var dx = Math.abs(ev.clientX - startX);
-        var dy = Math.abs(ev.clientY - startY);
-        if (dx > 5 || dy > 5) {
-          // Threshold crossed — start real move
-          document.removeEventListener('mousemove', onMoveStart);
-          document.removeEventListener('mouseup',   onMoveCancel);
-          moveStarted = true;
-          e.preventDefault();
-          e.stopPropagation();
-          initMoveBooking(block, booking, ev);
-        }
-      }
-
-      function onMoveCancel() {
-        document.removeEventListener('mousemove', onMoveStart);
-        document.removeEventListener('mouseup',   onMoveCancel);
-      }
-
-      document.addEventListener('mousemove', onMoveStart);
-      document.addEventListener('mouseup',   onMoveCancel);
-    });
-  });
 
   loadSchedule._isLoading = false;
 };
+
 
 /* --------------------------------------------------
    Table header builder
@@ -349,9 +233,7 @@ function detectSpans(resourceId, days, bMap) {
 
   // Helper: check if there's a booking on a specific date (from _allBookings, not just current view)
   var hasBookingOnDate = function (dateStr, matchFn) {
-    return _allBookings.some(function (b) {
-      return b.resource_id === resourceId && b.date === dateStr && matchFn(b);
-    });
+    return !!findBookingOnDate(resourceId, dateStr, matchFn);
   };
 
   /** Stable vertical order key — same for every day this booking appears. */
@@ -392,11 +274,7 @@ function detectSpans(resourceId, days, bMap) {
       prevDate.setDate(prevDate.getDate() - 1);
       while (true) {
         var prevDateStr = fmt(prevDate);
-        var prevBooking = _allBookings.find(function (ob) {
-          return ob.resource_id === resourceId &&
-                 ob.date === prevDateStr &&
-                 matchFn(ob);
-        });
+        var prevBooking = findBookingOnDate(resourceId, prevDateStr, matchFn);
         if (!prevBooking) break;
         if (prevBooking.split_after === 1 || prevBooking.split_after === true) break;
         spanIds.unshift(prevBooking.id);
@@ -408,15 +286,9 @@ function detectSpans(resourceId, days, bMap) {
       nextDate.setDate(nextDate.getDate() + 1);
       while (true) {
         var nextDateStr = fmt(nextDate);
-        var nextBooking = _allBookings.find(function (ob) {
-          return ob.resource_id === resourceId &&
-                 ob.date === nextDateStr &&
-                 matchFn(ob);
-        });
+        var nextBooking = findBookingOnDate(resourceId, nextDateStr, matchFn);
         if (!nextBooking) break;
-        var currBooking = _allBookings.find(function (ob) {
-          return ob.id === spanIds[spanIds.length - 1];
-        });
+        var currBooking = _bookingById[spanIds[spanIds.length - 1]];
         if (currBooking && (currBooking.split_after === 1 || currBooking.split_after === true)) break;
         spanIds.push(nextBooking.id);
         endDate = nextDateStr;
@@ -480,11 +352,7 @@ function detectSpans(resourceId, days, bMap) {
 
       var isAfterSplit = false;
       if (hasPrev) {
-        var prevBooking = _allBookings.find(function (ob) {
-          return ob.resource_id === resourceId &&
-                 ob.date === prevDateStr &&
-                 matchFn(ob);
-        });
+        var prevBooking = findBookingOnDate(resourceId, prevDateStr, matchFn);
         isAfterSplit = prevBooking && (prevBooking.split_after === 1 || prevBooking.split_after === true);
       }
 
@@ -528,21 +396,19 @@ function findBookingSpanSegment(booking) {
   var targetHours = parseFloat(booking.hours);
   var targetTentative = !!booking.is_tentative;
   var matchFn = function (b) {
-    return b.resource_id === resourceId &&
-           b.project_id === targetProject &&
+    return b.project_id === targetProject &&
            parseFloat(b.hours) === targetHours &&
            !!b.is_tentative === targetTentative;
   };
 
-  // Walk backward to span start
+  // Walk backward to span start (indexed by resource+date)
   var spanStart = new Date(booking.date);
   while (true) {
     var prevD = new Date(spanStart);
     prevD.setDate(prevD.getDate() - 1);
     var prevStr = fmt(prevD);
-    var prevBk = _allBookings.find(function (b) { return b.date === prevStr && matchFn(b); });
+    var prevBk = findBookingOnDate(resourceId, prevStr, matchFn);
     if (!prevBk) break;
-    // Cannot extend past a split point on the previous day
     if (prevBk.split_after === 1 || prevBk.split_after === true) break;
     spanStart = prevD;
   }
@@ -552,14 +418,13 @@ function findBookingSpanSegment(booking) {
   var cur = new Date(spanStart);
   while (true) {
     var curStr = fmt(cur);
-    var curBk = _allBookings.find(function (b) { return b.date === curStr && matchFn(b); });
+    var curBk = findBookingOnDate(resourceId, curStr, matchFn);
     if (!curBk) break;
     segment.push(curBk);
     if (curBk.split_after === 1 || curBk.split_after === true) break;
     cur.setDate(cur.getDate() + 1);
   }
 
-  // Safety: ensure the original booking is included
   if (segment.length === 0) return [booking];
   if (!segment.some(function (b) { return b.id === booking.id; })) return [booking];
   return segment;
@@ -572,7 +437,7 @@ function findBookingSpanSegment(booking) {
    Only returns multi-day groups (null for solo bookings) — used by edit modal.
    -------------------------------------------------- */
 function getSpanGroup(bookingId, bMap, days) {
-  var target = _allBookings.find(function (b) { return b.id === bookingId; });
+  var target = _bookingById[bookingId] || _allBookings.find(function (b) { return b.id === bookingId; });
   if (!target) return null;
 
   var group = findBookingSpanSegment(target);
