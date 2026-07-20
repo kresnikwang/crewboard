@@ -57,6 +57,13 @@
   filter: brightness(1.08);
   box-shadow: 0 1px 2px rgba(30,58,110,.08), 0 8px 18px rgba(30,58,110,.12), inset 0 0 0 1px rgba(0,0,0,.05);
 }
+/* Raise the day that owns the scissors so its overflow paints ABOVE the next cell
+   (table cells otherwise cover the seam and steal the click). */
+.booking-block.hover-active {
+  z-index: 50;
+  overflow: visible;
+  position: relative;
+}
 
 /* === Continuous booking bar (span) styles === */
 .booking-block.span-s {
@@ -125,15 +132,15 @@
   /* center of control on the right edge (between this day and next) */
   right: -14px;
   top: 50%;
-  /* larger hit box for reliable click; visual disc stays small */
-  width: 28px;
-  height: 28px;
-  margin-top: -14px;
+  /* larger hit box; visual disc stays small — clicks also use geometric hit-test in JS */
+  width: 30px;
+  height: 30px;
+  margin-top: -15px;
   border-radius: 50%;
   cursor: pointer;
   opacity: 0;
   pointer-events: none;
-  z-index: 50;
+  z-index: 60;
   background: transparent;
   transition: opacity .08s linear, transform .08s linear;
 }
@@ -167,6 +174,7 @@
 }
 .booking-block.hover-active .split-handle {
   opacity: 1;
+  /* pointer-events still auto for cursor:pointer; real hit uses geometry so next-day cover is OK */
   pointer-events: auto;
 }
 .booking-block .split-handle:hover {
@@ -531,6 +539,11 @@
   filter: brightness(1.08);
   box-shadow: 0 1px 2px rgba(30,58,110,.08), 0 8px 18px rgba(30,58,110,.12), inset 0 0 0 1px rgba(0,0,0,.05);
 }
+.m-booking.hover-active {
+  z-index: 50;
+  overflow: visible;
+  position: relative;
+}
 .m-booking.moving { opacity: 0.4; cursor: grabbing; transform: scale(0.96); }
 .m-booking-hours { font-weight: 600; color: #374151; }
 .m-booking .booking-project {
@@ -599,14 +612,14 @@
   position: absolute;
   right: -12px; /* width 24 → center on seam */
   top: 50%;
-  width: 24px;
-  height: 24px;
-  margin-top: -12px;
+  width: 26px;
+  height: 26px;
+  margin-top: -13px;
   border-radius: 50%;
   cursor: pointer;
   opacity: 0;
   pointer-events: none;
-  z-index: 50;
+  z-index: 60;
   background: transparent;
   transition: opacity .08s linear, transform .08s linear;
 }

@@ -219,67 +219,16 @@ window.loadSchedule = async function loadSchedule() {
     });
   });
 
-  /*
-   * Split / edit / move — use capture-phase delegation so scissors always win.
-   * Previously: inline onclick="editBooking" on the bar stole most seam clicks
-   * because the scissors sit half outside the parent and were easy to "miss".
-   */
-  var _suppressBookingClickUntil = 0;
-  function markSuppressBookingClick() {
-    _suppressBookingClickUntil = Date.now() + 500;
-  }
-  function shouldSuppressBookingClick() {
-    return Date.now() < _suppressBookingClickUntil;
-  }
-
-  if (scheduleGrid && !scheduleGrid._splitEditDelegated) {
-    scheduleGrid._splitEditDelegated = true;
-
-    // Capture: split wins before any bubble/inline handler
-    scheduleGrid.addEventListener('mousedown', function (e) {
-      var split = e.target.closest && e.target.closest('.split-handle');
-      if (!split || !scheduleGrid.contains(split)) return;
-      e.preventDefault();
-      e.stopPropagation();
-      markSuppressBookingClick();
-    }, true);
-
-    scheduleGrid.addEventListener('click', function (e) {
-      var split = e.target.closest && e.target.closest('.split-handle');
-      if (split && scheduleGrid.contains(split)) {
-        e.preventDefault();
-        e.stopPropagation();
-        if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
-        markSuppressBookingClick();
-        var splitId = parseInt(split.dataset.bookingId, 10);
-        if (splitId) window.splitBooking(splitId);
-        return;
-      }
-
-      // Booking bar click → edit (week + month), unless we just hit scissors/resize
-      if (shouldSuppressBookingClick()) {
-        e.preventDefault();
-        e.stopPropagation();
-        return;
-      }
-      if (e.target.closest('.resize-handle, .resize-handle-left, .split-handle')) return;
-
-      var block = e.target.closest('.booking-block, .m-booking');
-      if (!block || !scheduleGrid.contains(block)) return;
-      // leave blocks have their own handler
-      if (block.classList.contains('leave-block') || block.classList.contains('m-leave')) return;
-
-      e.stopPropagation();
-      var bookingId = parseInt(block.dataset.bookingId, 10);
-      if (bookingId) window.editBooking(bookingId);
-    }, true);
-  }
+  /* Split + edit: geometric hit-test (scissors overflow under next-day cell) */
+  ensureSchedulePointerDelegation(scheduleGrid);
 
   /* attach move (drag) handlers to booking block bodies */
   document.querySelectorAll('.booking-block, .m-booking').forEach(function (block) {
     block.addEventListener('mousedown', function (e) {
-      // Ignore if clicking on the resize handle (left or right) or split handle
-      if (e.target.closest('.resize-handle') || e.target.closest('.resize-handle-left') || e.target.closest('.split-handle')) return;
+      // Ignore resize / split (geometry: next-day cell may be e.target)
+      if (e.target.closest('.resize-handle') || e.target.closest('.resize-handle-left')) return;
+      if (e.target.closest('.split-handle') || hitTestSplitHandle(e.clientX, e.clientY)) return;
+      if (isIgnoringBookingEdit()) return;
       // Only primary mouse button
       if (e.button !== 0) return;
 
