@@ -475,11 +475,7 @@ function updateSplitHandlesAfterReSplit(leftIds, rightIds) {
         splitHandle.className = 'split-handle';
         splitHandle.dataset.bookingId = id;
         splitHandle.title = t('schedule.split_booking');
-        splitHandle.addEventListener('click', function (e) {
-          e.stopPropagation();
-          e.preventDefault();
-          window.splitBooking(id);
-        });
+        // Clicks are handled by capture-phase delegation on #schedule-grid
         block.appendChild(splitHandle);
       }
     });

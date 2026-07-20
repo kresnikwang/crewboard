@@ -375,18 +375,24 @@ document.addEventListener('DOMContentLoaded', function () {
     var rect = block.getBoundingClientRect();
     if (!rect.width) return null;
     var relX = clientX - rect.left;
-    // Near-edge zone: at least 20px, up to 42% of cell — left zone maps to PREVIOUS seam
-    var zone = Math.max(20, Math.min(rect.width * 0.42, 36));
+    // Acquire zone (show scissors) vs keep zone (hysteresis so the button
+    // doesn't vanish under the cursor while you try to click it).
+    var acquire = Math.max(22, Math.min(rect.width * 0.42, 40));
+    var keep = Math.max(acquire + 10, Math.min(rect.width * 0.55, 52));
+
+    var prevEl = idx > 0 ? findBlockEl(seg[idx - 1].id) : null;
+    var selfEl = idx < seg.length - 1 ? findBlockEl(seg[idx].id) : null;
+
+    // Sticky: if already showing a seam for this span, keep it while still nearby
+    if (lastActiveBlock) {
+      if (prevEl && lastActiveBlock === prevEl && relX <= keep) return prevEl;
+      if (selfEl && lastActiveBlock === selfEl && relX >= rect.width - keep) return selfEl;
+    }
 
     // Left side of this day → cut before this day = previous day's right scissors
-    if (relX <= zone && idx > 0) {
-      return findBlockEl(seg[idx - 1].id) || null;
-    }
+    if (relX <= acquire && prevEl) return prevEl;
     // Right side of this day → cut after this day = this day's scissors (if not last)
-    if (relX >= rect.width - zone && idx < seg.length - 1) {
-      return findBlockEl(seg[idx].id) || null;
-    }
-    // Last day has no right scissors; anywhere not in left zone → no scissors
+    if (relX >= rect.width - acquire && selfEl) return selfEl;
     // Middle of day → no scissors (avoid wrong-side flash)
     return null;
   }

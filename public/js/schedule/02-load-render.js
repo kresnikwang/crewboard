@@ -165,15 +165,6 @@ window.loadSchedule = async function loadSchedule() {
     initDragSelection(scheduleGrid);
   }
 
-  /* attach click on booking blocks in month view */
-  document.querySelectorAll('.m-booking[data-booking-id]').forEach(function (el) {
-    el.addEventListener('click', function (e) {
-      e.stopPropagation();
-      var bookingId = parseInt(el.dataset.bookingId, 10);
-      window.editBooking(bookingId);
-    });
-  });
-
   /* attach click on leave blocks for editing */
   document.querySelectorAll('.leave-block[data-leave-id], .m-leave[data-leave-id]').forEach(function (el) {
     el.addEventListener('click', function (e) {
@@ -228,17 +219,61 @@ window.loadSchedule = async function loadSchedule() {
     });
   });
 
-  /* attach split handlers */
-  document.querySelectorAll('.split-handle').forEach(function (handle) {
-    handle.addEventListener('click', function (e) {
-      e.stopPropagation();
+  /*
+   * Split / edit / move — use capture-phase delegation so scissors always win.
+   * Previously: inline onclick="editBooking" on the bar stole most seam clicks
+   * because the scissors sit half outside the parent and were easy to "miss".
+   */
+  var _suppressBookingClickUntil = 0;
+  function markSuppressBookingClick() {
+    _suppressBookingClickUntil = Date.now() + 500;
+  }
+  function shouldSuppressBookingClick() {
+    return Date.now() < _suppressBookingClickUntil;
+  }
+
+  if (scheduleGrid && !scheduleGrid._splitEditDelegated) {
+    scheduleGrid._splitEditDelegated = true;
+
+    // Capture: split wins before any bubble/inline handler
+    scheduleGrid.addEventListener('mousedown', function (e) {
+      var split = e.target.closest && e.target.closest('.split-handle');
+      if (!split || !scheduleGrid.contains(split)) return;
       e.preventDefault();
-      var bookingId = parseInt(handle.dataset.bookingId, 10);
-      if (bookingId) {
-        window.splitBooking(bookingId);
+      e.stopPropagation();
+      markSuppressBookingClick();
+    }, true);
+
+    scheduleGrid.addEventListener('click', function (e) {
+      var split = e.target.closest && e.target.closest('.split-handle');
+      if (split && scheduleGrid.contains(split)) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
+        markSuppressBookingClick();
+        var splitId = parseInt(split.dataset.bookingId, 10);
+        if (splitId) window.splitBooking(splitId);
+        return;
       }
-    });
-  });
+
+      // Booking bar click → edit (week + month), unless we just hit scissors/resize
+      if (shouldSuppressBookingClick()) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      if (e.target.closest('.resize-handle, .resize-handle-left, .split-handle')) return;
+
+      var block = e.target.closest('.booking-block, .m-booking');
+      if (!block || !scheduleGrid.contains(block)) return;
+      // leave blocks have their own handler
+      if (block.classList.contains('leave-block') || block.classList.contains('m-leave')) return;
+
+      e.stopPropagation();
+      var bookingId = parseInt(block.dataset.bookingId, 10);
+      if (bookingId) window.editBooking(bookingId);
+    }, true);
+  }
 
   /* attach move (drag) handlers to booking block bodies */
   document.querySelectorAll('.booking-block, .m-booking').forEach(function (block) {
@@ -686,7 +721,6 @@ function buildResourceRow(r, days, bMap, lMap) {
         ' data-booking-id="' + b.id + '"' +
         ' data-resource-id="' + b.resource_id + '"' +
         ' data-date="' + b.date + '"' +
-        ' onclick="window.editBooking(' + b.id + ')"' +
         ' title="' + escAttr(tooltipLines) + '">';
 
       if (hasBorderLeft) {

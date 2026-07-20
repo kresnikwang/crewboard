@@ -123,20 +123,21 @@
 .booking-block .split-handle {
   position: absolute;
   /* center of control on the right edge (between this day and next) */
-  right: -12px;
+  right: -14px;
   top: 50%;
-  width: 24px;
-  height: 24px;
-  margin-top: -12px;
+  /* larger hit box for reliable click; visual disc stays small */
+  width: 28px;
+  height: 28px;
+  margin-top: -14px;
   border-radius: 50%;
   cursor: pointer;
   opacity: 0;
   pointer-events: none;
-  z-index: 40;
+  z-index: 50;
   background: transparent;
   transition: opacity .08s linear, transform .08s linear;
 }
-/* Visible disc ~15px, centered in the 24px hit area */
+/* Visible disc ~15px, centered in the hit area */
 .booking-block .split-handle::before {
   content: '';
   position: absolute;
@@ -596,16 +597,16 @@
 
 .m-booking .split-handle {
   position: absolute;
-  right: -10px; /* width 20 → center on seam */
+  right: -12px; /* width 24 → center on seam */
   top: 50%;
-  width: 20px;
-  height: 20px;
-  margin-top: -10px;
+  width: 24px;
+  height: 24px;
+  margin-top: -12px;
   border-radius: 50%;
   cursor: pointer;
   opacity: 0;
   pointer-events: none;
-  z-index: 40;
+  z-index: 50;
   background: transparent;
   transition: opacity .08s linear, transform .08s linear;
 }
