@@ -1987,11 +1987,12 @@
     }
 
     // Highlight the full contiguous span on hover (resize handles on both ends).
-    // Only the day under the cursor gets .hover-active (shows scissors) — avoids
-    // every seam fighting the pointer. Delayed clear prevents flicker when the
-    // cursor briefly crosses a cell gap.
+    // Scissors (.hover-active) only appear near a day seam, and always on the day
+    // that OWNS that seam (the earlier day): so approaching day2 from the left
+    // lights day1's right scissors (cut between day1|day2), not day2's right scissors.
     var lastHoveredSpanIds = null; // array of string ids, or null
     var lastActiveBlock = null;
+    var lastSpanSegment = null; // booking objects for current span
     var hoverClearTimer = null;
 
     function cancelHoverClear() {
@@ -2008,50 +2009,80 @@
         clearBookingHoverHighlight();
         lastHoveredSpanIds = null;
         lastActiveBlock = null;
-      }, 140);
+        lastSpanSegment = null;
+      }, 160);
     }
 
-    document.addEventListener('mouseover', function (e) {
-      var grid = document.getElementById('schedule-grid');
-      if (!grid) return;
+    function findBlockEl(bookingId) {
+      return document.querySelector(
+        '.booking-block[data-booking-id="' + bookingId + '"], .m-booking[data-booking-id="' + bookingId + '"]'
+      );
+    }
 
-      // split / resize handles live inside the booking block
-      var block = e.target.closest('.booking-block, .m-booking');
-      if (!block || !grid.contains(block)) {
-        scheduleHoverClear();
-        return;
+    /**
+     * Pick which day's right-edge scissors should light up based on cursor X.
+     * Returns the block element that owns the nearest seam, or null if mid-day.
+     */
+    function pickSeamOwnerBlock(block, clientX, eventTarget) {
+      // Already on a scissors control → keep that day
+      var onSplit = eventTarget && eventTarget.closest && eventTarget.closest('.split-handle');
+      if (onSplit) {
+        return onSplit.closest('.booking-block, .m-booking') || block;
       }
-
-      cancelHoverClear();
 
       var bid = block.dataset.bookingId;
-      if (!bid) return;
+      var booking = _allBookings.find(function (b) { return String(b.id) === String(bid); });
+      if (!booking) return null;
 
-      // Same span: only update which day is "active" for scissors
-      if (lastHoveredSpanIds && lastHoveredSpanIds.indexOf(String(bid)) >= 0) {
-        if (block !== lastActiveBlock) {
-          if (lastActiveBlock) lastActiveBlock.classList.remove('hover-active');
-          block.classList.add('hover-active');
-          lastActiveBlock = block;
-        }
-        return;
+      var seg = lastSpanSegment;
+      if (!seg || !seg.some(function (b) { return String(b.id) === String(bid); })) {
+        seg = findBookingSpanSegment(booking);
       }
+      if (!seg || seg.length <= 1) return null;
 
-      if (lastHoveredSpanIds) clearBookingHoverHighlight();
-      lastHoveredSpanIds = highlightBookingSegments(bid);
-      block.classList.add('hover-active');
-      lastActiveBlock = block;
-    });
+      var idx = -1;
+      for (var i = 0; i < seg.length; i++) {
+        if (String(seg[i].id) === String(bid)) { idx = i; break; }
+      }
+      if (idx < 0) return null;
+
+      var rect = block.getBoundingClientRect();
+      if (!rect.width) return null;
+      var relX = clientX - rect.left;
+      // Near-edge zone: at least 20px, up to 42% of cell — left zone maps to PREVIOUS seam
+      var zone = Math.max(20, Math.min(rect.width * 0.42, 36));
+
+      // Left side of this day → cut before this day = previous day's right scissors
+      if (relX <= zone && idx > 0) {
+        return findBlockEl(seg[idx - 1].id) || null;
+      }
+      // Right side of this day → cut after this day = this day's scissors (if not last)
+      if (relX >= rect.width - zone && idx < seg.length - 1) {
+        return findBlockEl(seg[idx].id) || null;
+      }
+      // Last day has no right scissors; anywhere not in left zone → no scissors
+      // Middle of day → no scissors (avoid wrong-side flash)
+      return null;
+    }
+
+    function setHoverActive(el) {
+      if (el === lastActiveBlock) return;
+      if (lastActiveBlock) lastActiveBlock.classList.remove('hover-active');
+      if (el) el.classList.add('hover-active');
+      lastActiveBlock = el;
+    }
 
     function highlightBookingSegments(bookingId) {
       var ids = [String(bookingId)];
       var booking = _allBookings.find(function (b) { return String(b.id) === String(bookingId); });
+      var seg = null;
       if (booking) {
-        var seg = findBookingSpanSegment(booking);
+        seg = findBookingSpanSegment(booking);
         if (seg && seg.length) {
           ids = seg.map(function (b) { return String(b.id); });
         }
       }
+      lastSpanSegment = seg;
       ids.forEach(function (id) {
         document.querySelectorAll(
           '.booking-block[data-booking-id="' + id + '"], .m-booking[data-booking-id="' + id + '"]'
@@ -2069,6 +2100,44 @@
         el.classList.remove('hover-highlight', 'hover-active');
       });
     }
+
+    document.addEventListener('mouseover', function (e) {
+      var grid = document.getElementById('schedule-grid');
+      if (!grid) return;
+
+      var block = e.target.closest('.booking-block, .m-booking');
+      if (!block || !grid.contains(block)) {
+        scheduleHoverClear();
+        return;
+      }
+
+      cancelHoverClear();
+
+      var bid = block.dataset.bookingId;
+      if (!bid) return;
+
+      if (!lastHoveredSpanIds || lastHoveredSpanIds.indexOf(String(bid)) < 0) {
+        if (lastHoveredSpanIds) clearBookingHoverHighlight();
+        lastHoveredSpanIds = highlightBookingSegments(bid);
+      }
+
+      setHoverActive(pickSeamOwnerBlock(block, e.clientX, e.target));
+    });
+
+    // Continuous update while moving inside a day cell (mouseover alone won't fire)
+    document.addEventListener('mousemove', function (e) {
+      if (!lastHoveredSpanIds) return;
+      var grid = document.getElementById('schedule-grid');
+      if (!grid) return;
+
+      var block = e.target.closest('.booking-block, .m-booking');
+      if (!block || !grid.contains(block)) return;
+      var bid = block.dataset.bookingId;
+      if (!bid || lastHoveredSpanIds.indexOf(String(bid)) < 0) return;
+
+      cancelHoverClear();
+      setHoverActive(pickSeamOwnerBlock(block, e.clientX, e.target));
+    });
 
     /* Desktop keyboard shortcuts for schedule navigation */
     document.addEventListener('keydown', function (e) {
