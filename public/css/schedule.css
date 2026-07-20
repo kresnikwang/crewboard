@@ -102,54 +102,81 @@
 .booking-block.resizing .resize-handle-left { opacity: 1; pointer-events: auto; background: var(--primary); }
 
 /*
- * Split control — small scissors button on the day seam (NOT a full-height strip).
- * Full-height hit areas used to fight with grab / ew-resize and made the cursor flicker.
- * Soft seam line is visual-only (pointer-events: none).
+ * Split control
+ * - Visual scissors sits INSIDE the bar (right: 2px) so the pointer never has to
+ *   leave the booking into the cell gap (that gap used to clear hover → flicker).
+ * - Larger hit box via padding; cursor stays pointer only on this control.
+ * - Only the segment under the mouse (.hover-active) exposes the scissors; other
+ *   days of the span stay grab for dragging.
  */
-.booking-block.span-s.hover-highlight::after,
-.booking-block.span-m.hover-highlight::after {
+.booking-block.span-s.hover-active::after,
+.booking-block.span-m.hover-active::after {
   content: '';
   position: absolute;
-  right: -1px;
-  top: 2px;
-  bottom: 2px;
+  right: 0;
+  top: 3px;
+  bottom: 3px;
   width: 0;
-  border-right: 1.5px dashed rgba(30, 27, 75, 0.35);
+  border-right: 1.5px dashed rgba(30, 27, 75, 0.4);
   pointer-events: none;
   z-index: 5;
 }
 
 .booking-block .split-handle {
   position: absolute;
-  right: -9px;
+  right: 0;
   top: 50%;
-  width: 18px;
-  height: 18px;
-  margin-top: -9px; /* keep transform free for hover scale */
+  width: 28px;
+  height: 28px;
+  margin-top: -14px;
   border-radius: 50%;
   cursor: pointer;
   opacity: 0;
   pointer-events: none;
-  z-index: 30;
-  background-color: #1e1b4b;
+  z-index: 40;
+  background: transparent;
+  transition: opacity .08s linear, transform .08s linear;
+}
+/* Visible 20px disc (center); outer 28px is invisible hit padding */
+.booking-block .split-handle::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  border-radius: 50%;
+  background: #1e1b4b;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25), 0 0 0 1.5px rgba(255, 255, 255, 0.95);
+  pointer-events: none;
+}
+/* White scissors icon on top of the disc */
+.booking-block .split-handle::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  pointer-events: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='6' cy='6' r='3'%3E%3C/circle%3E%3Ccircle cx='6' cy='18' r='3'%3E%3C/circle%3E%3Cline x1='9.8' y1='8.2' x2='21' y2='19'%3E%3C/line%3E%3Cline x1='9.8' y1='15.8' x2='21' y2='5'%3E%3C/line%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: center;
-  background-size: 11px 11px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22), 0 0 0 1.5px rgba(255, 255, 255, 0.9);
-  transition: opacity .12s var(--ease-out), transform .12s var(--ease-out), box-shadow .12s var(--ease-out);
+  background-size: contain;
 }
-/* Show scissors only while the continuous span is hovered — small target, stable cursor */
-.booking-block.hover-highlight .split-handle {
-  opacity: 0.72;
+/* Only the day under the cursor shows scissors — avoids every seam fighting for the pointer */
+.booking-block.hover-active .split-handle {
+  opacity: 1;
   pointer-events: auto;
 }
 .booking-block .split-handle:hover {
-  opacity: 1;
-  transform: scale(1.12);
-  box-shadow: 0 2px 8px rgba(30, 27, 75, 0.35), 0 0 0 2px rgba(255, 255, 255, 0.95);
+  transform: scale(1.05);
 }
-/* No full-height ::before/::after tooltips — use native title attribute (i18n) instead */
+.booking-block .split-handle:hover::before {
+  box-shadow: 0 2px 8px rgba(30, 27, 75, 0.4), 0 0 0 2px #fff;
+}
 
 /* Move preview highlight — green */
 .booking-cell.move-preview,
@@ -556,48 +583,68 @@
 .m-booking.hover-highlight .resize-handle-left { opacity: 1; pointer-events: auto; }
 .m-booking.resizing .resize-handle-left { opacity: 1; pointer-events: auto; background: var(--primary); }
 
-/* Split control — month view (small scissors button, not full-height strip) */
-.m-booking.span-s.hover-highlight::after,
-.m-booking.span-m.hover-highlight::after {
+/* Split control — month view (same inside-bar + hover-active approach) */
+.m-booking.span-s.hover-active::after,
+.m-booking.span-m.hover-active::after {
   content: '';
   position: absolute;
-  right: -1px;
+  right: 0;
   top: 1px;
   bottom: 1px;
   width: 0;
-  border-right: 1px dashed rgba(30, 27, 75, 0.35);
+  border-right: 1px dashed rgba(30, 27, 75, 0.4);
   pointer-events: none;
   z-index: 5;
 }
 
 .m-booking .split-handle {
   position: absolute;
-  right: -8px;
+  right: 0;
   top: 50%;
-  width: 16px;
-  height: 16px;
-  margin-top: -8px;
+  width: 22px;
+  height: 22px;
+  margin-top: -11px;
   border-radius: 50%;
   cursor: pointer;
   opacity: 0;
   pointer-events: none;
-  z-index: 30;
-  background-color: #1e1b4b;
+  z-index: 40;
+  background: transparent;
+  transition: opacity .08s linear, transform .08s linear;
+}
+.m-booking .split-handle::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border-radius: 50%;
+  background: #1e1b4b;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22), 0 0 0 1.5px rgba(255, 255, 255, 0.95);
+  pointer-events: none;
+}
+.m-booking .split-handle::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  pointer-events: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='6' cy='6' r='3'%3E%3C/circle%3E%3Ccircle cx='6' cy='18' r='3'%3E%3C/circle%3E%3Cline x1='9.8' y1='8.2' x2='21' y2='19'%3E%3C/line%3E%3Cline x1='9.8' y1='15.8' x2='21' y2='5'%3E%3C/line%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: center;
-  background-size: 10px 10px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 0 0 1.5px rgba(255, 255, 255, 0.9);
-  transition: opacity .12s var(--ease-out), transform .12s var(--ease-out), box-shadow .12s var(--ease-out);
+  background-size: contain;
 }
-.m-booking.hover-highlight .split-handle {
-  opacity: 0.72;
+.m-booking.hover-active .split-handle {
+  opacity: 1;
   pointer-events: auto;
 }
 .m-booking .split-handle:hover {
-  opacity: 1;
-  transform: scale(1.12);
-  box-shadow: 0 2px 6px rgba(30, 27, 75, 0.35), 0 0 0 2px rgba(255, 255, 255, 0.95);
+  transform: scale(1.05);
 }
 
 /* Leave block in month view */

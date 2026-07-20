@@ -522,12 +522,9 @@ function detectSpans(resourceId, days, bMap) {
       }
       // else: solo booking (cls = null), has both left and right resize handles
 
-      // Only show text on span start (or solo) — middle/end of continuous bars stay clean
-      var showText = !cls || cls === 'span-s';
-
       info[b.id] = {
         cls: cls,
-        showText: showText,
+        showText: true, // every day cell shows project name
         spanLen: spanLengths[b.id] || 1,
         sortIdx: sortIdx  // Store the sort index for consistent ordering
       };

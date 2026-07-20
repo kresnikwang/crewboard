@@ -312,31 +312,61 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  // Highlight the full contiguous span on hover (not just one day id),
-  // so both resize handles on span ends become interactive together.
+  // Highlight the full contiguous span on hover (resize handles on both ends).
+  // Only the day under the cursor gets .hover-active (shows scissors) — avoids
+  // every seam fighting the pointer. Delayed clear prevents flicker when the
+  // cursor briefly crosses a cell gap.
   var lastHoveredSpanIds = null; // array of string ids, or null
+  var lastActiveBlock = null;
+  var hoverClearTimer = null;
+
+  function cancelHoverClear() {
+    if (hoverClearTimer) {
+      clearTimeout(hoverClearTimer);
+      hoverClearTimer = null;
+    }
+  }
+
+  function scheduleHoverClear() {
+    if (hoverClearTimer) return;
+    hoverClearTimer = setTimeout(function () {
+      hoverClearTimer = null;
+      clearBookingHoverHighlight();
+      lastHoveredSpanIds = null;
+      lastActiveBlock = null;
+    }, 140);
+  }
 
   document.addEventListener('mouseover', function (e) {
     var grid = document.getElementById('schedule-grid');
     if (!grid) return;
 
+    // split / resize handles live inside the booking block
     var block = e.target.closest('.booking-block, .m-booking');
-    // Left bookings entirely (empty cell, header, outside grid) → clear
     if (!block || !grid.contains(block)) {
-      if (lastHoveredSpanIds) {
-        clearBookingHoverHighlight();
-        lastHoveredSpanIds = null;
+      scheduleHoverClear();
+      return;
+    }
+
+    cancelHoverClear();
+
+    var bid = block.dataset.bookingId;
+    if (!bid) return;
+
+    // Same span: only update which day is "active" for scissors
+    if (lastHoveredSpanIds && lastHoveredSpanIds.indexOf(String(bid)) >= 0) {
+      if (block !== lastActiveBlock) {
+        if (lastActiveBlock) lastActiveBlock.classList.remove('hover-active');
+        block.classList.add('hover-active');
+        lastActiveBlock = block;
       }
       return;
     }
 
-    var bid = block.dataset.bookingId;
-    if (!bid) return;
-    // Already highlighting this span — keep handles active while moving across days
-    if (lastHoveredSpanIds && lastHoveredSpanIds.indexOf(String(bid)) >= 0) return;
-
     if (lastHoveredSpanIds) clearBookingHoverHighlight();
     lastHoveredSpanIds = highlightBookingSegments(bid);
+    block.classList.add('hover-active');
+    lastActiveBlock = block;
   });
 
   function highlightBookingSegments(bookingId) {
@@ -359,8 +389,10 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function clearBookingHoverHighlight() {
-    document.querySelectorAll('.booking-block.hover-highlight, .m-booking.hover-highlight').forEach(function (el) {
-      el.classList.remove('hover-highlight');
+    document.querySelectorAll(
+      '.booking-block.hover-highlight, .m-booking.hover-highlight, .booking-block.hover-active, .m-booking.hover-active'
+    ).forEach(function (el) {
+      el.classList.remove('hover-highlight', 'hover-active');
     });
   }
 
