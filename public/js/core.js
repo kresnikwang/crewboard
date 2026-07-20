@@ -489,6 +489,10 @@ window.closeModal = function closeModal() {
   if (typeof window._clearDragHighlight === 'function') {
     window._clearDragHighlight();
   }
+  // Clear multi-day edit span context (schedule module)
+  if (typeof window._clearEditSpanContext === 'function') {
+    window._clearEditSpanContext();
+  }
 };
 
 // 监听 Bootstrap Modal 的 hidden 事件，确保内容清空在动画结束后执行

@@ -158,11 +158,32 @@
     }
 
     var grid = document.getElementById('schedule-grid');
+    /* Preserve scroll position across re-renders (mutations, SSE, SWR). */
+    var prevScrollTop = grid ? grid.scrollTop : 0;
+    var prevScrollLeft = grid ? grid.scrollLeft : 0;
+    var monthScrollEl = grid && grid.querySelector('.month-scroll');
+    var prevMonthTop = monthScrollEl ? monthScrollEl.scrollTop : 0;
+    var prevMonthLeft = monthScrollEl ? monthScrollEl.scrollLeft : 0;
+
     grid.innerHTML = html;
     /* Month view: let .month-scroll be the sole scroll container
        so that sticky headers work correctly. Week view: .schedule-grid
        itself scrolls. */
     grid.style.overflow = isMonth ? 'hidden' : '';
+
+    requestAnimationFrame(function () {
+      if (!grid) return;
+      if (isMonth) {
+        var ms = grid.querySelector('.month-scroll');
+        if (ms) {
+          ms.scrollTop = prevMonthTop;
+          ms.scrollLeft = prevMonthLeft;
+        }
+      } else {
+        grid.scrollTop = prevScrollTop;
+        grid.scrollLeft = prevScrollLeft;
+      }
+    });
 
     var addBtn = document.getElementById('btn-add-booking');
     if (addBtn) {
@@ -548,9 +569,12 @@
         }
         // else: solo booking (cls = null), has both left and right resize handles
 
+        // Only show text on span start (or solo) — middle/end of continuous bars stay clean
+        var showText = !cls || cls === 'span-s';
+
         info[b.id] = {
           cls: cls,
-          showText: true,
+          showText: showText,
           spanLen: spanLengths[b.id] || 1,
           sortIdx: sortIdx  // Store the sort index for consistent ordering
         };
@@ -729,7 +753,7 @@
         }
         // Show split handle for span-start and span-middle (split point between days)
         if (si && (si.cls === 'span-s' || si.cls === 'span-m')) {
-          html += '<div class="split-handle" data-booking-id="' + b.id + '"></div>';
+          html += '<div class="split-handle" data-booking-id="' + b.id + '" title="' + escAttr(t('schedule.split_booking')) + '"></div>';
         }
         html += '</div>';
       });
@@ -782,8 +806,14 @@
       ? resizeSegment[resizeSegment.length - 1].date
       : booking.date;
 
-    // ── 3. 视觉状态 ────────────────────────────────────────────────
-    blockElement.classList.add('resizing');
+    // ── 3. 视觉状态：整段连续 booking 一起标 resizing ────────────────
+    var resizeIds = (resizeSegment && resizeSegment.length)
+      ? resizeSegment.map(function (b) { return b.id; })
+      : [booking.id];
+    resizeIds.forEach(function (id) {
+      var el = scheduleGrid.querySelector('[data-booking-id="' + id + '"]');
+      if (el) el.classList.add('resizing');
+    });
 
     // 在 overlay 创建之前捕获 booking block 的 offset（相对于 td），overlay 之后 getBoundingClientRect 不可靠
     var _barTop    = blockElement.offsetTop;
@@ -852,6 +882,8 @@
       _rafRight = requestAnimationFrame(function () {
         _rafRight = null;
 
+        edgeAutoScroll(e.clientX, e.clientY);
+
         // 暂时隐藏遮罩以穿透取到下方元素
         overlay.style.pointerEvents = 'none';
         var el = document.elementFromPoint(e.clientX, e.clientY);
@@ -880,6 +912,7 @@
     function handleMouseUp(e) {
       if (!isResizing) return;
       cleanup();
+      suppressNextClick(); // prevent post-drag click from opening edit modal
 
       // 检查是否有实际移动：要么 index 变化，要么鼠标向左移动了足够距离
       var movedLeft = e.clientX < startX - 30; // 向左移动超过 30px
@@ -989,16 +1022,19 @@
       isResizing = false;
       if (_rafRight) { cancelAnimationFrame(_rafRight); _rafRight = null; }
       clearPreview();
-      blockElement.classList.remove('resizing');
+      resizeIds.forEach(function (id) {
+        var el = scheduleGrid.querySelector('[data-booking-id="' + id + '"]');
+        if (el) el.classList.remove('resizing');
+      });
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup',   handleMouseUp);
+      document.removeEventListener('keydown',   handleKeyDown);
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
     }
 
     function handleKeyDown(e) {
       if (e.key === 'Escape') {
         cleanup();
-        document.removeEventListener('keydown', handleKeyDown);
       }
     }
 
@@ -1048,8 +1084,12 @@
       if (originalIndex === -1) return; // 整个 span 都不在视图中
     }
 
-    // 3. 视觉状态
-    blockElement.classList.add('resizing');
+    // 3. 视觉状态：整段标 resizing
+    var resizeIdsLeft = groupSegment.map(function (b) { return b.id; });
+    resizeIdsLeft.forEach(function (id) {
+      var el = scheduleGrid.querySelector('[data-booking-id="' + id + '"]');
+      if (el) el.classList.add('resizing');
+    });
 
     // overlay 之前捕获 offset（overlay 覆盖后 getBoundingClientRect 不可靠）
     var _barTopL    = blockElement.offsetTop;
@@ -1098,6 +1138,7 @@
       if (_rafLeft) return;
       _rafLeft = requestAnimationFrame(function () {
         _rafLeft = null;
+        edgeAutoScroll(e.clientX, e.clientY);
         overlay.style.pointerEvents = 'none';
         var el = document.elementFromPoint(e.clientX, e.clientY);
         overlay.style.pointerEvents = '';
@@ -1119,6 +1160,7 @@
     function handleMouseUp(e) {
       if (!isResizing) return;
       cleanup();
+      suppressNextClick(); // prevent post-drag click from opening edit modal
       if (currentHoverIndex === originalIndex) return;
 
       if (currentHoverIndex < originalIndex) {
@@ -1201,7 +1243,10 @@
       isResizing = false;
       if (_rafLeft) { cancelAnimationFrame(_rafLeft); _rafLeft = null; }
       clearPreview();
-      blockElement.classList.remove('resizing');
+      resizeIdsLeft.forEach(function (id) {
+        var el = scheduleGrid.querySelector('[data-booking-id="' + id + '"]');
+        if (el) el.classList.remove('resizing');
+      });
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup',   handleMouseUp);
       document.removeEventListener('keydown',   handleKeyDown);
@@ -1292,6 +1337,8 @@
       _rafMove = requestAnimationFrame(function () {
         _rafMove = null;
 
+        edgeAutoScroll(e.clientX, e.clientY);
+
         overlay.style.pointerEvents = 'none';
         var el = document.elementFromPoint(e.clientX, e.clientY);
         overlay.style.pointerEvents = '';
@@ -1317,6 +1364,7 @@
     function handleMouseUp() {
       if (!isMoving) return;
       cleanup();
+      suppressNextClick(); // prevent post-drag click from opening edit modal
 
       if (currentDelta === 0) return;
 
@@ -1438,14 +1486,12 @@
       });
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup',   handleMouseUp);
+      document.removeEventListener('keydown',   handleKeyDown);
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
     }
 
     function handleKeyDown(e) {
-      if (e.key === 'Escape') {
-        cleanup();
-        document.removeEventListener('keydown', handleKeyDown);
-      }
+      if (e.key === 'Escape') cleanup();
     }
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -1511,6 +1557,8 @@
       if (_rafDrag) return;
       _rafDrag = requestAnimationFrame(function () {
         _rafDrag = null;
+
+        edgeAutoScroll(e.clientX, e.clientY);
 
         var cell = document.elementFromPoint(e.clientX, e.clientY);
         if (!cell) return;
@@ -1825,7 +1873,7 @@
         }
         // Show split handle for span-start and span-middle (split point between days)
         if (si && (si.cls === 'span-s' || si.cls === 'span-m')) {
-          html += '<div class="split-handle" data-booking-id="' + b.id + '"></div>';
+          html += '<div class="split-handle" data-booking-id="' + b.id + '" title="' + escAttr(t('schedule.split_booking')) + '"></div>';
         }
         html += '</div>';
       });
@@ -1941,56 +1989,89 @@
       });
     }
 
-    // Highlight all segments of the same booking on hover
-    var lastHoveredId = null;
+    // Highlight the full contiguous span on hover (not just one day id),
+    // so both resize handles on span ends become interactive together.
+    var lastHoveredSpanIds = null; // array of string ids, or null
+
     document.addEventListener('mouseover', function (e) {
       var grid = document.getElementById('schedule-grid');
       if (!grid) return;
+
       var block = e.target.closest('.booking-block, .m-booking');
-      if (!block) {
-        if (lastHoveredId) {
-          clearBookingHoverHighlight(lastHoveredId);
-          lastHoveredId = null;
+      // Left bookings entirely (empty cell, header, outside grid) → clear
+      if (!block || !grid.contains(block)) {
+        if (lastHoveredSpanIds) {
+          clearBookingHoverHighlight();
+          lastHoveredSpanIds = null;
         }
         return;
       }
-      var bid = block.dataset.bookingId;
-      if (bid && bid !== lastHoveredId) {
-        if (lastHoveredId) {
-          clearBookingHoverHighlight(lastHoveredId);
-        }
-        highlightBookingSegments(bid);
-        lastHoveredId = bid;
-      }
-    });
 
-    document.addEventListener('mouseout', function (e) {
-      var grid = document.getElementById('schedule-grid');
-      if (!grid) return;
-      var block = e.target.closest('.booking-block, .m-booking');
-      if (block) {
-        var related = e.relatedTarget && e.relatedTarget.closest('.booking-block, .m-booking');
-        if (related && related.dataset.bookingId === block.dataset.bookingId) {
-          return; // still hovering same booking
-        }
-      }
-      if (lastHoveredId) {
-        clearBookingHoverHighlight(lastHoveredId);
-        lastHoveredId = null;
-      }
+      var bid = block.dataset.bookingId;
+      if (!bid) return;
+      // Already highlighting this span — keep handles active while moving across days
+      if (lastHoveredSpanIds && lastHoveredSpanIds.indexOf(String(bid)) >= 0) return;
+
+      if (lastHoveredSpanIds) clearBookingHoverHighlight();
+      lastHoveredSpanIds = highlightBookingSegments(bid);
     });
 
     function highlightBookingSegments(bookingId) {
-      document.querySelectorAll('.booking-block[data-booking-id="' + bookingId + '"], .m-booking[data-booking-id="' + bookingId + '"]').forEach(function (el) {
-        el.classList.add('hover-highlight');
+      var ids = [String(bookingId)];
+      var booking = _allBookings.find(function (b) { return String(b.id) === String(bookingId); });
+      if (booking) {
+        var seg = findBookingSpanSegment(booking);
+        if (seg && seg.length) {
+          ids = seg.map(function (b) { return String(b.id); });
+        }
+      }
+      ids.forEach(function (id) {
+        document.querySelectorAll(
+          '.booking-block[data-booking-id="' + id + '"], .m-booking[data-booking-id="' + id + '"]'
+        ).forEach(function (el) {
+          el.classList.add('hover-highlight');
+        });
       });
+      return ids;
     }
 
-    function clearBookingHoverHighlight(bookingId) {
-      document.querySelectorAll('.booking-block[data-booking-id="' + bookingId + '"], .m-booking[data-booking-id="' + bookingId + '"]').forEach(function (el) {
+    function clearBookingHoverHighlight() {
+      document.querySelectorAll('.booking-block.hover-highlight, .m-booking.hover-highlight').forEach(function (el) {
         el.classList.remove('hover-highlight');
       });
     }
+
+    /* Desktop keyboard shortcuts for schedule navigation */
+    document.addEventListener('keydown', function (e) {
+      if (state.currentPage !== 'schedule') return;
+      // Ignore when typing in form fields or when a modal is open
+      var tag = (e.target && e.target.tagName) || '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target.isContentEditable) return;
+      if (isModalOpen()) return;
+      // Ignore modified keys (except we don't use them)
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        if (prevBtn) prevBtn.click();
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        if (nextBtn) nextBtn.click();
+      } else if (e.key === 't' || e.key === 'T') {
+        e.preventDefault();
+        if (todayBtn) todayBtn.click();
+      } else if (e.key === 'w' || e.key === 'W') {
+        if (state.scheduleView === 'week') return;
+        e.preventDefault();
+        var weekBtn = document.querySelector('#view-toggle .view-btn[data-view="week"]');
+        if (weekBtn) weekBtn.click();
+      } else if (e.key === 'm' || e.key === 'M') {
+        if (state.scheduleView === 'month') return;
+        e.preventDefault();
+        var monthBtn = document.querySelector('#view-toggle .view-btn[data-view="month"]');
+        if (monthBtn) monthBtn.click();
+      }
+    });
   });
 
   /* --------------------------------------------------
@@ -1999,6 +2080,121 @@
 
 
   /* schedule/05-modal.js — part of schedule module (bundled into schedule.js) */
+
+  /** Span context for the open edit modal: { ids, firstDate, lastDate, dayDate, count } or null */
+  var _editSpanContext = null;
+  window._clearEditSpanContext = function () { _editSpanContext = null; };
+
+  function getEditRangeMode() {
+    var checked = document.querySelector('input[name="bk-edit-range"]:checked');
+    return checked ? checked.value : 'day';
+  }
+
+  /**
+   * Scope toggle when editing a day that belongs to a multi-day continuous span.
+   * Default = this day only; user can switch to "all days" without pre-splitting.
+   */
+  function buildEditRangeField(booking, spanGroup) {
+    if (!booking || !spanGroup || spanGroup.length <= 1) return '';
+
+    var first = spanGroup[0];
+    var last = spanGroup[spanGroup.length - 1];
+    var dayLabel = booking.date.length >= 10 ? booking.date.slice(5) : booking.date;
+    var rangeLabel = first.date.slice(5) + ' ~ ' + last.date.slice(5);
+    var n = spanGroup.length;
+
+    return (
+      '<div class="bk-edit-range" id="bk-edit-range-wrap">' +
+        '<div class="bk-edit-range-label">' + t('schedule.edit_scope') +
+          '<span class="bk-edit-range-badge">' + n + ' ' + t('schedule.days') + '</span>' +
+        '</div>' +
+        '<div class="bk-edit-range-options" role="radiogroup" aria-label="' + escAttr(t('schedule.edit_scope')) + '">' +
+          '<label class="bk-edit-range-opt">' +
+            '<input type="radio" name="bk-edit-range" value="day" checked>' +
+            '<span class="bk-edit-range-opt-body">' +
+              '<span class="bk-edit-range-opt-title">' + t('schedule.edit_this_day') + '</span>' +
+              '<span class="bk-edit-range-opt-sub">' + dayLabel + '</span>' +
+            '</span>' +
+          '</label>' +
+          '<label class="bk-edit-range-opt">' +
+            '<input type="radio" name="bk-edit-range" value="all">' +
+            '<span class="bk-edit-range-opt-body">' +
+              '<span class="bk-edit-range-opt-title">' + t('schedule.edit_all_days') + '</span>' +
+              '<span class="bk-edit-range-opt-sub">' + rangeLabel + ' · ' + n + ' ' + t('schedule.days') + '</span>' +
+            '</span>' +
+          '</label>' +
+        '</div>' +
+        '<div class="bk-edit-range-hint" id="bk-edit-range-hint">' + t('schedule.edit_scope_day_hint') + '</div>' +
+      '</div>'
+    );
+  }
+
+  function initEditRangeToggle(booking, spanGroup) {
+    _editSpanContext = null;
+    if (!booking || !spanGroup || spanGroup.length <= 1) return;
+
+    _editSpanContext = {
+      ids: spanGroup.map(function (b) { return b.id; }),
+      firstDate: spanGroup[0].date,
+      lastDate: spanGroup[spanGroup.length - 1].date,
+      dayDate: booking.date,
+      count: spanGroup.length
+    };
+
+    var dateStart = document.getElementById('bk-date-start');
+    var dateEnd = document.getElementById('bk-date-end');
+    var deleteBtn = document.querySelector('#modal-footer .bk-footer-left');
+    var saveBtn = document.querySelector('#modal-footer .btn-primary');
+    var titleEl = document.getElementById('modal-title');
+    var hintEl = document.getElementById('bk-edit-range-hint');
+
+    function applyMode() {
+      var mode = getEditRangeMode();
+      var isAll = mode === 'all';
+
+      // All-days mode keeps each day on its own date; lock date fields to the span range display
+      if (dateStart) {
+        dateStart.disabled = isAll;
+        dateStart.value = isAll ? _editSpanContext.firstDate : _editSpanContext.dayDate;
+      }
+      if (dateEnd) {
+        dateEnd.disabled = isAll;
+        dateEnd.value = isAll ? _editSpanContext.lastDate : _editSpanContext.dayDate;
+      }
+
+      if (hintEl) {
+        hintEl.textContent = isAll
+          ? t('schedule.edit_scope_all_hint')
+          : t('schedule.edit_scope_day_hint');
+      }
+      if (titleEl) {
+        titleEl.textContent = isAll
+          ? (t('schedule.batch_edit') + ' (' + _editSpanContext.count + ' ' + t('schedule.days') + ')')
+          : t('schedule.edit_booking');
+      }
+      if (deleteBtn) {
+        deleteBtn.textContent = isAll ? t('schedule.delete_all') : t('schedule.delete_booking');
+      }
+      if (saveBtn) {
+        saveBtn.textContent = isAll ? t('schedule.save_all') : t('schedule.save_changes');
+      }
+
+      // Visual state on option cards
+      document.querySelectorAll('.bk-edit-range-opt').forEach(function (lab) {
+        var input = lab.querySelector('input');
+        if (input && input.checked) lab.classList.add('active');
+        else lab.classList.remove('active');
+      });
+
+      updateBookingTotal();
+    }
+
+    document.querySelectorAll('input[name="bk-edit-range"]').forEach(function (radio) {
+      radio.addEventListener('change', applyMode);
+    });
+    applyMode();
+  }
+
   async function showBookingModal(bookingId, resourceId, date, endDate) {
     var fetched = await Promise.all([
       api('/api/resources'),
@@ -2010,6 +2206,13 @@
     var booking = null;
     if (bookingId) {
       booking = _allBookings.find(function (b) { return b.id === bookingId; });
+    }
+
+    // Contiguous multi-day span containing this booking (if any)
+    var spanGroup = null;
+    if (booking) {
+      var seg = findBookingSpanSegment(booking);
+      if (seg && seg.length > 1) spanGroup = seg;
     }
 
     var dateVal = (booking && booking.date) || date || fmt(new Date());
@@ -2028,6 +2231,7 @@
     var body = buildModalTabs(bookingId) +
       /* ---- BOOKING TAB ---- */
       '<div class="bk-tab-content active" id="bk-tab-booking">' +
+        buildEditRangeField(booking, spanGroup) +
         buildResourceField(resources, null, preSelectedIds) +
         buildTimeFields(dateVal, endDateVal, hoursVal, bookingId) +
         '<div class="bk-separator"></div>' +
@@ -2078,6 +2282,9 @@
 
     /* Init time mode toggle */
     initTimeToggle();
+
+    /* Edit range (this day vs whole span) */
+    initEditRangeToggle(booking, spanGroup);
 
     /* Update total on input change */
     updateBookingTotal();
@@ -2880,6 +3087,44 @@
 
     var scopeSelect = document.getElementById('bk-scope');
     var projectScopeId = scopeSelect && scopeSelect.value ? parseInt(scopeSelect.value, 10) : null;
+    var hoursRounded = Math.round(totalH * 10) / 10;
+    var isTentative = document.getElementById('bk-tentative').checked;
+    var notesVal = document.getElementById('bk-notes').value;
+
+    /* Multi-day span: "全部天数" applies the same fields to every day in the span
+       (dates stay on each day — only project / hours / notes / tentative change). */
+    var editRange = typeof getEditRangeMode === 'function' ? getEditRangeMode() : 'day';
+    if (id && editRange === 'all' && _editSpanContext && _editSpanContext.ids && _editSpanContext.ids.length > 1) {
+      if (hoursRounded <= 0) { toast(t('schedule.invalid_hours'), 'error'); return; }
+      try {
+        var spanIds = _editSpanContext.ids;
+        var promises = spanIds.map(function (bid) {
+          var b = _allBookings.find(function (x) { return x.id === bid; });
+          if (!b) return Promise.resolve();
+          return (window.apiBookingWithConflictConfirm || api)('/api/bookings/' + bid, {
+            method: 'PUT',
+            body: {
+              resource_id: resourceIds[0],
+              project_id: projectId,
+              project_scope_id: projectScopeId,
+              date: b.date,
+              hours: hoursRounded,
+              is_tentative: isTentative,
+              notes: notesVal
+            }
+          });
+        });
+        await Promise.all(promises.filter(Boolean));
+        _editSpanContext = null;
+        document.getElementById('modal').classList.remove('bk-modal');
+        closeModal();
+        toast(t('schedule.batch_updated'), 'success');
+        reloadAfterMutation();
+      } catch (err) {
+        toast(err.message || t('common.update_failed'), 'error');
+      }
+      return;
+    }
 
     try {
       if (id) {
@@ -2900,9 +3145,9 @@
             project_id: projectId,
             project_scope_id: projectScopeId,
             date: startDateVal,
-            hours: Math.round(totalH * 10) / 10,
-            is_tentative: document.getElementById('bk-tentative').checked,
-            notes: document.getElementById('bk-notes').value
+            hours: hoursRounded,
+            is_tentative: isTentative,
+            notes: notesVal
           };
           await (window.apiBookingWithConflictConfirm || api)('/api/bookings/' + id, { method: 'PUT', body: data });
         } else {
@@ -3096,6 +3341,7 @@
           await Promise.all(promises);
         }
       }
+      _editSpanContext = null;
       document.getElementById('modal').classList.remove('bk-modal');
       closeModal();
       toast(id ? t('schedule.booking_updated') : t('schedule.booking_created'), 'success');
@@ -3203,25 +3449,10 @@
       toast(t('schedule.no_edit_permission'), 'error');
       return;
     }
-    // Check if this booking belongs to a continuous span group
-    var isMonth = state.scheduleView === 'month';
-    var days = isMonth
-      ? (function () { var d = []; for (var w = 0; w < 4; w++) for (var dd = 0; dd < 7; dd++) d.push(addDays(state.scheduleWeekStart, w * 7 + dd)); return d; })()
-      : weekDates(state.scheduleWeekStart);
-    var bMap = {};
-    _allBookings.forEach(function (b) {
-      var key = b.resource_id + '_' + b.date;
-      if (!bMap[key]) bMap[key] = [];
-      bMap[key].push(b);
-    });
-    var group = getSpanGroup(id, bMap, days);
-    if (group) {
-      // Multi-day span: edit all days together (user can split first if they want single-day edit)
-      var ids = group.map(function (b) { return b.id; });
-      showBatchEditModal(ids);
-    } else {
-      showBookingModal(id);
-    }
+    // Always open the full single-day editor for the clicked day.
+    // If it belongs to a multi-day span, the modal shows a "this day / all days"
+    // range toggle so the user can edit one day without pre-splitting.
+    showBookingModal(id);
   };
 
   /* Split a multi-day booking at the clicked point (called by split-handle click) */
@@ -3317,6 +3548,7 @@
           var splitHandle = document.createElement('div');
           splitHandle.className = 'split-handle';
           splitHandle.dataset.bookingId = id;
+          splitHandle.title = t('schedule.split_booking');
           splitHandle.addEventListener('click', function (e) {
             e.stopPropagation();
             e.preventDefault();
@@ -3331,9 +3563,30 @@
   }
 
   window.deleteBooking = async function (id) {
+    var editRange = typeof getEditRangeMode === 'function' ? getEditRangeMode() : 'day';
+    var deleteAll = editRange === 'all' && _editSpanContext && _editSpanContext.ids && _editSpanContext.ids.length > 1;
+
+    if (deleteAll) {
+      if (!confirm(t('schedule.confirm_delete_batch'))) return;
+      try {
+        await Promise.all(_editSpanContext.ids.map(function (bid) {
+          return api('/api/bookings/' + bid, { method: 'DELETE' });
+        }));
+        _editSpanContext = null;
+        document.getElementById('modal').classList.remove('bk-modal');
+        closeModal();
+        toast(t('schedule.batch_deleted'), 'success');
+        reloadAfterMutation();
+      } catch (err) {
+        toast(err.message || t('common.delete_failed'), 'error');
+      }
+      return;
+    }
+
     if (!confirm(t('schedule.confirm_delete_booking'))) return;
     try {
       await api('/api/bookings/' + id, { method: 'DELETE' });
+      _editSpanContext = null;
       document.getElementById('modal').classList.remove('bk-modal');
       closeModal();
       toast(t('schedule.booking_deleted'), 'success');
@@ -3480,5 +3733,64 @@
     return str.length > maxLen ? str.slice(0, maxLen) + '\u2026' : str;
   }
 
+  /** Suppress the synthetic click that fires after a drag/resize mouseup. */
+  function suppressNextClick() {
+    var active = true;
+    function handler(ev) {
+      if (!active) return;
+      active = false;
+      ev.stopPropagation();
+      ev.preventDefault();
+      document.removeEventListener('click', handler, true);
+    }
+    document.addEventListener('click', handler, true);
+    // Safety: remove listener if click never arrives (e.g. mouse left window)
+    setTimeout(function () {
+      if (active) {
+        active = false;
+        document.removeEventListener('click', handler, true);
+      }
+    }, 400);
+  }
+
+  /**
+   * Auto-scroll the active schedule container when the pointer is near an edge.
+   * Works for week view (.schedule-grid) and month view (.month-scroll).
+   */
+  function edgeAutoScroll(clientX, clientY) {
+    var grid = document.getElementById('schedule-grid');
+    if (!grid) return false;
+    var scrollEl = grid.querySelector('.month-scroll') || grid;
+    var rect = scrollEl.getBoundingClientRect();
+    var edge = 48;
+    var speed = 14;
+    var scrolled = false;
+
+    if (clientX < rect.left + edge) {
+      scrollEl.scrollLeft -= speed;
+      scrolled = true;
+    } else if (clientX > rect.right - edge) {
+      scrollEl.scrollLeft += speed;
+      scrolled = true;
+    }
+
+    if (clientY < rect.top + edge) {
+      scrollEl.scrollTop -= speed;
+      scrolled = true;
+    } else if (clientY > rect.bottom - edge) {
+      scrollEl.scrollTop += speed;
+      scrolled = true;
+    }
+
+    return scrolled;
+  }
+
+  /** True when a Bootstrap (or fallback) modal is open. */
+  function isModalOpen() {
+    var el = document.getElementById('modal-overlay');
+    if (!el) return false;
+    return el.classList.contains('show') || el.classList.contains('showing') ||
+      (el.style.display === 'flex');
+  }
 
 })();

@@ -196,7 +196,7 @@ function buildMonthResourceRow(r, days, bMap, lMap) {
       }
       // Show split handle for span-start and span-middle (split point between days)
       if (si && (si.cls === 'span-s' || si.cls === 'span-m')) {
-        html += '<div class="split-handle" data-booking-id="' + b.id + '"></div>';
+        html += '<div class="split-handle" data-booking-id="' + b.id + '" title="' + escAttr(t('schedule.split_booking')) + '"></div>';
       }
       html += '</div>';
     });
@@ -312,56 +312,89 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  // Highlight all segments of the same booking on hover
-  var lastHoveredId = null;
+  // Highlight the full contiguous span on hover (not just one day id),
+  // so both resize handles on span ends become interactive together.
+  var lastHoveredSpanIds = null; // array of string ids, or null
+
   document.addEventListener('mouseover', function (e) {
     var grid = document.getElementById('schedule-grid');
     if (!grid) return;
+
     var block = e.target.closest('.booking-block, .m-booking');
-    if (!block) {
-      if (lastHoveredId) {
-        clearBookingHoverHighlight(lastHoveredId);
-        lastHoveredId = null;
+    // Left bookings entirely (empty cell, header, outside grid) → clear
+    if (!block || !grid.contains(block)) {
+      if (lastHoveredSpanIds) {
+        clearBookingHoverHighlight();
+        lastHoveredSpanIds = null;
       }
       return;
     }
-    var bid = block.dataset.bookingId;
-    if (bid && bid !== lastHoveredId) {
-      if (lastHoveredId) {
-        clearBookingHoverHighlight(lastHoveredId);
-      }
-      highlightBookingSegments(bid);
-      lastHoveredId = bid;
-    }
-  });
 
-  document.addEventListener('mouseout', function (e) {
-    var grid = document.getElementById('schedule-grid');
-    if (!grid) return;
-    var block = e.target.closest('.booking-block, .m-booking');
-    if (block) {
-      var related = e.relatedTarget && e.relatedTarget.closest('.booking-block, .m-booking');
-      if (related && related.dataset.bookingId === block.dataset.bookingId) {
-        return; // still hovering same booking
-      }
-    }
-    if (lastHoveredId) {
-      clearBookingHoverHighlight(lastHoveredId);
-      lastHoveredId = null;
-    }
+    var bid = block.dataset.bookingId;
+    if (!bid) return;
+    // Already highlighting this span — keep handles active while moving across days
+    if (lastHoveredSpanIds && lastHoveredSpanIds.indexOf(String(bid)) >= 0) return;
+
+    if (lastHoveredSpanIds) clearBookingHoverHighlight();
+    lastHoveredSpanIds = highlightBookingSegments(bid);
   });
 
   function highlightBookingSegments(bookingId) {
-    document.querySelectorAll('.booking-block[data-booking-id="' + bookingId + '"], .m-booking[data-booking-id="' + bookingId + '"]').forEach(function (el) {
-      el.classList.add('hover-highlight');
+    var ids = [String(bookingId)];
+    var booking = _allBookings.find(function (b) { return String(b.id) === String(bookingId); });
+    if (booking) {
+      var seg = findBookingSpanSegment(booking);
+      if (seg && seg.length) {
+        ids = seg.map(function (b) { return String(b.id); });
+      }
+    }
+    ids.forEach(function (id) {
+      document.querySelectorAll(
+        '.booking-block[data-booking-id="' + id + '"], .m-booking[data-booking-id="' + id + '"]'
+      ).forEach(function (el) {
+        el.classList.add('hover-highlight');
+      });
     });
+    return ids;
   }
 
-  function clearBookingHoverHighlight(bookingId) {
-    document.querySelectorAll('.booking-block[data-booking-id="' + bookingId + '"], .m-booking[data-booking-id="' + bookingId + '"]').forEach(function (el) {
+  function clearBookingHoverHighlight() {
+    document.querySelectorAll('.booking-block.hover-highlight, .m-booking.hover-highlight').forEach(function (el) {
       el.classList.remove('hover-highlight');
     });
   }
+
+  /* Desktop keyboard shortcuts for schedule navigation */
+  document.addEventListener('keydown', function (e) {
+    if (state.currentPage !== 'schedule') return;
+    // Ignore when typing in form fields or when a modal is open
+    var tag = (e.target && e.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target.isContentEditable) return;
+    if (isModalOpen()) return;
+    // Ignore modified keys (except we don't use them)
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      if (prevBtn) prevBtn.click();
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      if (nextBtn) nextBtn.click();
+    } else if (e.key === 't' || e.key === 'T') {
+      e.preventDefault();
+      if (todayBtn) todayBtn.click();
+    } else if (e.key === 'w' || e.key === 'W') {
+      if (state.scheduleView === 'week') return;
+      e.preventDefault();
+      var weekBtn = document.querySelector('#view-toggle .view-btn[data-view="week"]');
+      if (weekBtn) weekBtn.click();
+    } else if (e.key === 'm' || e.key === 'M') {
+      if (state.scheduleView === 'month') return;
+      e.preventDefault();
+      var monthBtn = document.querySelector('#view-toggle .view-btn[data-view="month"]');
+      if (monthBtn) monthBtn.click();
+    }
+  });
 });
 
 /* --------------------------------------------------

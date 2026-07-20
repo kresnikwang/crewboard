@@ -24,8 +24,14 @@ function initResizeBooking(blockElement, booking, startEvent) {
     ? resizeSegment[resizeSegment.length - 1].date
     : booking.date;
 
-  // ── 3. 视觉状态 ────────────────────────────────────────────────
-  blockElement.classList.add('resizing');
+  // ── 3. 视觉状态：整段连续 booking 一起标 resizing ────────────────
+  var resizeIds = (resizeSegment && resizeSegment.length)
+    ? resizeSegment.map(function (b) { return b.id; })
+    : [booking.id];
+  resizeIds.forEach(function (id) {
+    var el = scheduleGrid.querySelector('[data-booking-id="' + id + '"]');
+    if (el) el.classList.add('resizing');
+  });
 
   // 在 overlay 创建之前捕获 booking block 的 offset（相对于 td），overlay 之后 getBoundingClientRect 不可靠
   var _barTop    = blockElement.offsetTop;
@@ -94,6 +100,8 @@ function initResizeBooking(blockElement, booking, startEvent) {
     _rafRight = requestAnimationFrame(function () {
       _rafRight = null;
 
+      edgeAutoScroll(e.clientX, e.clientY);
+
       // 暂时隐藏遮罩以穿透取到下方元素
       overlay.style.pointerEvents = 'none';
       var el = document.elementFromPoint(e.clientX, e.clientY);
@@ -122,6 +130,7 @@ function initResizeBooking(blockElement, booking, startEvent) {
   function handleMouseUp(e) {
     if (!isResizing) return;
     cleanup();
+    suppressNextClick(); // prevent post-drag click from opening edit modal
 
     // 检查是否有实际移动：要么 index 变化，要么鼠标向左移动了足够距离
     var movedLeft = e.clientX < startX - 30; // 向左移动超过 30px
@@ -231,16 +240,19 @@ function initResizeBooking(blockElement, booking, startEvent) {
     isResizing = false;
     if (_rafRight) { cancelAnimationFrame(_rafRight); _rafRight = null; }
     clearPreview();
-    blockElement.classList.remove('resizing');
+    resizeIds.forEach(function (id) {
+      var el = scheduleGrid.querySelector('[data-booking-id="' + id + '"]');
+      if (el) el.classList.remove('resizing');
+    });
     document.removeEventListener('mousemove', handleMouseMove);
     document.removeEventListener('mouseup',   handleMouseUp);
+    document.removeEventListener('keydown',   handleKeyDown);
     if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
   }
 
   function handleKeyDown(e) {
     if (e.key === 'Escape') {
       cleanup();
-      document.removeEventListener('keydown', handleKeyDown);
     }
   }
 
@@ -290,8 +302,12 @@ function initResizeBookingLeft(blockElement, booking, startEvent) {
     if (originalIndex === -1) return; // 整个 span 都不在视图中
   }
 
-  // 3. 视觉状态
-  blockElement.classList.add('resizing');
+  // 3. 视觉状态：整段标 resizing
+  var resizeIdsLeft = groupSegment.map(function (b) { return b.id; });
+  resizeIdsLeft.forEach(function (id) {
+    var el = scheduleGrid.querySelector('[data-booking-id="' + id + '"]');
+    if (el) el.classList.add('resizing');
+  });
 
   // overlay 之前捕获 offset（overlay 覆盖后 getBoundingClientRect 不可靠）
   var _barTopL    = blockElement.offsetTop;
@@ -340,6 +356,7 @@ function initResizeBookingLeft(blockElement, booking, startEvent) {
     if (_rafLeft) return;
     _rafLeft = requestAnimationFrame(function () {
       _rafLeft = null;
+      edgeAutoScroll(e.clientX, e.clientY);
       overlay.style.pointerEvents = 'none';
       var el = document.elementFromPoint(e.clientX, e.clientY);
       overlay.style.pointerEvents = '';
@@ -361,6 +378,7 @@ function initResizeBookingLeft(blockElement, booking, startEvent) {
   function handleMouseUp(e) {
     if (!isResizing) return;
     cleanup();
+    suppressNextClick(); // prevent post-drag click from opening edit modal
     if (currentHoverIndex === originalIndex) return;
 
     if (currentHoverIndex < originalIndex) {
@@ -443,7 +461,10 @@ function initResizeBookingLeft(blockElement, booking, startEvent) {
     isResizing = false;
     if (_rafLeft) { cancelAnimationFrame(_rafLeft); _rafLeft = null; }
     clearPreview();
-    blockElement.classList.remove('resizing');
+    resizeIdsLeft.forEach(function (id) {
+      var el = scheduleGrid.querySelector('[data-booking-id="' + id + '"]');
+      if (el) el.classList.remove('resizing');
+    });
     document.removeEventListener('mousemove', handleMouseMove);
     document.removeEventListener('mouseup',   handleMouseUp);
     document.removeEventListener('keydown',   handleKeyDown);
@@ -534,6 +555,8 @@ function initMoveBooking(blockElement, booking, startEvent) {
     _rafMove = requestAnimationFrame(function () {
       _rafMove = null;
 
+      edgeAutoScroll(e.clientX, e.clientY);
+
       overlay.style.pointerEvents = 'none';
       var el = document.elementFromPoint(e.clientX, e.clientY);
       overlay.style.pointerEvents = '';
@@ -559,6 +582,7 @@ function initMoveBooking(blockElement, booking, startEvent) {
   function handleMouseUp() {
     if (!isMoving) return;
     cleanup();
+    suppressNextClick(); // prevent post-drag click from opening edit modal
 
     if (currentDelta === 0) return;
 
@@ -680,14 +704,12 @@ function initMoveBooking(blockElement, booking, startEvent) {
     });
     document.removeEventListener('mousemove', handleMouseMove);
     document.removeEventListener('mouseup',   handleMouseUp);
+    document.removeEventListener('keydown',   handleKeyDown);
     if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
   }
 
   function handleKeyDown(e) {
-    if (e.key === 'Escape') {
-      cleanup();
-      document.removeEventListener('keydown', handleKeyDown);
-    }
+    if (e.key === 'Escape') cleanup();
   }
 
   document.addEventListener('mousemove', handleMouseMove);
@@ -753,6 +775,8 @@ function initDragSelection(container) {
     if (_rafDrag) return;
     _rafDrag = requestAnimationFrame(function () {
       _rafDrag = null;
+
+      edgeAutoScroll(e.clientX, e.clientY);
 
       var cell = document.elementFromPoint(e.clientX, e.clientY);
       if (!cell) return;

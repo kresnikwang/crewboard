@@ -111,11 +111,32 @@ window.loadSchedule = async function loadSchedule() {
   }
 
   var grid = document.getElementById('schedule-grid');
+  /* Preserve scroll position across re-renders (mutations, SSE, SWR). */
+  var prevScrollTop = grid ? grid.scrollTop : 0;
+  var prevScrollLeft = grid ? grid.scrollLeft : 0;
+  var monthScrollEl = grid && grid.querySelector('.month-scroll');
+  var prevMonthTop = monthScrollEl ? monthScrollEl.scrollTop : 0;
+  var prevMonthLeft = monthScrollEl ? monthScrollEl.scrollLeft : 0;
+
   grid.innerHTML = html;
   /* Month view: let .month-scroll be the sole scroll container
      so that sticky headers work correctly. Week view: .schedule-grid
      itself scrolls. */
   grid.style.overflow = isMonth ? 'hidden' : '';
+
+  requestAnimationFrame(function () {
+    if (!grid) return;
+    if (isMonth) {
+      var ms = grid.querySelector('.month-scroll');
+      if (ms) {
+        ms.scrollTop = prevMonthTop;
+        ms.scrollLeft = prevMonthLeft;
+      }
+    } else {
+      grid.scrollTop = prevScrollTop;
+      grid.scrollLeft = prevScrollLeft;
+    }
+  });
 
   var addBtn = document.getElementById('btn-add-booking');
   if (addBtn) {
@@ -501,9 +522,12 @@ function detectSpans(resourceId, days, bMap) {
       }
       // else: solo booking (cls = null), has both left and right resize handles
 
+      // Only show text on span start (or solo) — middle/end of continuous bars stay clean
+      var showText = !cls || cls === 'span-s';
+
       info[b.id] = {
         cls: cls,
-        showText: true,
+        showText: showText,
         spanLen: spanLengths[b.id] || 1,
         sortIdx: sortIdx  // Store the sort index for consistent ordering
       };
@@ -682,7 +706,7 @@ function buildResourceRow(r, days, bMap, lMap) {
       }
       // Show split handle for span-start and span-middle (split point between days)
       if (si && (si.cls === 'span-s' || si.cls === 'span-m')) {
-        html += '<div class="split-handle" data-booking-id="' + b.id + '"></div>';
+        html += '<div class="split-handle" data-booking-id="' + b.id + '" title="' + escAttr(t('schedule.split_booking')) + '"></div>';
       }
       html += '</div>';
     });

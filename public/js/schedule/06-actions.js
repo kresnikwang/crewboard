@@ -13,6 +13,44 @@ window.saveBooking = async function (id) {
 
   var scopeSelect = document.getElementById('bk-scope');
   var projectScopeId = scopeSelect && scopeSelect.value ? parseInt(scopeSelect.value, 10) : null;
+  var hoursRounded = Math.round(totalH * 10) / 10;
+  var isTentative = document.getElementById('bk-tentative').checked;
+  var notesVal = document.getElementById('bk-notes').value;
+
+  /* Multi-day span: "全部天数" applies the same fields to every day in the span
+     (dates stay on each day — only project / hours / notes / tentative change). */
+  var editRange = typeof getEditRangeMode === 'function' ? getEditRangeMode() : 'day';
+  if (id && editRange === 'all' && _editSpanContext && _editSpanContext.ids && _editSpanContext.ids.length > 1) {
+    if (hoursRounded <= 0) { toast(t('schedule.invalid_hours'), 'error'); return; }
+    try {
+      var spanIds = _editSpanContext.ids;
+      var promises = spanIds.map(function (bid) {
+        var b = _allBookings.find(function (x) { return x.id === bid; });
+        if (!b) return Promise.resolve();
+        return (window.apiBookingWithConflictConfirm || api)('/api/bookings/' + bid, {
+          method: 'PUT',
+          body: {
+            resource_id: resourceIds[0],
+            project_id: projectId,
+            project_scope_id: projectScopeId,
+            date: b.date,
+            hours: hoursRounded,
+            is_tentative: isTentative,
+            notes: notesVal
+          }
+        });
+      });
+      await Promise.all(promises.filter(Boolean));
+      _editSpanContext = null;
+      document.getElementById('modal').classList.remove('bk-modal');
+      closeModal();
+      toast(t('schedule.batch_updated'), 'success');
+      reloadAfterMutation();
+    } catch (err) {
+      toast(err.message || t('common.update_failed'), 'error');
+    }
+    return;
+  }
 
   try {
     if (id) {
@@ -33,9 +71,9 @@ window.saveBooking = async function (id) {
           project_id: projectId,
           project_scope_id: projectScopeId,
           date: startDateVal,
-          hours: Math.round(totalH * 10) / 10,
-          is_tentative: document.getElementById('bk-tentative').checked,
-          notes: document.getElementById('bk-notes').value
+          hours: hoursRounded,
+          is_tentative: isTentative,
+          notes: notesVal
         };
         await (window.apiBookingWithConflictConfirm || api)('/api/bookings/' + id, { method: 'PUT', body: data });
       } else {
@@ -229,6 +267,7 @@ window.saveBooking = async function (id) {
         await Promise.all(promises);
       }
     }
+    _editSpanContext = null;
     document.getElementById('modal').classList.remove('bk-modal');
     closeModal();
     toast(id ? t('schedule.booking_updated') : t('schedule.booking_created'), 'success');
@@ -336,25 +375,10 @@ window.editBooking = function (id) {
     toast(t('schedule.no_edit_permission'), 'error');
     return;
   }
-  // Check if this booking belongs to a continuous span group
-  var isMonth = state.scheduleView === 'month';
-  var days = isMonth
-    ? (function () { var d = []; for (var w = 0; w < 4; w++) for (var dd = 0; dd < 7; dd++) d.push(addDays(state.scheduleWeekStart, w * 7 + dd)); return d; })()
-    : weekDates(state.scheduleWeekStart);
-  var bMap = {};
-  _allBookings.forEach(function (b) {
-    var key = b.resource_id + '_' + b.date;
-    if (!bMap[key]) bMap[key] = [];
-    bMap[key].push(b);
-  });
-  var group = getSpanGroup(id, bMap, days);
-  if (group) {
-    // Multi-day span: edit all days together (user can split first if they want single-day edit)
-    var ids = group.map(function (b) { return b.id; });
-    showBatchEditModal(ids);
-  } else {
-    showBookingModal(id);
-  }
+  // Always open the full single-day editor for the clicked day.
+  // If it belongs to a multi-day span, the modal shows a "this day / all days"
+  // range toggle so the user can edit one day without pre-splitting.
+  showBookingModal(id);
 };
 
 /* Split a multi-day booking at the clicked point (called by split-handle click) */
@@ -450,6 +474,7 @@ function updateSplitHandlesAfterReSplit(leftIds, rightIds) {
         var splitHandle = document.createElement('div');
         splitHandle.className = 'split-handle';
         splitHandle.dataset.bookingId = id;
+        splitHandle.title = t('schedule.split_booking');
         splitHandle.addEventListener('click', function (e) {
           e.stopPropagation();
           e.preventDefault();
@@ -464,9 +489,30 @@ function updateSplitHandlesAfterReSplit(leftIds, rightIds) {
 }
 
 window.deleteBooking = async function (id) {
+  var editRange = typeof getEditRangeMode === 'function' ? getEditRangeMode() : 'day';
+  var deleteAll = editRange === 'all' && _editSpanContext && _editSpanContext.ids && _editSpanContext.ids.length > 1;
+
+  if (deleteAll) {
+    if (!confirm(t('schedule.confirm_delete_batch'))) return;
+    try {
+      await Promise.all(_editSpanContext.ids.map(function (bid) {
+        return api('/api/bookings/' + bid, { method: 'DELETE' });
+      }));
+      _editSpanContext = null;
+      document.getElementById('modal').classList.remove('bk-modal');
+      closeModal();
+      toast(t('schedule.batch_deleted'), 'success');
+      reloadAfterMutation();
+    } catch (err) {
+      toast(err.message || t('common.delete_failed'), 'error');
+    }
+    return;
+  }
+
   if (!confirm(t('schedule.confirm_delete_booking'))) return;
   try {
     await api('/api/bookings/' + id, { method: 'DELETE' });
+    _editSpanContext = null;
     document.getElementById('modal').classList.remove('bk-modal');
     closeModal();
     toast(t('schedule.booking_deleted'), 'success');

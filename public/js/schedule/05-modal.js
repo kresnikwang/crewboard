@@ -1,4 +1,119 @@
 /* schedule/05-modal.js — part of schedule module (bundled into schedule.js) */
+
+/** Span context for the open edit modal: { ids, firstDate, lastDate, dayDate, count } or null */
+var _editSpanContext = null;
+window._clearEditSpanContext = function () { _editSpanContext = null; };
+
+function getEditRangeMode() {
+  var checked = document.querySelector('input[name="bk-edit-range"]:checked');
+  return checked ? checked.value : 'day';
+}
+
+/**
+ * Scope toggle when editing a day that belongs to a multi-day continuous span.
+ * Default = this day only; user can switch to "all days" without pre-splitting.
+ */
+function buildEditRangeField(booking, spanGroup) {
+  if (!booking || !spanGroup || spanGroup.length <= 1) return '';
+
+  var first = spanGroup[0];
+  var last = spanGroup[spanGroup.length - 1];
+  var dayLabel = booking.date.length >= 10 ? booking.date.slice(5) : booking.date;
+  var rangeLabel = first.date.slice(5) + ' ~ ' + last.date.slice(5);
+  var n = spanGroup.length;
+
+  return (
+    '<div class="bk-edit-range" id="bk-edit-range-wrap">' +
+      '<div class="bk-edit-range-label">' + t('schedule.edit_scope') +
+        '<span class="bk-edit-range-badge">' + n + ' ' + t('schedule.days') + '</span>' +
+      '</div>' +
+      '<div class="bk-edit-range-options" role="radiogroup" aria-label="' + escAttr(t('schedule.edit_scope')) + '">' +
+        '<label class="bk-edit-range-opt">' +
+          '<input type="radio" name="bk-edit-range" value="day" checked>' +
+          '<span class="bk-edit-range-opt-body">' +
+            '<span class="bk-edit-range-opt-title">' + t('schedule.edit_this_day') + '</span>' +
+            '<span class="bk-edit-range-opt-sub">' + dayLabel + '</span>' +
+          '</span>' +
+        '</label>' +
+        '<label class="bk-edit-range-opt">' +
+          '<input type="radio" name="bk-edit-range" value="all">' +
+          '<span class="bk-edit-range-opt-body">' +
+            '<span class="bk-edit-range-opt-title">' + t('schedule.edit_all_days') + '</span>' +
+            '<span class="bk-edit-range-opt-sub">' + rangeLabel + ' · ' + n + ' ' + t('schedule.days') + '</span>' +
+          '</span>' +
+        '</label>' +
+      '</div>' +
+      '<div class="bk-edit-range-hint" id="bk-edit-range-hint">' + t('schedule.edit_scope_day_hint') + '</div>' +
+    '</div>'
+  );
+}
+
+function initEditRangeToggle(booking, spanGroup) {
+  _editSpanContext = null;
+  if (!booking || !spanGroup || spanGroup.length <= 1) return;
+
+  _editSpanContext = {
+    ids: spanGroup.map(function (b) { return b.id; }),
+    firstDate: spanGroup[0].date,
+    lastDate: spanGroup[spanGroup.length - 1].date,
+    dayDate: booking.date,
+    count: spanGroup.length
+  };
+
+  var dateStart = document.getElementById('bk-date-start');
+  var dateEnd = document.getElementById('bk-date-end');
+  var deleteBtn = document.querySelector('#modal-footer .bk-footer-left');
+  var saveBtn = document.querySelector('#modal-footer .btn-primary');
+  var titleEl = document.getElementById('modal-title');
+  var hintEl = document.getElementById('bk-edit-range-hint');
+
+  function applyMode() {
+    var mode = getEditRangeMode();
+    var isAll = mode === 'all';
+
+    // All-days mode keeps each day on its own date; lock date fields to the span range display
+    if (dateStart) {
+      dateStart.disabled = isAll;
+      dateStart.value = isAll ? _editSpanContext.firstDate : _editSpanContext.dayDate;
+    }
+    if (dateEnd) {
+      dateEnd.disabled = isAll;
+      dateEnd.value = isAll ? _editSpanContext.lastDate : _editSpanContext.dayDate;
+    }
+
+    if (hintEl) {
+      hintEl.textContent = isAll
+        ? t('schedule.edit_scope_all_hint')
+        : t('schedule.edit_scope_day_hint');
+    }
+    if (titleEl) {
+      titleEl.textContent = isAll
+        ? (t('schedule.batch_edit') + ' (' + _editSpanContext.count + ' ' + t('schedule.days') + ')')
+        : t('schedule.edit_booking');
+    }
+    if (deleteBtn) {
+      deleteBtn.textContent = isAll ? t('schedule.delete_all') : t('schedule.delete_booking');
+    }
+    if (saveBtn) {
+      saveBtn.textContent = isAll ? t('schedule.save_all') : t('schedule.save_changes');
+    }
+
+    // Visual state on option cards
+    document.querySelectorAll('.bk-edit-range-opt').forEach(function (lab) {
+      var input = lab.querySelector('input');
+      if (input && input.checked) lab.classList.add('active');
+      else lab.classList.remove('active');
+    });
+
+    updateBookingTotal();
+  }
+
+  document.querySelectorAll('input[name="bk-edit-range"]').forEach(function (radio) {
+    radio.addEventListener('change', applyMode);
+  });
+  applyMode();
+}
+
 async function showBookingModal(bookingId, resourceId, date, endDate) {
   var fetched = await Promise.all([
     api('/api/resources'),
@@ -10,6 +125,13 @@ async function showBookingModal(bookingId, resourceId, date, endDate) {
   var booking = null;
   if (bookingId) {
     booking = _allBookings.find(function (b) { return b.id === bookingId; });
+  }
+
+  // Contiguous multi-day span containing this booking (if any)
+  var spanGroup = null;
+  if (booking) {
+    var seg = findBookingSpanSegment(booking);
+    if (seg && seg.length > 1) spanGroup = seg;
   }
 
   var dateVal = (booking && booking.date) || date || fmt(new Date());
@@ -28,6 +150,7 @@ async function showBookingModal(bookingId, resourceId, date, endDate) {
   var body = buildModalTabs(bookingId) +
     /* ---- BOOKING TAB ---- */
     '<div class="bk-tab-content active" id="bk-tab-booking">' +
+      buildEditRangeField(booking, spanGroup) +
       buildResourceField(resources, null, preSelectedIds) +
       buildTimeFields(dateVal, endDateVal, hoursVal, bookingId) +
       '<div class="bk-separator"></div>' +
@@ -78,6 +201,9 @@ async function showBookingModal(bookingId, resourceId, date, endDate) {
 
   /* Init time mode toggle */
   initTimeToggle();
+
+  /* Edit range (this day vs whole span) */
+  initEditRangeToggle(booking, spanGroup);
 
   /* Update total on input change */
   updateBookingTotal();
