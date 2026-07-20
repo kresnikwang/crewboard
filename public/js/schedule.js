@@ -372,8 +372,8 @@
      Returns a map: bookingId -> { cls, showText, spanLen, sortIdx }
      A span is consecutive days with same (project_id, hours, is_tentative).
 
-     Vertical order uses a STABLE LANE across the whole row (not per-day sort),
-     so two concurrent projects stay on fixed tracks and do not "cross" mid-week.
+     Vertical order is a STABLE key (project → hours → tentative → scope → id)
+     applied the same way every day, so concurrent bars never swap tracks mid-week.
      -------------------------------------------------- */
   function detectSpans(resourceId, days, bMap) {
     var info = {};
@@ -396,32 +396,45 @@
 
     // Helper: check if there's a booking on a specific date (from _allBookings, not just current view)
     var hasBookingOnDate = function (dateStr, matchFn) {
-      // Use _allBookings directly to find bookings outside current view
       return _allBookings.some(function (b) {
         return b.resource_id === resourceId && b.date === dateStr && matchFn(b);
       });
     };
 
+    /** Stable vertical order key — same for every day this booking appears. */
+    var stableSortKey = function (b) {
+      // project first so each project keeps a fixed track relative to others
+      var scope = b.project_scope_id != null ? Number(b.project_scope_id) : 0;
+      return [
+        Number(b.project_id) || 0,
+        parseFloat(b.hours) || 0,
+        b.is_tentative ? 1 : 0,
+        scope,
+        Number(b.id) || 0
+      ];
+    };
+    var cmpKeys = function (ka, kb) {
+      for (var i = 0; i < ka.length; i++) {
+        if (ka[i] !== kb[i]) return ka[i] < kb[i] ? -1 : 1;
+      }
+      return 0;
+    };
+
     // First pass: identify all spans and calculate their lengths (using full dataset)
-    var spanLengths = {}; // bookingId -> span length (in days)
-    var spanStartDate = {}; // bookingId -> start date of span
-    var spanEndDate = {}; // bookingId -> end date of span
-    var spanMembers = {}; // spanKey -> span meta
-    var bookingToSpanKey = {}; // bookingId -> spanKey
-    var processed = {}; // track which booking ids have been processed
+    var spanLengths = {};
+    var spanStartDate = {};
+    var spanEndDate = {};
+    var processed = {};
 
     for (var di = 0; di < dateFmts.length; di++) {
       rawDayLists[di].forEach(function (b) {
         if (processed[b.id]) return;
 
         var matchFn = matchFnBuilder(b);
-
-        // Find the full span for this booking (extend beyond current view if needed)
         var spanIds = [b.id];
         var startDate = b.date;
         var endDate = b.date;
 
-        // Look backward for more bookings in this span (outside current view)
         var prevDate = new Date(b.date);
         prevDate.setDate(prevDate.getDate() - 1);
         while (true) {
@@ -432,14 +445,12 @@
                    matchFn(ob);
           });
           if (!prevBooking) break;
-          // Check if prevBooking has split_after (can't extend past split)
           if (prevBooking.split_after === 1 || prevBooking.split_after === true) break;
           spanIds.unshift(prevBooking.id);
           startDate = prevDateStr;
           prevDate.setDate(prevDate.getDate() - 1);
         }
 
-        // Look forward for more bookings in this span
         var nextDate = new Date(b.date);
         nextDate.setDate(nextDate.getDate() + 1);
         while (true) {
@@ -450,7 +461,6 @@
                    matchFn(ob);
           });
           if (!nextBooking) break;
-          // Check for split point (this booking has split_after)
           var currBooking = _allBookings.find(function (ob) {
             return ob.id === spanIds[spanIds.length - 1];
           });
@@ -460,109 +470,61 @@
           nextDate.setDate(nextDate.getDate() + 1);
         }
 
-        // Stable key for this contiguous segment
-        var spanKey = spanIds[0];
-        spanMembers[spanKey] = {
-          ids: spanIds,
-          start: startDate,
-          end: endDate,
-          len: spanIds.length,
-          project_id: b.project_id,
-          hours: parseFloat(b.hours),
-          is_tentative: !!b.is_tentative
-        };
-
-        // Record span info for all bookings in this span
         spanIds.forEach(function (id) {
           spanLengths[id] = spanIds.length;
           spanStartDate[id] = startDate;
           spanEndDate[id] = endDate;
-          bookingToSpanKey[id] = spanKey;
           processed[id] = true;
         });
       });
     }
 
-    // Second pass: detect group bookings (same project + same dates, multiple resources)
-    var isGroupBooking = {}; // bookingId -> boolean
-    for (var di2 = 0; di2 < dateFmts.length; di2++) {
-      rawDayLists[di2].forEach(function (b) {
-        if (isGroupBooking[b.id] !== undefined) return; // already computed
-
-        var start = spanStartDate[b.id] || b.date;
-        var end = spanEndDate[b.id] || b.date;
-
-        // Check if any other resource has the same project in the same date range
-        var isGroup = _allBookings.some(function (other) {
-          if (other.id === b.id) return false;
-          if (other.project_id !== b.project_id) return false;
-          if (other.resource_id === resourceId) return false; // must be different resource
-          // Check if dates overlap
-          var otherStart = spanStartDate[other.id] || other.date;
-          var otherEnd = spanEndDate[other.id] || other.date;
-          return start <= otherEnd && otherStart <= end;
-        });
-        isGroupBooking[b.id] = isGroup;
+    // Second pass: stable rank among all bookings on this resource (for sortIdx).
+    // Use min id per (project, hours, tentative, scope) so all days of that track share one rank.
+    var trackKeyOf = function (b) {
+      return [
+        Number(b.project_id) || 0,
+        parseFloat(b.hours) || 0,
+        b.is_tentative ? 1 : 0,
+        b.project_scope_id != null ? Number(b.project_scope_id) : 0
+      ].join('|');
+    };
+    var trackRank = {}; // trackKey -> rank
+    var trackList = [];
+    var seenTrack = {};
+    rawDayLists.forEach(function (list) {
+      list.forEach(function (b) {
+        var tk = trackKeyOf(b);
+        if (seenTrack[tk]) return;
+        seenTrack[tk] = true;
+        trackList.push({ key: tk, sample: b });
       });
-    }
-
-    // Third pass: assign a STABLE vertical lane for each span across the whole row.
-    // Greedy packing: place each span in the lowest free lane so concurrent projects
-    // keep a fixed track and never "cross" mid-week.
-    var spanList = Object.keys(spanMembers).map(function (k) {
-      var s = spanMembers[k];
-      s.key = k;
-      s.isGroup = s.ids.some(function (id) { return isGroupBooking[id]; });
-      return s;
     });
-    spanList.sort(function (a, b) {
-      // Earlier start first, then longer, then group, then project, hours, id
-      if (a.start !== b.start) return a.start < b.start ? -1 : 1;
-      if (b.len !== a.len) return b.len - a.len;
-      if (a.isGroup !== b.isGroup) return (b.isGroup ? 1 : 0) - (a.isGroup ? 1 : 0);
-      if (a.project_id !== b.project_id) return a.project_id - b.project_id;
-      if (a.hours !== b.hours) return a.hours - b.hours;
-      return Number(a.key) - Number(b.key);
-    });
+    trackList.sort(function (a, b) { return cmpKeys(stableSortKey(a.sample), stableSortKey(b.sample)); });
+    trackList.forEach(function (t, i) { trackRank[t.key] = i; });
 
-    var laneEnds = []; // lane index -> last end date (YYYY-MM-DD) occupying this lane
-    var spanLane = {}; // spanKey -> lane
-    spanList.forEach(function (s) {
-      var lane = 0;
-      for (; lane < laneEnds.length; lane++) {
-        // Free if previous span on this lane ends before this one starts
-        if (laneEnds[lane] < s.start) break;
-      }
-      if (lane === laneEnds.length) laneEnds.push(s.end);
-      else laneEnds[lane] = s.end;
-      spanLane[s.key] = lane;
-    });
-
-    // Fourth pass: assign span classes; sortIdx = stable lane (same every day)
+    // Third pass: assign span classes; sortIdx = stable track rank
     for (var di3 = 0; di3 < dateFmts.length; di3++) {
       rawDayLists[di3].forEach(function (b) {
         var matchFn = matchFnBuilder(b);
         var bDate = b.date;
         var startDate = spanStartDate[b.id] || bDate;
         var endDate = spanEndDate[b.id] || bDate;
-        var sk = bookingToSpanKey[b.id];
-        var lane = (sk != null && spanLane[sk] != null) ? spanLane[sk] : 999;
+        var rank = trackRank[trackKeyOf(b)];
+        if (rank == null) rank = 999;
 
-        // Check if there's a previous day in the span (outside view if needed)
         var prevDate = new Date(bDate);
         prevDate.setDate(prevDate.getDate() - 1);
         var prevDateStr = fmt(prevDate);
         var hasPrev = prevDateStr >= startDate && prevDateStr < bDate &&
                       hasBookingOnDate(prevDateStr, matchFn);
 
-        // Check if there's a next day in the span (outside view if needed)
         var nextDate = new Date(bDate);
         nextDate.setDate(nextDate.getDate() + 1);
         var nextDateStr = fmt(nextDate);
         var hasNext = nextDateStr > bDate && nextDateStr <= endDate &&
                       hasBookingOnDate(nextDateStr, matchFn);
 
-        // Check if this booking is after a split point
         var isAfterSplit = false;
         if (hasPrev) {
           var prevBooking = _allBookings.find(function (ob) {
@@ -573,12 +535,7 @@
           isAfterSplit = prevBooking && (prevBooking.split_after === 1 || prevBooking.split_after === true);
         }
 
-        // Force span-e if this booking has split_after flag
         var isSplitPoint = b.split_after === 1 || b.split_after === true;
-
-        // split_after only affects the RIGHT side (no visual connection to next day)
-        // It does NOT affect the LEFT side (can still be span-m or span-e if hasPrev)
-        // isAfterSplit affects the LEFT side (treat as new span start)
         var effectiveHasNext = hasNext && !isSplitPoint;
         var effectiveHasPrev = hasPrev && !isAfterSplit;
 
@@ -590,13 +547,12 @@
         } else if (!effectiveHasPrev && effectiveHasNext) {
           cls = 'span-s';
         }
-        // else: solo booking (cls is null), has both left and right resize handles
 
         info[b.id] = {
           cls: cls,
-          showText: true, // every day cell shows project name
+          showText: true,
           spanLen: spanLengths[b.id] || 1,
-          sortIdx: lane  // stable lane across all days of this resource row
+          sortIdx: rank
         };
       });
     }
