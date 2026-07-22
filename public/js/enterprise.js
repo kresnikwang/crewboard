@@ -202,7 +202,15 @@ window.loadEnterprise = async function loadEnterprise() {
             method: 'POST',
             body: { email: email, name: name }
           });
-          toast(t('enterprise.invite_sent'));
+          if (result.email_sent) {
+            toast(t('enterprise.invite_sent'));
+          } else {
+            // 邮件发送失败：复制邀请链接作为兜底，管理员可手动转发
+            if (result.invite_link && navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(result.invite_link).catch(function () {});
+            }
+            toast(t('enterprise.invite_email_failed'), 'error');
+          }
           document.getElementById('invite-email').value = '';
           document.getElementById('invite-name').value = '';
           loadInvitations();

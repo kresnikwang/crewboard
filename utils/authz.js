@@ -211,7 +211,7 @@ function authMiddleware(db) {
     const token = req.headers.authorization?.replace('Bearer ', '') || req.query.token;
     if (token) {
       const session = db.prepare(
-        'SELECT * FROM sessions WHERE token = ? AND expires_at > datetime(?)'
+        'SELECT * FROM sessions WHERE token = ? AND expires_at > ?'
       ).get(token, new Date().toISOString());
       if (session) {
         req.user = db.prepare(`
@@ -227,12 +227,15 @@ function authMiddleware(db) {
 
 /** Remove expired sessions and used/expired password-reset tokens. */
 function cleanupExpiredAuth(db) {
+  // expires_at is stored as ISO-8601 UTC (toISOString); compare with ISO so
+  // same-day expiry is honoured (datetime('now') string-compares incorrectly).
+  const nowIso = new Date().toISOString();
   const sessions = db.prepare(
-    "DELETE FROM sessions WHERE expires_at <= datetime('now')"
-  ).run();
+    'DELETE FROM sessions WHERE expires_at <= ?'
+  ).run(nowIso);
   const tokens = db.prepare(
-    "DELETE FROM password_reset_tokens WHERE used = 1 OR expires_at <= datetime('now')"
-  ).run();
+    'DELETE FROM password_reset_tokens WHERE used = 1 OR expires_at <= ?'
+  ).run(nowIso);
   return {
     sessionsDeleted: sessions.changes,
     tokensDeleted: tokens.changes,

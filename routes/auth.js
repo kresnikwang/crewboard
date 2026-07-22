@@ -591,6 +591,7 @@ module.exports = function(db) {
       token,
       invite_code: enterprise.code,
       enterprise_name: enterprise.name,
+      invite_link: inviteLink,
       email_sent: emailResult.ok
     });
   });
@@ -618,6 +619,43 @@ module.exports = function(db) {
     db.prepare('DELETE FROM invitations WHERE id = ? AND enterprise_id = ?')
       .run(req.params.id, req.user.enterprise_id);
     res.json({ ok: true });
+  });
+
+  // Accept invitation (logged-in user without an enterprise, e.g. clicked the
+  // invite link while already signed in with the invited email account)
+  router.post('/invitations/accept', (req, res) => {
+    if (!req.user) return res.status(401).json({ error: '未登录' });
+    if (req.user.enterprise_id) return res.status(400).json({ error: '您已属于一个企业' });
+
+    const { token } = req.body;
+    if (!token) return res.status(400).json({ error: '缺少邀请令牌' });
+
+    const invitation = db.prepare(`
+      SELECT i.*, e.name as enterprise_name
+      FROM invitations i
+      JOIN enterprises e ON i.enterprise_id = e.id
+      WHERE i.token = ? AND i.status = 'pending'
+    `).get(token);
+    if (!invitation) return res.status(400).json({ error: '邀请不存在或已被取消' });
+
+    // Invitation must be addressed to this account's email
+    if (!req.user.email || req.user.email.toLowerCase() !== (invitation.email || '').toLowerCase()) {
+      return res.status(400).json({ error: '邀请邮箱与当前登录账号不匹配' });
+    }
+
+    const enterprise_id = invitation.enterprise_id;
+    // Create resource entry
+    const resResult = db.prepare('INSERT INTO resources (name, email, role, team, enterprise_id) VALUES (?,?,?,?,?)')
+      .run(req.user.name, req.user.email, '', '', enterprise_id);
+    const resourceId = resResult.lastInsertRowid;
+    // Join enterprise
+    db.prepare('UPDATE users SET enterprise_id = ?, resource_id = ?, role = ? WHERE id = ?')
+      .run(enterprise_id, resourceId, 'basic', req.user.id);
+    // Mark invitation as accepted
+    db.prepare('UPDATE invitations SET status = ? WHERE id = ?').run('accepted', invitation.id);
+
+    const enterprise = publicEnterprise(getEnterpriseRow(db, enterprise_id), { forAdmin: false });
+    res.json({ ok: true, enterprise_name: invitation.enterprise_name, enterprise });
   });
 
   // === FORGOT PASSWORD ===
@@ -656,8 +694,11 @@ module.exports = function(db) {
 
   // Step 2: Verify reset token
   router.get('/reset-password/:token', (req, res) => {
+    // expires_at is stored as ISO-8601 UTC (toISOString) — compare against an
+    // ISO string directly. Using datetime(?) yields 'YYYY-MM-DD HH:MM:SS',
+    // whose string comparison against ISO ('T' > ' ') accepted expired tokens.
     const row = db.prepare(
-      'SELECT * FROM password_reset_tokens WHERE token = ? AND used = 0 AND expires_at > datetime(?)'
+      'SELECT * FROM password_reset_tokens WHERE token = ? AND used = 0 AND expires_at > ?'
     ).get(req.params.token, new Date().toISOString());
 
     if (!row) return res.status(400).json({ error: '链接无效或已过期，请重新申请' });
@@ -673,7 +714,7 @@ module.exports = function(db) {
     if (new_password.length < 6) return res.status(400).json({ error: '密码至少6位' });
 
     const row = db.prepare(
-      'SELECT * FROM password_reset_tokens WHERE token = ? AND used = 0 AND expires_at > datetime(?)'
+      'SELECT * FROM password_reset_tokens WHERE token = ? AND used = 0 AND expires_at > ?'
     ).get(token, new Date().toISOString());
 
     if (!row) return res.status(400).json({ error: '链接无效或已过期，请重新申请' });

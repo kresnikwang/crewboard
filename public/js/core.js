@@ -670,8 +670,29 @@ function initLoginHandler() {
       setToken(data.token);
       window.state.user = data.user;
       window.state.enterprise = data.enterprise;
-      if (data.user && data.user.must_change_password) {
-        showFirstLoginView(data.user);
+
+      // Arrived via invite link (#register?invite=...) and account has no
+      // enterprise yet → accept the invitation right after login.
+      if (data.user && !data.user.enterprise_id &&
+          window.location.hash.indexOf('#register') === 0) {
+        var invMatch = window.location.hash.match(/invite=([^&]+)/);
+        if (invMatch) {
+          try {
+            var acc = await api('/api/auth/invitations/accept', {
+              method: 'POST',
+              body: { token: invMatch[1] },
+            });
+            var me = await api('/api/auth/me');
+            window.state.user = me.user;
+            window.state.enterprise = me.enterprise;
+            window.location.hash = '';
+            if (window.toast) window.toast(t('enterprise.invite_accepted') + (acc.enterprise_name ? '「' + acc.enterprise_name + '」' : ''));
+          } catch (_) { /* invite invalid or email mismatch — continue normal login */ }
+        }
+      }
+
+      if (window.state.user && window.state.user.must_change_password) {
+        showFirstLoginView(window.state.user);
       } else {
         enterApp();
       }
@@ -1128,7 +1149,37 @@ function handleHashRoute() {
   }
   // Handle #register?invite=xxx&email=xxx
   if (hash.indexOf('#register') === 0) {
+    var inviteMatch = hash.match(/invite=([^&]+)/);
     var emailMatch = hash.match(/email=([^&]+)/);
+
+    // Already logged in (clicked invite link while signed in) → accept directly
+    if (inviteMatch && localStorage.getItem('rg_token')) {
+      api('/api/auth/invitations/accept', {
+        method: 'POST',
+        body: { token: inviteMatch[1] }
+      }).then(function (data) {
+        window.location.hash = '';
+        if (window.toast) window.toast(t('enterprise.invite_accepted') + (data.enterprise_name ? '「' + data.enterprise_name + '」' : ''));
+        restoreSession();
+      }).catch(function (err) {
+        if (err && /已属于/.test(err.message || '')) {
+          // Already in an enterprise — just enter the app
+          window.location.hash = '';
+          restoreSession();
+        } else {
+          // Expired session / invalid invite → fall back to register page
+          document.getElementById('auth-page').style.display = 'flex';
+          document.getElementById('main-app').style.display = 'none';
+          showAuthView('register');
+          if (emailMatch) {
+            var ef = document.getElementById('reg-email');
+            if (ef) ef.value = decodeURIComponent(emailMatch[1]);
+          }
+        }
+      });
+      return true;
+    }
+
     document.getElementById('auth-page').style.display = 'flex';
     document.getElementById('main-app').style.display = 'none';
     showAuthView('register');
