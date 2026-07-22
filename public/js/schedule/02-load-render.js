@@ -26,20 +26,7 @@ window.loadSchedule = async function loadSchedule() {
   /* Update range label */
   var rangeEl = document.getElementById('schedule-range');
   if (rangeEl) {
-    var s = days[0], e = days[days.length - 1];
-    var sMonth = s.getMonth() + 1, eMonth = e.getMonth() + 1;
-    var sYear = s.getFullYear(), eYear = e.getFullYear();
-    var currentYear = new Date().getFullYear();
-    var rangeText;
-    var showYear = (sYear !== currentYear || eYear !== currentYear);
-    if (showYear) {
-      rangeText = sYear + t('common.year') + sMonth + t('common.month') + s.getDate() + t('common.day') + ' - ' + eYear + t('common.year') + eMonth + t('common.month') + e.getDate() + t('common.day');
-    } else if (sMonth !== eMonth) {
-      rangeText = sMonth + t('common.month') + s.getDate() + t('common.day') + ' - ' + eMonth + t('common.month') + e.getDate() + t('common.day');
-    } else {
-      rangeText = sMonth + t('common.month') + s.getDate() + t('common.day') + ' - ' + e.getDate() + t('common.day');
-    }
-    rangeEl.textContent = rangeText;
+    rangeEl.textContent = fmtRange(days[0], days[days.length - 1]);
   }
 
   /* Update today button label */

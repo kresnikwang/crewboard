@@ -149,9 +149,9 @@ window.loadEnterprise = async function loadEnterprise() {
     '</div>';
 
     html += '<div class="section-card card mb-3">' +
-      '<h3>操作审计</h3>' +
-      '<p style="color:var(--text-secondary);margin-bottom:12px">最近的排程与资源变更记录（仅管理员可见）</p>' +
-      '<div id="ent-audit-logs" style="font-size:13px;max-height:320px;overflow:auto">加载中…</div>' +
+      '<h3>' + t('enterprise.audit_title') + '</h3>' +
+      '<p style="color:var(--text-secondary);margin-bottom:12px">' + t('enterprise.audit_desc') + '</p>' +
+      '<div id="ent-audit-logs" style="font-size:13px;max-height:320px;overflow:auto">' + t('common.loading') + '</div>' +
     '</div>';
   }
 
@@ -242,12 +242,12 @@ window.loadEnterprise = async function loadEnterprise() {
 
     var currentTimezone = ent.timezone || 'Asia/Shanghai';
     var timezoneOptions = [
-      { value: 'Asia/Shanghai', label: 'Asia/Shanghai (北京 / Beijing)' },
-      { value: 'Asia/Tokyo', label: 'Asia/Tokyo (东京 / Tokyo)' },
-      { value: 'Europe/London', label: 'Europe/London (伦敦 / London)' },
-      { value: 'America/New_York', label: 'America/New_York (纽约 / New York)' },
-      { value: 'America/Los_Angeles', label: 'America/Los_Angeles (洛杉矶 / Los Angeles)' },
-      { value: 'UTC', label: 'UTC (UTC)' }
+      { value: 'Asia/Shanghai', label: 'Asia/Shanghai (' + t('enterprise.tz_city.shanghai') + ')' },
+      { value: 'Asia/Tokyo', label: 'Asia/Tokyo (' + t('enterprise.tz_city.tokyo') + ')' },
+      { value: 'Europe/London', label: 'Europe/London (' + t('enterprise.tz_city.london') + ')' },
+      { value: 'America/New_York', label: 'America/New_York (' + t('enterprise.tz_city.new_york') + ')' },
+      { value: 'America/Los_Angeles', label: 'America/Los_Angeles (' + t('enterprise.tz_city.los_angeles') + ')' },
+      { value: 'UTC', label: 'UTC' }
     ];
     var timezoneOptionsHtml = timezoneOptions.map(function (tz) {
       var selected = tz.value === currentTimezone ? ' selected' : '';
@@ -268,7 +268,7 @@ window.loadEnterprise = async function loadEnterprise() {
         '</div>' +
         '<div class="form-group mb-3">' +
           '<label>' + t('wecom.app_secret') + '</label>' +
-          '<input type="password" id="set-wecom-secret" class="text-input form-control" value="" placeholder="' + (ent.wecom_secret_set ? '••••••••（已配置，留空则保持不变）' : t('wecom.app_secret_placeholder')) + '">' +
+          '<input type="password" id="set-wecom-secret" class="text-input form-control" value="" placeholder="' + (ent.wecom_secret_set ? t('wecom.secret_configured') : t('wecom.app_secret_placeholder')) + '">' +
         '</div>' +
         '<div class="form-group mb-3">' +
           '<label>' + t('wecom.department_id') + '</label>' +
@@ -783,7 +783,7 @@ window.updateSidebarUserInfo = function updateSidebarUserInfo() {
       avatarHtml +
       '<div>' +
         '<div class="user-name">' + escHtml(user.name || '') + '</div>' +
-        '<div class="user-role">' + escHtml(user.role || '') + '</div>' +
+        '<div class="user-role">' + escHtml(typeof window.roleLabel === 'function' ? window.roleLabel(user.role) : (user.role || '')) + '</div>' +
       '</div>' +
     '</div>';
 }
@@ -859,21 +859,17 @@ async function loadEnterpriseAuditLogs() {
     var data = await api('/api/audit-logs?limit=40');
     var rows = (data && data.rows) || [];
     if (!rows.length) {
-      el.innerHTML = '<p style="color:var(--text-secondary);margin:0">暂无审计记录</p>';
+      el.innerHTML = '<p style="color:var(--text-secondary);margin:0">' + t('enterprise.audit_empty') + '</p>';
       return;
     }
-    var actionLabel = {
-      'booking.create': '创建排程',
-      'booking.update': '更新排程',
-      'booking.delete': '删除排程',
-      'leave.create': '登记休假',
-      'leave.delete': '删除休假',
-      'resource.create': '添加人员',
-      'resource.update': '更新人员',
-      'resource.delete': '删除人员'
+    var actionKey = function (action) { return 'audit.action.' + String(action || '').replace('.', '_'); };
+    var actionText = function (action) {
+      var k = actionKey(action);
+      // Fall back to the raw action code for unknown actions
+      return (window.translations && window.translations.zh && window.translations.zh[k]) ? t(k) : action;
     };
     var html = '<table class="table table-sm" style="margin:0"><thead><tr>' +
-      '<th style="width:140px">时间</th><th style="width:90px">操作人</th><th style="width:100px">动作</th><th>详情</th>' +
+      '<th style="width:140px">' + t('enterprise.audit_col_time') + '</th><th style="width:90px">' + t('enterprise.audit_col_user') + '</th><th style="width:100px">' + t('enterprise.audit_col_action') + '</th><th>' + t('enterprise.audit_col_details') + '</th>' +
       '</tr></thead><tbody>';
     rows.forEach(function (r) {
       var detail = '';
@@ -897,13 +893,13 @@ async function loadEnterpriseAuditLogs() {
       html += '<tr>' +
         '<td style="white-space:nowrap;color:var(--text-secondary)">' + escHtml(r.created_at || '') + '</td>' +
         '<td>' + escHtml(r.user_name || '—') + '</td>' +
-        '<td>' + escHtml(actionLabel[r.action] || r.action) + '</td>' +
+        '<td>' + escHtml(actionText(r.action)) + '</td>' +
         '<td style="color:var(--text-secondary)">' + detail + '</td>' +
         '</tr>';
     });
     html += '</tbody></table>';
     el.innerHTML = html;
   } catch (err) {
-    el.innerHTML = '<p style="color:var(--danger);margin:0">' + escHtml(err.message || '加载失败') + '</p>';
+    el.innerHTML = '<p style="color:var(--danger);margin:0">' + escHtml(err.message || t('common.load_failed')) + '</p>';
   }
 }

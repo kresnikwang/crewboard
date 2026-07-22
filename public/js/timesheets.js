@@ -77,11 +77,7 @@
     /* ---- update range label ---- */
     var rangeEl = document.getElementById('ts-range');
     if (rangeEl) {
-      var s = days[0];
-      var e = days[6];
-      rangeEl.textContent =
-        (s.getMonth() + 1) + t('common.month') + s.getDate() + t('common.day') + ' - ' +
-        (e.getMonth() + 1) + t('common.month') + e.getDate() + t('common.day');
+      rangeEl.textContent = fmtRange(days[0], days[6]);
     }
 
     /* ---- parallel data fetch ---- */

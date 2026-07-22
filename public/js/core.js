@@ -124,14 +124,18 @@ window.toastBookingOverload = function toastBookingOverload(resultOrList) {
     buf.forEach(function (c) { if (c.date) byDate[c.date] = c; });
     var unique = Object.keys(byDate).sort().map(function (d) { return byDate[d]; });
     if (!unique.length) return;
+    var isZh = !(typeof getLang === 'function' && getLang() === 'en');
     var lines = unique.slice(0, 6).map(function (c) {
       var overH = c.over_hours != null
         ? c.over_hours
         : (Math.round((Number(c.projected_hours) - Number(c.capacity)) * 10) / 10);
-      return (c.date || '') + '：' + c.projected_hours + 'h / 产能 ' + c.capacity + 'h（超出 ' + overH + 'h）';
+      if (typeof t === 'function') {
+        return t('schedule.overload_line', { date: c.date || '', projected: c.projected_hours, capacity: c.capacity, over: overH });
+      }
+      return (c.date || '') + ': ' + c.projected_hours + 'h / ' + c.capacity + 'h (-' + overH + 'h)';
     });
-    if (unique.length > 6) lines.push('…共 ' + unique.length + ' 天超出');
-    var msg = (typeof t === 'function' ? t('schedule.overload_notice') : '已超出日产能') + '：' + lines.join('；');
+    if (unique.length > 6) lines.push(typeof t === 'function' ? t('schedule.overload_more', { count: unique.length }) : '');
+    var msg = (typeof t === 'function' ? t('schedule.overload_notice') : 'Over daily capacity') + (isZh ? '：' : ': ') + lines.join(isZh ? '；' : '; ');
     if (typeof toast === 'function') toast(msg, 'warning');
     else if (typeof window.showToast === 'function') window.showToast(msg, 'warning');
   }, 80);
@@ -149,9 +153,9 @@ window.apiBookingWithConflictConfirm = async function apiBookingWithConflictConf
       var lines = conflicts.slice(0, 8).map(function (c) {
         return '• ' + (c.message || c.type + ' ' + (c.date || ''));
       });
-      if (conflicts.length > 8) lines.push('• …共 ' + conflicts.length + ' 项');
+      if (conflicts.length > 8) lines.push('• ' + (typeof t === 'function' ? t('schedule.conflict_more', { count: conflicts.length }) : conflicts.length + ' items'));
       // Only leave conflicts still require confirmation + force
-      var title = '与休假冲突，仍要强制创建/更新吗？';
+      var title = typeof t === 'function' ? t('schedule.conflict_force_title') : 'Conflicts with leave. Force create/update?';
       var ok = window.confirm(title + '\n\n' + lines.join('\n'));
       if (!ok) throw err;
       var body = Object.assign({}, (opts && opts.body) || {}, { force: true });
@@ -365,8 +369,17 @@ function weekDates(monday) {
 }
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAY_NAMES_ZH = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 
 function shortDay(date) {
+  // Language-aware weekday abbreviation (used by schedule week view & timesheets)
+  if (typeof getLang === 'function' && getLang() === 'zh') {
+    if (typeof t === 'function') {
+      var parts = String(t('schedule.weekdays_sun_first')).split(',');
+      if (parts.length === 7) return parts[date.getDay()];
+    }
+    return DAY_NAMES_ZH[date.getDay()];
+  }
   return DAY_NAMES[date.getDay()];
 }
 
@@ -374,6 +387,34 @@ function fmtDate(date) {
   const m = date.getMonth() + 1;
   const d = date.getDate();
   return m + '/' + d;
+}
+
+/**
+ * Language-aware date range label for page headers.
+ * zh: 7月20日 - 26日 / 6月29日 - 7月5日 / 2026年12月28日 - 2027年1月3日
+ * en: Jul 20 - 26   / Jun 29 - Jul 5   / Dec 28, 2026 - Jan 3, 2027
+ */
+function fmtRange(s, e) {
+  var sMonth = s.getMonth() + 1, eMonth = e.getMonth() + 1;
+  var sYear = s.getFullYear(), eYear = e.getFullYear();
+  var currentYear = new Date().getFullYear();
+  var showYear = (sYear !== currentYear || eYear !== currentYear);
+  var isEn = typeof getLang === 'function' && getLang() === 'en';
+  if (isEn) {
+    var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    var a = MON[sMonth - 1] + ' ' + s.getDate();
+    var b = (sMonth !== eMonth ? MON[eMonth - 1] + ' ' : '') + e.getDate();
+    if (showYear) {
+      return a + ', ' + sYear + ' - ' + (sMonth !== eMonth ? MON[eMonth - 1] + ' ' : '') + e.getDate() + ', ' + eYear;
+    }
+    return a + ' - ' + b;
+  }
+  if (showYear) {
+    return sYear + t('common.year') + sMonth + t('common.month') + s.getDate() + t('common.day') + ' - ' + eYear + t('common.year') + eMonth + t('common.month') + e.getDate() + t('common.day');
+  } else if (sMonth !== eMonth) {
+    return sMonth + t('common.month') + s.getDate() + t('common.day') + ' - ' + eMonth + t('common.month') + e.getDate() + t('common.day');
+  }
+  return sMonth + t('common.month') + s.getDate() + t('common.day') + ' - ' + e.getDate() + t('common.day');
 }
 
 function isToday(date) {
@@ -392,8 +433,16 @@ window.addDays = addDays;
 window.weekDates = weekDates;
 window.shortDay = shortDay;
 window.fmtDate = fmtDate;
+window.fmtRange = fmtRange;
 window.isToday = isToday;
 window.isWeekend = isWeekend;
+
+/** Localized system-role label (admin/manager/basic are system UI terms, not user-entered data) */
+window.roleLabel = function roleLabel(role) {
+  var map = { admin: 'manage.admin', manager: 'manage.manager', basic: 'manage.basic_user', owner: 'manage.admin', member: 'manage.basic_user' };
+  if (typeof t === 'function' && map[role]) return t(map[role]);
+  return role || '';
+};
 
 // --------------- Toast Notification (Bootstrap 5 实现) ---------------
 // 保留 window.toast(msg, type) 接口不变，内部改用 Bootstrap Toast API
@@ -914,7 +963,7 @@ async function enterApp() {
       if (userInfo) {
         userInfo.innerHTML =
           '<div class="user-name">' + user.name + '</div>' +
-          '<div class="user-role">' + (user.role || '') + '</div>';
+          '<div class="user-role">' + window.roleLabel(user.role) + '</div>';
       }
     }
   }
@@ -1208,6 +1257,8 @@ document.querySelectorAll('.lang-btn').forEach(btn => {
           typeof window.loadPage === 'function') {
         window.loadPage(window.state.currentPage);
       }
+      // Re-render sidebar chrome (role badge is a localized system label)
+      if (typeof window.updateSidebarUserInfo === 'function') window.updateSidebarUserInfo();
     } catch (e) { /* no-op: language is already applied to static UI */ }
   });
 });

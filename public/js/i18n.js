@@ -847,6 +847,80 @@
     'status.not_linked': 'Not linked', 'status.pending_register': '· Pending'
   });
 
+  // --- app title / weekdays / overload & conflict dialogs ---
+  Object.assign(translations.zh, {
+    'app.title': '神马排班CrewBoard',
+    'schedule.weekdays_sun_first': '周日,周一,周二,周三,周四,周五,周六',
+    'schedule.weekdays_mon_first': '一,二,三,四,五,六,日',
+    'schedule.overload_line': '{date}：{projected}h / 产能 {capacity}h（超出 {over}h）',
+    'schedule.overload_more': '…共 {count} 天超出',
+    'schedule.conflict_force_title': '与休假冲突，仍要强制创建/更新吗？',
+    'schedule.conflict_more': '…共 {count} 项'
+  });
+  Object.assign(translations.en, {
+    'app.title': 'CrewBoard',
+    'schedule.weekdays_sun_first': 'Sun,Mon,Tue,Wed,Thu,Fri,Sat',
+    'schedule.weekdays_mon_first': 'Mo,Tu,We,Th,Fr,Sa,Su',
+    'schedule.overload_line': '{date}: {projected}h / capacity {capacity}h ({over}h over)',
+    'schedule.overload_more': '…{count} days over in total',
+    'schedule.conflict_force_title': 'Conflicts with existing leave. Force create/update anyway?',
+    'schedule.conflict_more': '…{count} conflicts in total'
+  });
+
+  // --- enterprise audit log section ---
+  Object.assign(translations.zh, {
+    'enterprise.audit_title': '操作审计',
+    'enterprise.audit_desc': '最近的排程与资源变更记录（仅管理员可见）',
+    'enterprise.audit_empty': '暂无审计记录',
+    'enterprise.audit_col_time': '时间',
+    'enterprise.audit_col_user': '操作人',
+    'enterprise.audit_col_action': '动作',
+    'enterprise.audit_col_details': '详情',
+    'audit.action.booking_create': '创建排程',
+    'audit.action.booking_update': '更新排程',
+    'audit.action.booking_delete': '删除排程',
+    'audit.action.leave_create': '登记休假',
+    'audit.action.leave_delete': '删除休假',
+    'audit.action.resource_create': '添加人员',
+    'audit.action.resource_update': '更新人员',
+    'audit.action.resource_delete': '删除人员'
+  });
+  Object.assign(translations.en, {
+    'enterprise.audit_title': 'Audit Log',
+    'enterprise.audit_desc': 'Recent schedule and resource changes (visible to admins only)',
+    'enterprise.audit_empty': 'No audit records yet',
+    'enterprise.audit_col_time': 'Time',
+    'enterprise.audit_col_user': 'Operator',
+    'enterprise.audit_col_action': 'Action',
+    'enterprise.audit_col_details': 'Details',
+    'audit.action.booking_create': 'Created booking',
+    'audit.action.booking_update': 'Updated booking',
+    'audit.action.booking_delete': 'Deleted booking',
+    'audit.action.leave_create': 'Recorded leave',
+    'audit.action.leave_delete': 'Deleted leave',
+    'audit.action.resource_create': 'Added resource',
+    'audit.action.resource_update': 'Updated resource',
+    'audit.action.resource_delete': 'Deleted resource'
+  });
+
+  // --- wecom secret placeholder / timezone city names ---
+  Object.assign(translations.zh, {
+    'wecom.secret_configured': '••••••••（已配置，留空则保持不变）',
+    'enterprise.tz_city.shanghai': '北京',
+    'enterprise.tz_city.tokyo': '东京',
+    'enterprise.tz_city.london': '伦敦',
+    'enterprise.tz_city.new_york': '纽约',
+    'enterprise.tz_city.los_angeles': '洛杉矶'
+  });
+  Object.assign(translations.en, {
+    'wecom.secret_configured': '•••••••• (configured — leave blank to keep)',
+    'enterprise.tz_city.shanghai': 'Beijing',
+    'enterprise.tz_city.tokyo': 'Tokyo',
+    'enterprise.tz_city.london': 'London',
+    'enterprise.tz_city.new_york': 'New York',
+    'enterprise.tz_city.los_angeles': 'Los Angeles'
+  });
+
   // ==================== Utility Functions ====================
 
   function getLang() {
@@ -866,8 +940,18 @@
 
   function t(key, params) {
     var lang = getLang();
-    var str = translations[lang][key] || translations['zh'][key] || key;
-    if (params) {
+    var str;
+    // Note: use hasOwnProperty — an explicit '' translation is valid
+    // (e.g. EN renders dates without 年/月/日 suffixes) and must NOT
+    // fall back to Chinese.
+    if (Object.prototype.hasOwnProperty.call(translations[lang], key)) {
+      str = translations[lang][key];
+    } else if (Object.prototype.hasOwnProperty.call(translations.zh, key)) {
+      str = translations.zh[key];
+    } else {
+      str = key;
+    }
+    if (params && str) {
       Object.keys(params).forEach(function (k) {
         str = str.replace(new RegExp('\\{' + k + '\\}', 'g'), params[k]);
       });
@@ -896,6 +980,11 @@
       var hk = htmls[m].getAttribute('data-i18n-html');
       if (hk) htmls[m].innerHTML = t(hk);
     }
+    // Keep <title> and <html lang> in sync with the active language
+    try {
+      document.title = t('app.title');
+      document.documentElement.setAttribute('lang', getLang() === 'zh' ? 'zh-CN' : 'en');
+    } catch (e) {}
   }
 
   // Export to window
