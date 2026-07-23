@@ -151,7 +151,7 @@ function buildMonthResourceRow(r, days, bMap, lMap) {
       else if (dayLeave.type === 'holiday') leaveCls += ' holiday';
       var leaveLabel = getLeaveLabel(dayLeave.type);
       html += '<div class="' + leaveCls + '" data-leave-id="' + dayLeave.id + '"' +
-        ' title="' + escAttr(leaveLabel + (dayLeave.notes ? ': ' + dayLeave.notes : '')) + '">' +
+        ' title="' + escAttr(leaveLabel + (dayLeave.notes ? ': ' + dayLeave.notes : '') + ' · ' + t('schedule.leave_click_hint')) + '">' +
         leaveLabel + '</div>';
     }
 
@@ -187,8 +187,10 @@ function buildMonthResourceRow(r, days, bMap, lMap) {
       if (showText) {
         var displayName = b.client_name || b.project_name;
         var displayProj = displayName + (b.scope_name ? ' - ' + b.scope_name : '');
+        /* Full-name tooltip: project (+ scope + client) — truncated label only shows 18 chars */
+        var fullProjName = b.project_name + (b.scope_name ? ' - ' + b.scope_name : '') + (b.client_name ? ' (' + b.client_name + ')' : '');
         html += '<span class="m-booking-hours">' + b.hours + 'h</span> ' +
-          '<span class="booking-project">' + esc(truncate(displayProj, 18)) + '</span>';
+          '<span class="booking-project" title="' + escAttr(fullProjName) + '">' + esc(truncate(displayProj, 18)) + '</span>';
       }
       // Show resize handle for end of span or solo booking (cls is null)
       if (!si || si.cls === 'span-e' || !si.cls) {

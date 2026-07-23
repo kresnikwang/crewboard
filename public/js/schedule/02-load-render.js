@@ -569,7 +569,7 @@ function buildResourceRow(r, days, bMap, lMap) {
       else if (dayLeave.type === 'personal') leaveCls += ' personal';
       else if (dayLeave.type === 'holiday') leaveCls += ' holiday';
       html += '<div class="' + leaveCls + '" data-leave-id="' + dayLeave.id + '"' +
-        ' title="' + escAttr(leaveLabel + (dayLeave.notes ? ': ' + dayLeave.notes : '')) + '">' +
+        ' title="' + escAttr(leaveLabel + (dayLeave.notes ? ': ' + dayLeave.notes : '') + ' · ' + t('schedule.leave_click_hint')) + '">' +
         leaveLabel + '</div>';
     }
 

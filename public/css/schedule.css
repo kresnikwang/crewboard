@@ -107,6 +107,10 @@
 }
 /* Whole-span hover: ends keep interactive handles even when pointer is on middle segment */
 .booking-block.hover-highlight .resize-handle { opacity: 1; pointer-events: auto; }
+/* Direct bar hover: activate end handles so the ew-resize cursor shows on the
+   booking's right/left edge as a drag-adjust hint (pure CSS, no JS hover needed) */
+.booking-block:hover .resize-handle,
+.booking-block:hover .resize-handle-left { opacity: 1; pointer-events: auto; }
 .booking-block.resizing { outline: 2px solid var(--primary); outline-offset: 1px; z-index: 4; }
 .booking-block.resizing .resize-handle { opacity: 1; pointer-events: auto; background: var(--primary); }
 .booking-block .resize-handle-left {
@@ -117,6 +121,9 @@
   z-index: 10;
 }
 .booking-block.hover-highlight .resize-handle-left { opacity: 1; pointer-events: auto; }
+/* Leave blocks are click-to-edit (never dragged) — pointer, not grab */
+.booking-block.leave-block { cursor: pointer; }
+.booking-cell:has(.leave-block:hover) { cursor: pointer; }
 .booking-block.resizing .resize-handle-left { opacity: 1; pointer-events: auto; background: var(--primary); }
 
 /*
@@ -777,6 +784,9 @@
   z-index: 10;
 }
 .m-booking.hover-highlight .resize-handle { opacity: 1; pointer-events: auto; }
+/* Direct bar hover: activate end handles (ew-resize cursor hint), same as week view */
+.m-booking:hover .resize-handle,
+.m-booking:hover .resize-handle-left { opacity: 1; pointer-events: auto; }
 .m-booking.resizing { outline: 2px solid var(--primary); outline-offset: 1px; z-index: 4; }
 .m-booking.resizing .resize-handle { opacity: 1; pointer-events: auto; background: var(--primary); }
 .m-booking .resize-handle-left {
@@ -787,6 +797,9 @@
   z-index: 10;
 }
 .m-booking.hover-highlight .resize-handle-left { opacity: 1; pointer-events: auto; }
+/* Month-view leave blocks are click-to-edit — pointer, not grab */
+.m-leave { cursor: pointer; }
+.m-day-cell:has(.m-leave:hover) { cursor: pointer; }
 .m-booking.resizing .resize-handle-left { opacity: 1; pointer-events: auto; background: var(--primary); }
 
 /* Split control — month view: smaller, centered on day seam */

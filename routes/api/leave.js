@@ -148,8 +148,28 @@ router.put('/leave/:id', (req, res) => {
   const newNotes = notes !== undefined ? notes : existing.notes;
   const newDate = date || existing.date;
 
+  /* Guard: moving onto a date that already has a leave entry for the same
+     resource would create a duplicate (renderer keeps only one per day). */
+  if (newDate !== existing.date) {
+    const clash = db.prepare('SELECT id FROM leave_entries WHERE resource_id = ? AND date = ? AND id != ?')
+      .get(existing.resource_id, newDate, req.params.id);
+    if (clash) return res.status(409).json({ error: '该日期已有休假记录，请选择其他日期' });
+  }
+
   db.prepare('UPDATE leave_entries SET type = ?, notes = ?, date = ? WHERE id = ?')
     .run(newType, newNotes, newDate, req.params.id);
+  logAudit(db, {
+    enterpriseId: entId,
+    user: req.user,
+    action: 'leave.update',
+    entityType: 'leave',
+    entityId: +req.params.id,
+    details: {
+      resource_id: existing.resource_id,
+      from: { date: existing.date, type: existing.type },
+      to: { date: newDate, type: newType },
+    },
+  });
   res.json({ ok: true });
   sseBroadcast(entId, 'schedule-change', { action: 'leave-update' }, req.user?.id);
 });
