@@ -130,3 +130,9 @@ bootstrap-bridge.css        → 第13行（设计令牌映射 + 修正层）
 - pm2 有时会残留失效进程，需要 pm2 kill 后重新 start
 - 服务器没有配置 SQLite 数据库自动备份，每次部署时手动备份
 - 同服务器还运行：skand-expense(3001)、paypayma(3002)，端口不冲突
+
+## 沙箱测试注意事项
+- Hermes 沙箱 secret-redaction 会改写脚本里的「token 样」字面量（UUID、`token=***
+  bash 与 execute_code Python 均受影响 → 敏感值一律运行时通过 subprocess 从 DB/文件读取。
+- 出网代理会改写请求体中的明文 "admin123"（演示企业 admin 密码）→ 运行时拼接。
+- 服务器 index.html 的 git diff 是部署期版本号注入（__VERSION__ → commit hash），属预期，勿提交。
