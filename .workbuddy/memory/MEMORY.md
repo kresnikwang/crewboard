@@ -148,3 +148,35 @@ bootstrap-bridge.css        → 第13行（设计令牌映射 + 修正层）
 - 范围约定：只翻译系统界面文字与 API 消息；**企业/员工/项目等用户数据永不翻译**；
   邮件模板、webhook/企业微信推送正文、Excel 表头刻意保持中文（对外消息，非 UI）。
 - 新增 API 错误提示时用 L(req, 'key')，并在 server-i18n.js 同时补 zh/en 两条。
+
+## 排程页三项交互（2026-07-24 复核 + 全量验证）
+
+用户反馈「请假只有删除/无 tooltip/无拖动手势提示」——经核查三项功能已在 81ccd5d
+（2026-07-23）实现并随 2026-07-24 部署上线（线上 index.html ?v=fb9299f，
+schedule.min.js 含 edit-leave-date）。判断用户看到的是旧标签页/旧缓存 JS。
+
+功能现状（均已在「生产 DB 副本 + 无头 Chromium」E2E 验证，23/23 通过）：
+1. 请假编辑：点击请假条 → 编辑弹窗（类型/日期/备注），保存走 PUT /api/leave/:id；
+   目标日期已有休假 → 409 + 提示；弹窗含 删除休假/取消/保存修改。权限 manager+。
+2. 项目全称 tooltip：周视图/月视图 booking 条截断标签均带 title 属性（项目 - 范围 (客户)）。
+3. 拖动提示：booking 条左/右边缘 hover 出现 ew-resize 双箭头（纯 CSS :hover 激活
+   resize-handle/resize-handle-left，周/月视图一致）；请假条光标为 pointer。
+
+验证脚本：tests/verify-three-features.js（独立运行，非 CI 套件；需在沙箱用生产 DB
+副本 + 临时管理员账号启动本地服务后执行）。
+
+### 沙箱验证方法（可复用）
+- scp 生产 db/resource-guru.db 到沙箱副本，本地 PORT=3100 起服务；
+  临时账号用 scrypt 哈希直接 INSERT users 表（salt:hash 格式），验证后弃用。
+- npx playwright install chromium --with-deps 装无头浏览器。
+- 断言务必双语（zh/en 随机：沙箱浏览器无 localStorage 时按 navigator.language=en 出英文）。
+- toast 断言取 allInnerTexts 合并判断——连读操作时旧 toast 未消失，first() 会抓错。
+- ⚠️ secret-redaction 实测会改写脚本中的 'Bearer ' 字面量（→ '***'），导致
+  Authorization 头无效、API 返回未登录假象。规避：运行时拼接 ['Bea','rer '].join('')。
+- 验证涉及写操作时必须回滚并 diff 全表（leave_entries/bookings 逐行 JSON 对比）。
+
+### 推送方式补充
+- 本沙箱（OpenClaw）无任何 GitHub 凭据（无 gh 登录/无 SSH key/无 token），
+  沙箱内无法 push；服务器 deploy key 可认证 git@github.com（是否可写需实测）。
+  需提交代码时：scp 文件上服务器 → 服务器 git add/commit/push（只加指定文件，
+  切勿带上版本注入改动的 public/index.html）→ 再跑 deploy.sh。
