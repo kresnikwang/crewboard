@@ -136,3 +136,15 @@ bootstrap-bridge.css        → 第13行（设计令牌映射 + 修正层）
   bash 与 execute_code Python 均受影响 → 敏感值一律运行时通过 subprocess 从 DB/文件读取。
 - 出网代理会改写请求体中的明文 "admin123"（演示企业 admin 密码）→ 运行时拼接。
 - 服务器 index.html 的 git diff 是部署期版本号注入（__VERSION__ → commit hash），属预期，勿提交。
+
+## 国际化（i18n）架构（2026-07-24 完善）
+- 前端：public/js/i18n.js（zh/en 词典 + t()/setLang()/getLang()/applyI18n()），
+  localStorage 键 crewboard_lang；无存储时按 navigator.language 自动判断（en→英文）。
+  登录页 #auth-lang-switch、侧边栏 #lang-toggle 两个切换入口；切换后重渲染当前页面。
+- applyI18n 用 setI18nText() 只替换文本节点——含 SVG 图标/徽章的元素（#btn-account、
+  #btn-logout、注册页选填 label）不会被清空子元素，改动 i18n 时务必保留该行为。
+- 服务端：utils/server-i18n.js（145 键 zh/en 词典 + reqLang/L/msg）。前端 api() 发送
+  Accept-Language；无头部默认 zh（测试套件依赖中文错误文本，如含「经理」字样断言）。
+- 范围约定：只翻译系统界面文字与 API 消息；**企业/员工/项目等用户数据永不翻译**；
+  邮件模板、webhook/企业微信推送正文、Excel 表头刻意保持中文（对外消息，非 UI）。
+- 新增 API 错误提示时用 L(req, 'key')，并在 server-i18n.js 同时补 zh/en 两条。
