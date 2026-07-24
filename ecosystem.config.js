@@ -47,6 +47,16 @@ module.exports = {
       log_date_format: 'YYYY-MM-DD HH:mm:ss',
       error_file: './logs/reminder-schedule-error.log',
       out_file: './logs/reminder-schedule.log',
+    },
+    {
+      name: 'crewboard-auth-watchdog',
+      script: 'scripts/auth-watchdog.js',
+      cron_restart: '*/10 * * * *', // 每 10 分钟自检：登录 + 会话查询
+      autorestart: false,
+      watch: false,
+      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+      error_file: './logs/auth-watchdog-error.log',
+      out_file: './logs/auth-watchdog.log',
     }
   ]
 };

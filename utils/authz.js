@@ -210,17 +210,37 @@ function createAuthz(db) {
 
 function authMiddleware(db) {
   return (req, res, next) => {
-    const token = req.headers.authorization?.replace('Bearer ', '') || req.query.token;
+    const rawToken = req.headers.authorization?.replace('Bearer ', '') || req.query.token;
+    const token = typeof rawToken === 'string' ? rawToken.trim() : rawToken;
     if (token) {
+      const nowIso = new Date().toISOString();
       const session = db.prepare(
         'SELECT * FROM sessions WHERE token = ? AND expires_at > ?'
-      ).get(token, new Date().toISOString());
+      ).get(token, nowIso);
       if (session) {
         req.user = db.prepare(`
           SELECT id, name, phone, email, enterprise_id, resource_id, role, avatar,
                  managed_project_ids, status, must_change_password
           FROM users WHERE id = ?
         `).get(session.user_id);
+      } else {
+        // Anomaly diagnostics (added 2026-07-25 after a live incident where a
+        // long-running process could INSERT/DELETE sessions correctly but this
+        // SELECT stopped matching valid rows; a pm2 restart recovered it).
+        // Log only the genuinely anomalous case: the token exists and is not
+        // expired, yet the lookup above missed it. Expired/unknown tokens are
+        // normal (stale clients) and stay silent.
+        try {
+          const row = db.prepare('SELECT expires_at FROM sessions WHERE token = ?').get(token);
+          if (row && row.expires_at > nowIso) {
+            console.error(
+              '[auth-anomaly] valid session missed by lookup; expires_at=' + row.expires_at +
+              ' now=' + nowIso + ' tokLen=' + token.length
+            );
+          }
+        } catch (e) {
+          console.error('[auth-anomaly] diagnostics failed: ' + e.message);
+        }
       }
     }
     next();

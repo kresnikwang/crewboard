@@ -180,3 +180,13 @@ schedule.min.js 含 edit-leave-date）。判断用户看到的是旧标签页/�
   沙箱内无法 push；服务器 deploy key 可认证 git@github.com（是否可写需实测）。
   需提交代码时：scp 文件上服务器 → 服务器 git add/commit/push（只加指定文件，
   切勿带上版本注入改动的 public/index.html）→ 再跑 deploy.sh。
+
+## 2026-07-25 事故备忘（必读）
+- 线上曾发生「长驻进程会话查询劣化」P0：登录正常但一切带 token 的请求 401/403，
+  无错误日志，静默数小时。pm2 restart 即恢复。根因未定位（疑 better-sqlite3 状态劣化）。
+- 已部署 scripts/auth-watchdog.js（pm2 cron */10 min）：真实 login+/me 自检，
+  失败自动重启（15min 冷却）+ 邮件告警 kris.wang@。日志 logs/auth-watchdog*.log。
+- utils/authz.js authMiddleware 内置 [auth-anomaly] 日志：会话存在且未过期但查询
+  miss 时打印 —— 出现该日志即事故复现，立即保存现场（pm2 进程先别急着重启，
+  可先 node -e 对比查询 + 记录 /proc/PID 信息）再重启恢复。
+- 规则0 的例外：若看门狗告警或发现同类故障，可直接执行 pm2 restart crewboard 救火。
