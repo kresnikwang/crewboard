@@ -1244,6 +1244,17 @@ function handleHashRoute() {
   return false;
 }
 
+// Re-run hash routing when the hash changes while the page is already open
+// (e.g. an email link opened in the same tab, or the user pastes a link).
+// Only react to the special auth hashes; ignore everything else so normal
+// in-app navigation is unaffected.
+window.addEventListener('hashchange', function () {
+  var hash = window.location.hash;
+  if (hash.indexOf('#reset-password') === 0 || hash.indexOf('#register') === 0) {
+    handleHashRoute();
+  }
+});
+
 // --------------- Language Toggle ---------------
 document.querySelectorAll('.lang-btn').forEach(btn => {
   btn.addEventListener('click', () => {
