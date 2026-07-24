@@ -73,6 +73,9 @@ window.api = async function api(path, opts = {}) {
   if (token) {
     headers['Authorization'] = 'Bearer ' + token;
   }
+  // Tell the API the UI language so server-side messages (errors/hints) localize.
+  // User-entered data (enterprise/employee info) is never translated server-side.
+  headers['Accept-Language'] = (typeof getLang === 'function' ? getLang() : 'zh') === 'en' ? 'en' : 'zh-CN';
   if (opts.body && typeof opts.body === 'object' && !(opts.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json';
     opts.body = JSON.stringify(opts.body);
@@ -1211,7 +1214,7 @@ function handleHashRoute() {
         if (window.toast) window.toast(t('enterprise.invite_accepted') + (data.enterprise_name ? '「' + data.enterprise_name + '」' : ''));
         restoreSession();
       }).catch(function (err) {
-        if (err && /已属于/.test(err.message || '')) {
+        if (err && (err.code === 'already_in_enterprise' || /已属于/.test(err.message || ''))) {
           // Already in an enterprise — just enter the app
           window.location.hash = '';
           restoreSession();

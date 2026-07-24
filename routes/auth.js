@@ -10,6 +10,7 @@ const {
   authMiddleware,
 } = require('../utils/authz');
 const { createRateLimiter } = require('../utils/rateLimit');
+const { L } = require('../utils/server-i18n');
 const uuidv4 = () => crypto.randomUUID();
 const router = express.Router();
 
@@ -57,19 +58,19 @@ module.exports = function(db) {
   const authLimiter = createRateLimiter({
     windowMs: 15 * 60 * 1000,
     max: 30,
-    message: '登录尝试过于频繁，请 15 分钟后再试',
+    message: (req) => L(req, 'rate.login_throttled'),
     keyFn: (req) => 'login:' + (req.ip || req.body?.account || 'unknown'),
   });
   const forgotLimiter = createRateLimiter({
     windowMs: 15 * 60 * 1000,
     max: 10,
-    message: '重置请求过于频繁，请 15 分钟后再试',
+    message: (req) => L(req, 'rate.reset_throttled'),
     keyFn: (req) => 'forgot:' + (req.ip || req.body?.email || 'unknown'),
   });
   const registerLimiter = createRateLimiter({
     windowMs: 60 * 60 * 1000,
     max: 20,
-    message: '注册过于频繁，请稍后再试',
+    message: (req) => L(req, 'rate.register_throttled'),
     keyFn: (req) => 'register:' + (req.ip || 'unknown'),
   });
 
@@ -77,16 +78,16 @@ module.exports = function(db) {
   router.post('/register', registerLimiter, (req, res) => {
     const { phone, email, password, name } = req.body;
     if (!password || !name || (!phone && !email)) {
-      return res.status(400).json({ error: '请填写姓名、密码和手机号或邮箱' });
+      return res.status(400).json({ error: L(req, 'auth.register_missing_fields') });
     }
     // Check uniqueness
     if (phone) {
       const existing = db.prepare('SELECT id FROM users WHERE phone = ?').get(phone);
-      if (existing) return res.status(400).json({ error: '该手机号已注册' });
+      if (existing) return res.status(400).json({ error: L(req, 'auth.phone_registered') });
     }
     if (email) {
       const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
-      if (existing) return res.status(400).json({ error: '该邮箱已注册' });
+      if (existing) return res.status(400).json({ error: L(req, 'auth.email_registered') });
     }
     const hash = hashPassword(password);
     const result = db.prepare('INSERT INTO users (phone, email, password_hash, name, role, status) VALUES (?,?,?,?,?,?)')
@@ -136,11 +137,11 @@ module.exports = function(db) {
   // Login
   router.post('/login', authLimiter, (req, res) => {
     const { account, password } = req.body;
-    if (!account || !password) return res.status(400).json({ error: '请输入账号和密码' });
+    if (!account || !password) return res.status(400).json({ error: L(req, 'auth.login_missing') });
 
     const user = db.prepare('SELECT * FROM users WHERE phone = ? OR email = ?').get(account, account);
-    if (!user) return res.status(401).json({ error: '账号不存在' });
-    if (!verifyPassword(password, user.password_hash)) return res.status(401).json({ error: '密码错误' });
+    if (!user) return res.status(401).json({ error: L(req, 'auth.account_not_found') });
+    if (!verifyPassword(password, user.password_hash)) return res.status(401).json({ error: L(req, 'auth.wrong_password') });
 
     const token = uuidv4();
     const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -162,7 +163,7 @@ module.exports = function(db) {
 
   // Get current user
   router.get('/me', (req, res) => {
-    if (!req.user) return res.status(401).json({ error: '未登录' });
+    if (!req.user) return res.status(401).json({ error: L(req, 'common.not_logged_in') });
     // Refresh must_change_password from DB
     const fresh = db.prepare('SELECT must_change_password FROM users WHERE id = ?').get(req.user.id);
     const user = { ...req.user, must_change_password: fresh?.must_change_password || 0 };
@@ -171,11 +172,11 @@ module.exports = function(db) {
 
   // Create enterprise
   router.post('/enterprises', (req, res) => {
-    if (!req.user) return res.status(401).json({ error: '未登录' });
-    if (req.user.enterprise_id) return res.status(400).json({ error: '您已属于一个企业' });
+    if (!req.user) return res.status(401).json({ error: L(req, 'common.not_logged_in') });
+    if (req.user.enterprise_id) return res.status(400).json({ error: L(req, 'auth.already_in_enterprise'), code: 'already_in_enterprise' });
 
     const { name } = req.body;
-    if (!name) return res.status(400).json({ error: '请输入企业名称' });
+    if (!name) return res.status(400).json({ error: L(req, 'auth.enter_enterprise_name') });
 
     const code = name.slice(0, 2).toUpperCase() + Math.random().toString(36).slice(2, 8).toUpperCase();
     const result = db.prepare('INSERT INTO enterprises (name, code, owner_id) VALUES (?,?,?)').run(name, code, req.user.id);
@@ -191,16 +192,16 @@ module.exports = function(db) {
 
   // Request to join enterprise
   router.post('/enterprises/join', (req, res) => {
-    if (!req.user) return res.status(401).json({ error: '未登录' });
-    if (req.user.enterprise_id) return res.status(400).json({ error: '您已属于一个企业' });
+    if (!req.user) return res.status(401).json({ error: L(req, 'common.not_logged_in') });
+    if (req.user.enterprise_id) return res.status(400).json({ error: L(req, 'auth.already_in_enterprise'), code: 'already_in_enterprise' });
 
     const { code, message } = req.body;
     const enterprise = db.prepare('SELECT * FROM enterprises WHERE code = ?').get(code);
-    if (!enterprise) return res.status(404).json({ error: '企业代码不存在' });
+    if (!enterprise) return res.status(404).json({ error: L(req, 'auth.enterprise_code_not_found') });
 
     const existing = db.prepare('SELECT id FROM join_requests WHERE user_id = ? AND enterprise_id = ? AND status = ?')
       .get(req.user.id, enterprise.id, 'pending');
-    if (existing) return res.status(400).json({ error: '您已提交过申请，请等待审核' });
+    if (existing) return res.status(400).json({ error: L(req, 'auth.request_already_submitted') });
 
     db.prepare('INSERT INTO join_requests (user_id, enterprise_id, message) VALUES (?,?,?)')
       .run(req.user.id, enterprise.id, message || '');
@@ -210,8 +211,8 @@ module.exports = function(db) {
 
   // List join requests (for owner/admin)
   router.get('/enterprises/requests', (req, res) => {
-    if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
-    if (!isAdmin(req.user)) return res.status(403).json({ error: '无权限' });
+    if (!req.user?.enterprise_id) return res.status(403).json({ error: L(req, 'common.forbidden') });
+    if (!isAdmin(req.user)) return res.status(403).json({ error: L(req, 'common.forbidden') });
 
     const requests = db.prepare(`
       SELECT jr.*, u.name as user_name, u.phone as user_phone, u.email as user_email
@@ -223,13 +224,13 @@ module.exports = function(db) {
 
   // Approve/reject join request
   router.put('/enterprises/requests/:id', (req, res) => {
-    if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
-    if (!isAdmin(req.user)) return res.status(403).json({ error: '无权限' });
+    if (!req.user?.enterprise_id) return res.status(403).json({ error: L(req, 'common.forbidden') });
+    if (!isAdmin(req.user)) return res.status(403).json({ error: L(req, 'common.forbidden') });
 
     const { status } = req.body; // 'approved' or 'rejected'
     const request = db.prepare('SELECT * FROM join_requests WHERE id = ? AND enterprise_id = ?')
       .get(req.params.id, req.user.enterprise_id);
-    if (!request) return res.status(404).json({ error: '申请不存在' });
+    if (!request) return res.status(404).json({ error: L(req, 'common.request_not_found') });
 
     db.prepare('UPDATE join_requests SET status = ?, reviewed_by = ? WHERE id = ?')
       .run(status, req.user.id, req.params.id);
@@ -250,7 +251,7 @@ module.exports = function(db) {
 
   // List enterprise members
   router.get('/enterprises/members', (req, res) => {
-    if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
+    if (!req.user?.enterprise_id) return res.status(403).json({ error: L(req, 'common.forbidden') });
     const members = db.prepare(`
       SELECT u.id, u.name, u.phone, u.email, u.role, u.resource_id,
              u.managed_project_ids, u.created_at
@@ -261,9 +262,9 @@ module.exports = function(db) {
 
   // Update member role (new three-role system: basic | manager | admin)
   router.put('/enterprises/members/:id/role', (req, res) => {
-    if (!isAdmin(req.user)) return res.status(403).json({ error: '仅管理员可操作' });
+    if (!isAdmin(req.user)) return res.status(403).json({ error: L(req, 'common.admin_only') });
     const { role } = req.body;
-    if (!['basic', 'manager', 'admin'].includes(role)) return res.status(400).json({ error: '无效角色，可选：basic / manager / admin' });
+    if (!['basic', 'manager', 'admin'].includes(role)) return res.status(400).json({ error: L(req, 'auth.invalid_role_options') });
     db.prepare('UPDATE users SET role = ? WHERE id = ? AND enterprise_id = ?')
       .run(role, req.params.id, req.user.enterprise_id);
     res.json({ ok: true });
@@ -272,14 +273,14 @@ module.exports = function(db) {
   // Update member role via permissions endpoint (compat alias → role only)
   // Prefer PUT /enterprises/members/:id/role
   router.put('/enterprises/members/:id/permissions', (req, res) => {
-    if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
-    if (!isAdmin(req.user)) return res.status(403).json({ error: '仅管理员可操作' });
+    if (!req.user?.enterprise_id) return res.status(403).json({ error: L(req, 'common.forbidden') });
+    if (!isAdmin(req.user)) return res.status(403).json({ error: L(req, 'common.admin_only') });
 
     const target = db.prepare('SELECT id, role FROM users WHERE id = ? AND enterprise_id = ?')
       .get(req.params.id, req.user.enterprise_id);
-    if (!target) return res.status(404).json({ error: '成员不存在' });
+    if (!target) return res.status(404).json({ error: L(req, 'common.member_not_found') });
     if (target.role === 'admin' && req.body.role && req.body.role !== 'admin') {
-      return res.status(400).json({ error: '请使用角色接口调整管理员' });
+      return res.status(400).json({ error: L(req, 'auth.use_role_api_for_admin') });
     }
 
     let role = req.body.role;
@@ -290,7 +291,7 @@ module.exports = function(db) {
       else role = 'basic';
     }
     if (!['basic', 'manager', 'admin'].includes(role)) {
-      return res.status(400).json({ error: '无效角色' });
+      return res.status(400).json({ error: L(req, 'auth.invalid_role') });
     }
     db.prepare('UPDATE users SET role=? WHERE id=? AND enterprise_id=?')
       .run(role, req.params.id, req.user.enterprise_id);
@@ -299,11 +300,11 @@ module.exports = function(db) {
 
   // Assign managed projects to a project manager
   router.put('/enterprises/members/:id/managed-projects', (req, res) => {
-    if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
-    if (!isAdmin(req.user)) return res.status(403).json({ error: '仅管理员可操作' });
+    if (!req.user?.enterprise_id) return res.status(403).json({ error: L(req, 'common.forbidden') });
+    if (!isAdmin(req.user)) return res.status(403).json({ error: L(req, 'common.admin_only') });
     const target = db.prepare('SELECT * FROM users WHERE id = ? AND enterprise_id = ?')
       .get(req.params.id, req.user.enterprise_id);
-    if (!target) return res.status(404).json({ error: '成员不存在' });
+    if (!target) return res.status(404).json({ error: L(req, 'common.member_not_found') });
     const { project_ids } = req.body; // array of project IDs
     const idsJson = JSON.stringify(Array.isArray(project_ids) ? project_ids.map(Number) : []);
     db.prepare('UPDATE users SET managed_project_ids = ? WHERE id = ? AND enterprise_id = ?')
@@ -313,8 +314,8 @@ module.exports = function(db) {
 
   // Update enterprise settings (webhook, theme etc.)
   router.put('/enterprises/settings', (req, res) => {
-    if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
-    if (!isAdmin(req.user)) return res.status(403).json({ error: '无权限' });
+    if (!req.user?.enterprise_id) return res.status(403).json({ error: L(req, 'common.forbidden') });
+    if (!isAdmin(req.user)) return res.status(403).json({ error: L(req, 'common.forbidden') });
 
     const {
       name,
@@ -351,21 +352,21 @@ module.exports = function(db) {
 
   // Upload enterprise logo
   router.put('/enterprises/logo', (req, res) => {
-    if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
-    if (!isAdmin(req.user)) return res.status(403).json({ error: '无权限' });
+    if (!req.user?.enterprise_id) return res.status(403).json({ error: L(req, 'common.forbidden') });
+    if (!isAdmin(req.user)) return res.status(403).json({ error: L(req, 'common.forbidden') });
 
     const { logo_data } = req.body;
-    if (!logo_data) return res.status(400).json({ error: '未提供Logo数据' });
+    if (!logo_data) return res.status(400).json({ error: L(req, 'auth.no_logo_data') });
 
     const match = logo_data.match(/^data:image\/(png|jpeg|jpg|webp);base64,(.+)$/);
-    if (!match) return res.status(400).json({ error: '无效的图片格式' });
+    if (!match) return res.status(400).json({ error: L(req, 'common.invalid_image') });
 
     const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
     const base64Data = match[2];
     const buffer = Buffer.from(base64Data, 'base64');
 
     if (buffer.length > 1024 * 1024) {
-      return res.status(400).json({ error: 'Logo文件大小不能超过 1MB' });
+      return res.status(400).json({ error: L(req, 'auth.logo_too_large') });
     }
 
     const logosDir = path.join(__dirname, '..', 'public', 'logos');
@@ -395,17 +396,17 @@ module.exports = function(db) {
 
   // Update profile (phone/email)
   router.put('/profile', (req, res) => {
-    if (!req.user) return res.status(401).json({ error: '未登录' });
+    if (!req.user) return res.status(401).json({ error: L(req, 'common.not_logged_in') });
     const { phone, email, name } = req.body;
 
     // Check uniqueness
     if (phone && phone !== req.user.phone) {
       const existing = db.prepare('SELECT id FROM users WHERE phone = ? AND id != ?').get(phone, req.user.id);
-      if (existing) return res.status(400).json({ error: '该手机号已被其他账号使用' });
+      if (existing) return res.status(400).json({ error: L(req, 'auth.phone_in_use') });
     }
     if (email && email !== req.user.email) {
       const existing = db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').get(email, req.user.id);
-      if (existing) return res.status(400).json({ error: '该邮箱已被其他账号使用' });
+      if (existing) return res.status(400).json({ error: L(req, 'auth.email_in_use') });
     }
 
     db.prepare('UPDATE users SET phone=?, email=?, name=? WHERE id=?')
@@ -422,13 +423,13 @@ module.exports = function(db) {
 
   // Upload avatar
   router.put('/avatar', (req, res) => {
-    if (!req.user) return res.status(401).json({ error: '未登录' });
+    if (!req.user) return res.status(401).json({ error: L(req, 'common.not_logged_in') });
     const { avatar_data } = req.body; // base64 data URI from client
-    if (!avatar_data) return res.status(400).json({ error: '未提供头像数据' });
+    if (!avatar_data) return res.status(400).json({ error: L(req, 'auth.no_avatar_data') });
 
     // Validate it's an image data URI
     const match = avatar_data.match(/^data:image\/(png|jpeg|jpg|webp);base64,(.+)$/);
-    if (!match) return res.status(400).json({ error: '无效的图片格式' });
+    if (!match) return res.status(400).json({ error: L(req, 'common.invalid_image') });
 
     const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
     const base64Data = match[2];
@@ -436,7 +437,7 @@ module.exports = function(db) {
 
     // Check size (should be under 500KB after client compression)
     if (buffer.length > 500 * 1024) {
-      return res.status(400).json({ error: '头像压缩后文件大小不能超过 500KB' });
+      return res.status(400).json({ error: L(req, 'auth.avatar_too_large') });
     }
 
     // Ensure avatars directory exists
@@ -467,14 +468,14 @@ module.exports = function(db) {
 
   // Change password (requires old password)
   router.put('/password', (req, res) => {
-    if (!req.user) return res.status(401).json({ error: '未登录' });
+    if (!req.user) return res.status(401).json({ error: L(req, 'common.not_logged_in') });
     const { old_password, new_password } = req.body;
-    if (!old_password || !new_password) return res.status(400).json({ error: '请填写旧密码和新密码' });
-    if (new_password.length < 6) return res.status(400).json({ error: '新密码至少6位' });
+    if (!old_password || !new_password) return res.status(400).json({ error: L(req, 'auth.pwd_both_required') });
+    if (new_password.length < 6) return res.status(400).json({ error: L(req, 'auth.new_pwd_min') });
 
     const user = db.prepare('SELECT password_hash FROM users WHERE id = ?').get(req.user.id);
     if (!verifyPassword(old_password, user.password_hash)) {
-      return res.status(400).json({ error: '旧密码不正确' });
+      return res.status(400).json({ error: L(req, 'auth.old_pwd_wrong') });
     }
 
     const newHash = hashPassword(new_password);
@@ -484,14 +485,14 @@ module.exports = function(db) {
 
   // First-login password change (no old password required, only valid when must_change_password=1)
   router.put('/first-password', (req, res) => {
-    if (!req.user) return res.status(401).json({ error: '未登录' });
+    if (!req.user) return res.status(401).json({ error: L(req, 'common.not_logged_in') });
     const userRow = db.prepare('SELECT must_change_password FROM users WHERE id = ?').get(req.user.id);
     if (!userRow || !userRow.must_change_password) {
-      return res.status(400).json({ error: '无需修改初始密码' });
+      return res.status(400).json({ error: L(req, 'auth.no_first_pwd_change') });
     }
     const { new_password } = req.body;
-    if (!new_password) return res.status(400).json({ error: '请输入新密码' });
-    if (new_password.length < 6) return res.status(400).json({ error: '密码至少6位' });
+    if (!new_password) return res.status(400).json({ error: L(req, 'auth.enter_new_pwd') });
+    if (new_password.length < 6) return res.status(400).json({ error: L(req, 'auth.pwd_min') });
 
     const newHash = hashPassword(new_password);
     db.prepare('UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?').run(newHash, req.user.id);
@@ -502,15 +503,15 @@ module.exports = function(db) {
   // POST /api/auth/enterprises/bulk-create
   // Body: { members: [{ email, name, title, team, phone? }], initial_password? }
   router.post('/enterprises/bulk-create', (req, res) => {
-    if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
-    if (!isAdmin(req.user)) return res.status(403).json({ error: '仅管理员可操作' });
+    if (!req.user?.enterprise_id) return res.status(403).json({ error: L(req, 'common.forbidden') });
+    if (!isAdmin(req.user)) return res.status(403).json({ error: L(req, 'common.admin_only') });
 
     const { members, initial_password } = req.body;
     if (!Array.isArray(members) || members.length === 0) {
-      return res.status(400).json({ error: '请提供成员列表' });
+      return res.status(400).json({ error: L(req, 'auth.members_required') });
     }
     const pwd = initial_password || 'Crewboard@2026';
-    if (pwd.length < 6) return res.status(400).json({ error: '初始密码至少6位' });
+    if (pwd.length < 6) return res.status(400).json({ error: L(req, 'auth.initial_pwd_min') });
 
     const results = [];
     const errors = [];
@@ -518,17 +519,17 @@ module.exports = function(db) {
     const transaction = db.transaction(() => {
       members.forEach((m, idx) => {
         const { email, name, title, team, phone } = m;
-        if (!name) { errors.push({ idx, reason: '姓名不能为空' }); return; }
-        if (!email && !phone) { errors.push({ idx, name, reason: '邮箱或手机号至少填一项' }); return; }
+        if (!name) { errors.push({ idx, reason: L(req, 'auth.bulk_name_empty') }); return; }
+        if (!email && !phone) { errors.push({ idx, name, reason: L(req, 'auth.bulk_need_contact') }); return; }
 
         // Check duplicate
         if (email) {
           const dup = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
-          if (dup) { errors.push({ idx, name, reason: `邮箱 ${email} 已存在` }); return; }
+          if (dup) { errors.push({ idx, name, reason: L(req, 'auth.bulk_email_exists', { email }) }); return; }
         }
         if (phone) {
           const dup = db.prepare('SELECT id FROM users WHERE phone = ?').get(phone);
-          if (dup) { errors.push({ idx, name, reason: `手机号 ${phone} 已存在` }); return; }
+          if (dup) { errors.push({ idx, name, reason: L(req, 'auth.bulk_phone_exists', { phone }) }); return; }
         }
 
         const hash = hashPassword(pwd);
@@ -559,21 +560,21 @@ module.exports = function(db) {
 
   // Send invitation
   router.post('/enterprises/invite', async (req, res) => {
-    if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
-    if (!isAdmin(req.user)) return res.status(403).json({ error: '仅管理员可操作' });
+    if (!req.user?.enterprise_id) return res.status(403).json({ error: L(req, 'common.forbidden') });
+    if (!isAdmin(req.user)) return res.status(403).json({ error: L(req, 'common.admin_only') });
 
     const { email, name } = req.body;
-    if (!email) return res.status(400).json({ error: '请输入邮箱地址' });
+    if (!email) return res.status(400).json({ error: L(req, 'auth.enter_email') });
 
     // Check if already invited
     const existing = db.prepare('SELECT id FROM invitations WHERE email = ? AND enterprise_id = ? AND status = ?')
       .get(email, req.user.enterprise_id, 'pending');
-    if (existing) return res.status(400).json({ error: '该邮箱已有待处理的邀请' });
+    if (existing) return res.status(400).json({ error: L(req, 'auth.invite_pending_exists') });
 
     // Check if already a member
     const existingUser = db.prepare('SELECT id FROM users WHERE email = ? AND enterprise_id = ?')
       .get(email, req.user.enterprise_id);
-    if (existingUser) return res.status(400).json({ error: '该邮箱的用户已是企业成员' });
+    if (existingUser) return res.status(400).json({ error: L(req, 'auth.invite_already_member') });
 
     const token = uuidv4();
     db.prepare('INSERT INTO invitations (enterprise_id, email, name, invited_by, token) VALUES (?,?,?,?,?)')
@@ -598,8 +599,8 @@ module.exports = function(db) {
 
   // List invitations
   router.get('/enterprises/invitations', (req, res) => {
-    if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
-    if (!isAdmin(req.user)) return res.status(403).json({ error: '无权限' });
+    if (!req.user?.enterprise_id) return res.status(403).json({ error: L(req, 'common.forbidden') });
+    if (!isAdmin(req.user)) return res.status(403).json({ error: L(req, 'common.forbidden') });
 
     const invitations = db.prepare(`
       SELECT i.*, u.name as invited_by_name
@@ -613,8 +614,8 @@ module.exports = function(db) {
 
   // Cancel invitation
   router.delete('/enterprises/invitations/:id', (req, res) => {
-    if (!req.user?.enterprise_id) return res.status(403).json({ error: '无权限' });
-    if (!isAdmin(req.user)) return res.status(403).json({ error: '无权限' });
+    if (!req.user?.enterprise_id) return res.status(403).json({ error: L(req, 'common.forbidden') });
+    if (!isAdmin(req.user)) return res.status(403).json({ error: L(req, 'common.forbidden') });
 
     db.prepare('DELETE FROM invitations WHERE id = ? AND enterprise_id = ?')
       .run(req.params.id, req.user.enterprise_id);
@@ -624,11 +625,11 @@ module.exports = function(db) {
   // Accept invitation (logged-in user without an enterprise, e.g. clicked the
   // invite link while already signed in with the invited email account)
   router.post('/invitations/accept', (req, res) => {
-    if (!req.user) return res.status(401).json({ error: '未登录' });
-    if (req.user.enterprise_id) return res.status(400).json({ error: '您已属于一个企业' });
+    if (!req.user) return res.status(401).json({ error: L(req, 'common.not_logged_in') });
+    if (req.user.enterprise_id) return res.status(400).json({ error: L(req, 'auth.already_in_enterprise'), code: 'already_in_enterprise' });
 
     const { token } = req.body;
-    if (!token) return res.status(400).json({ error: '缺少邀请令牌' });
+    if (!token) return res.status(400).json({ error: L(req, 'auth.invite_token_missing') });
 
     const invitation = db.prepare(`
       SELECT i.*, e.name as enterprise_name
@@ -636,11 +637,11 @@ module.exports = function(db) {
       JOIN enterprises e ON i.enterprise_id = e.id
       WHERE i.token = ? AND i.status = 'pending'
     `).get(token);
-    if (!invitation) return res.status(400).json({ error: '邀请不存在或已被取消' });
+    if (!invitation) return res.status(400).json({ error: L(req, 'auth.invite_not_found') });
 
     // Invitation must be addressed to this account's email
     if (!req.user.email || req.user.email.toLowerCase() !== (invitation.email || '').toLowerCase()) {
-      return res.status(400).json({ error: '邀请邮箱与当前登录账号不匹配' });
+      return res.status(400).json({ error: L(req, 'auth.invite_email_mismatch') });
     }
 
     const enterprise_id = invitation.enterprise_id;
@@ -663,12 +664,12 @@ module.exports = function(db) {
   // Step 1: Request password reset (no auth required)
   router.post('/forgot-password', forgotLimiter, async (req, res) => {
     const { email } = req.body;
-    if (!email) return res.status(400).json({ error: '请输入邮箱地址' });
+    if (!email) return res.status(400).json({ error: L(req, 'auth.enter_email') });
 
     const user = db.prepare('SELECT id, name, email FROM users WHERE email = ?').get(email);
     if (!user) {
       // Don't reveal whether email exists — return success either way
-      return res.json({ ok: true, message: '如果该邮箱已注册，重置链接已发送' });
+      return res.json({ ok: true, message: L(req, 'auth.reset_sent_if_registered') });
     }
 
     // Invalidate previous tokens for this user
@@ -689,7 +690,7 @@ module.exports = function(db) {
       console.error('[ForgotPassword] Email send failed:', result.error);
     }
 
-    res.json({ ok: true, message: '如果该邮箱已注册，重置链接已发送' });
+    res.json({ ok: true, message: L(req, 'auth.reset_sent_if_registered') });
   });
 
   // Step 2: Verify reset token
@@ -701,7 +702,7 @@ module.exports = function(db) {
       'SELECT * FROM password_reset_tokens WHERE token = ? AND used = 0 AND expires_at > ?'
     ).get(req.params.token, new Date().toISOString());
 
-    if (!row) return res.status(400).json({ error: '链接无效或已过期，请重新申请' });
+    if (!row) return res.status(400).json({ error: L(req, 'auth.reset_link_invalid') });
 
     const user = db.prepare('SELECT name, email FROM users WHERE id = ?').get(row.user_id);
     res.json({ ok: true, email: user?.email || '' });
@@ -710,14 +711,14 @@ module.exports = function(db) {
   // Step 3: Set new password with token
   router.post('/reset-password', (req, res) => {
     const { token, new_password } = req.body;
-    if (!token || !new_password) return res.status(400).json({ error: '缺少参数' });
-    if (new_password.length < 6) return res.status(400).json({ error: '密码至少6位' });
+    if (!token || !new_password) return res.status(400).json({ error: L(req, 'common.missing_params') });
+    if (new_password.length < 6) return res.status(400).json({ error: L(req, 'auth.pwd_min') });
 
     const row = db.prepare(
       'SELECT * FROM password_reset_tokens WHERE token = ? AND used = 0 AND expires_at > ?'
     ).get(token, new Date().toISOString());
 
-    if (!row) return res.status(400).json({ error: '链接无效或已过期，请重新申请' });
+    if (!row) return res.status(400).json({ error: L(req, 'auth.reset_link_invalid') });
 
     // Update password
     const newHash = hashPassword(new_password);

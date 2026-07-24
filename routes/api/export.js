@@ -4,6 +4,7 @@
 const express = require('express');
 const ExcelJS = require('exceljs');
 const { isWorkingDay } = require('../../db/holidays');
+const { L } = require('../../utils/server-i18n');
 
 module.exports = function register(router, ctx) {
   const { db, authz, isAdmin, isManagerOrAdmin, saveAvatarHelper, sseBroadcast } = ctx;
@@ -11,7 +12,7 @@ module.exports = function register(router, ctx) {
 // === EXCEL EXPORT ===
 router.get('/export/utilization', async (req, res) => {
   const { start, end } = req.query;
-  if (!start || !end) return res.status(400).json({ error: '缺少日期参数' });
+  if (!start || !end) return res.status(400).json({ error: L(req, 'common.missing_date_params') });
 
   const sql = `
     SELECT r.id, r.name, r.role, r.team, r.hours_per_day,
@@ -23,7 +24,7 @@ router.get('/export/utilization', async (req, res) => {
     GROUP BY r.id ORDER BY r.team, r.name
   `;
   const entId = req.user?.enterprise_id;
-  if (!entId) return res.status(400).json({ error: '缺少企业信息' });
+  if (!entId) return res.status(400).json({ error: L(req, 'common.missing_enterprise_info') });
   const rows = db.prepare(sql).all(start, end, start, end, entId);
 
   let workingDays = 0;
@@ -83,10 +84,10 @@ router.get('/export/utilization', async (req, res) => {
 
 router.get('/export/projects', async (req, res) => {
   const { start, end } = req.query;
-  if (!start || !end) return res.status(400).json({ error: '缺少日期参数' });
+  if (!start || !end) return res.status(400).json({ error: L(req, 'common.missing_date_params') });
 
   const entId = req.user?.enterprise_id;
-  if (!entId) return res.status(400).json({ error: '缺少企业信息' });
+  if (!entId) return res.status(400).json({ error: L(req, 'common.missing_enterprise_info') });
 
   /* manager: show projects they created OR are assigned to manage */
   let projectFilter = '';

@@ -2,6 +2,7 @@
  * sse.js routes
  */
 const express = require('express');
+const { L } = require('../../utils/server-i18n');
 
 module.exports = function register(router, ctx) {
   const { sseAddClient } = ctx;
@@ -10,7 +11,7 @@ module.exports = function register(router, ctx) {
   router.get('/sse', (req, res) => {
     const user = req.user;
     if (!user || !user.enterprise_id) {
-      return res.status(401).json({ error: '未授权' });
+      return res.status(401).json({ error: L(req, 'common.unauthorized') });
     }
 
     res.writeHead(200, {

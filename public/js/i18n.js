@@ -963,11 +963,34 @@
     return str;
   }
 
+  /**
+   * Set translated text on an element WITHOUT destroying child elements.
+   * Elements like <button><svg/>账号管理</button> or
+   * <label>手机号 <span class="label-optional">选填</span></label> keep their
+   * icons/badges: only the first non-empty text node is replaced (surrounding
+   * whitespace preserved). Plain-text elements use textContent as before.
+   */
+  function setI18nText(el, text) {
+    if (el.children && el.children.length > 0) {
+      for (var n = el.firstChild; n; n = n.nextSibling) {
+        if (n.nodeType === 3 && n.nodeValue.trim() !== '') {
+          var lead = n.nodeValue.match(/^\s*/)[0];
+          var trail = n.nodeValue.match(/\s*$/)[0];
+          n.nodeValue = lead + text + trail;
+          return;
+        }
+      }
+      el.appendChild(document.createTextNode(text));
+      return;
+    }
+    el.textContent = text;
+  }
+
   function applyI18n() {
     var els = document.querySelectorAll('[data-i18n]');
     for (var i = 0; i < els.length; i++) {
       var key = els[i].getAttribute('data-i18n');
-      if (key) els[i].textContent = t(key);
+      if (key) setI18nText(els[i], t(key));
     }
     var phs = document.querySelectorAll('[data-i18n-placeholder]');
     for (var j = 0; j < phs.length; j++) {

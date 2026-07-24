@@ -3,13 +3,14 @@
  */
 const express = require('express');
 const { isWorkingDay } = require('../../db/holidays');
+const { L } = require('../../utils/server-i18n');
 
 module.exports = function register(router, ctx) {
   const { db, authz, isAdmin, isManagerOrAdmin, saveAvatarHelper, sseBroadcast } = ctx;
 
 // === REPORTS ===
 router.get('/reports/utilization', (req, res) => {
-  if (req.user?.role === 'basic') return res.status(403).json({ error: '您没有查看报表的权限' });
+  if (req.user?.role === 'basic') return res.status(403).json({ error: L(req, 'reports.forbidden') });
   const { start, end } = req.query;
   const sql = `
     SELECT r.id, r.name, r.role, r.team, r.color, r.hours_per_day,
@@ -67,7 +68,7 @@ router.get('/reports/projects', (req, res) => {
   if (!entId) return res.json([]);
 
   /* basic users: no reports access */
-  if (req.user?.role === 'basic') return res.status(403).json({ error: '您没有查看报表的权限' });
+  if (req.user?.role === 'basic') return res.status(403).json({ error: L(req, 'reports.forbidden') });
   /* manager: show projects they created OR are assigned to manage */
   let projectFilter = '';
   let extraParams = [];
@@ -126,7 +127,7 @@ router.get('/reports/resource-drill', (req, res) => {
   const { resource_id, start, end } = req.query;
   const entId = req.user?.enterprise_id;
   if (!entId || !resource_id) return res.json([]);
-  if (req.user?.role === 'basic') return res.status(403).json({ error: '您没有查看报表的权限' });
+  if (req.user?.role === 'basic') return res.status(403).json({ error: L(req, 'reports.forbidden') });
   if (!authz.getResourceInEnterprise(resource_id, entId)) return res.json([]);
   const sql = `
     SELECT p.id, p.name, p.color, c.name as client_name,
@@ -151,7 +152,7 @@ router.get('/reports/project-drill', (req, res) => {
   // Check manager permission
   if (req.user?.role === 'manager') {
     const proj = db.prepare('SELECT id, created_by FROM projects WHERE id = ? AND enterprise_id = ?').get(project_id, entId);
-    if (!proj) return res.status(404).json({ error: '项目未找到' });
+    if (!proj) return res.status(404).json({ error: L(req, 'common.project_not_found_simple') });
     let isAllowed = proj.created_by === req.user.id;
     if (!isAllowed && req.user.managed_project_ids) {
       try {
@@ -163,7 +164,7 @@ router.get('/reports/project-drill', (req, res) => {
         console.error('[project-drill-permission] Error parsing managed_project_ids:', e);
       }
     }
-    if (!isAllowed) return res.status(403).json({ error: '没有权限查看该项目的报表' });
+    if (!isAllowed) return res.status(403).json({ error: L(req, 'reports.project_forbidden') });
   }
 
   const sql = `
@@ -187,7 +188,7 @@ router.get('/reports/project-scope-drill', (req, res) => {
   // Check manager permission
   if (req.user?.role === 'manager') {
     const proj = db.prepare('SELECT id, created_by FROM projects WHERE id = ? AND enterprise_id = ?').get(project_id, entId);
-    if (!proj) return res.status(404).json({ error: '项目未找到' });
+    if (!proj) return res.status(404).json({ error: L(req, 'common.project_not_found_simple') });
     let isAllowed = proj.created_by === req.user.id;
     if (!isAllowed && req.user.managed_project_ids) {
       try {
@@ -199,7 +200,7 @@ router.get('/reports/project-scope-drill', (req, res) => {
         console.error('[project-scope-drill-permission] Error parsing managed_project_ids:', e);
       }
     }
-    if (!isAllowed) return res.status(403).json({ error: '没有权限查看该项目的报表' });
+    if (!isAllowed) return res.status(403).json({ error: L(req, 'reports.project_forbidden') });
   }
 
   const sql = `
@@ -227,7 +228,7 @@ router.get('/reports/project-scope-drill', (req, res) => {
 
     SELECT 
       NULL as scope_id,
-      '未指定/其他' as scope_name,
+      ? as scope_name,
       COALESCE((SELECT SUM(hours) FROM bookings WHERE project_id = ? AND project_scope_id IS NULL AND date >= ? AND date <= ?), 0) as booked_hours,
       COALESCE((SELECT SUM(hours) FROM timesheets WHERE project_id = ? AND project_scope_id IS NULL AND date >= ? AND date <= ?), 0) as actual_hours
   `;
@@ -235,6 +236,7 @@ router.get('/reports/project-scope-drill', (req, res) => {
     project_id, start, end,
     project_id, start, end,
     project_id,
+    L(req, 'common.unspecified_scope'),
     project_id, start, end,
     project_id, start, end
   ];

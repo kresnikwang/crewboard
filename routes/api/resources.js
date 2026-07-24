@@ -3,6 +3,7 @@
  */
 const express = require('express');
 const { logAudit } = require('../../utils/audit');
+const { L } = require('../../utils/server-i18n');
 
 module.exports = function register(router, ctx) {
   const { db, authz, isAdmin, isManagerOrAdmin, saveAvatarHelper, sseBroadcast } = ctx;
@@ -35,8 +36,8 @@ router.get('/resources', (req, res) => {
 router.post('/resources', (req, res) => {
   const { name, email, role, team, color, hours_per_day, avatar } = req.body;
   const entId = req.user?.enterprise_id;
-  if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
-  if (req.user?.role !== 'admin') return res.status(403).json({ error: '仅管理员可添加人员' });
+  if (!entId) return res.status(400).json({ error: L(req, 'common.need_enterprise') });
+  if (req.user?.role !== 'admin') return res.status(403).json({ error: L(req, 'resources.add_admin_only') });
   const avatarUrl = saveAvatarHelper(avatar, '', 'resource');
   const stmt = db.prepare('INSERT INTO resources (name, email, role, team, color, hours_per_day, enterprise_id, avatar) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
   const result = stmt.run(name, email || null, role || '', team || '', color || '#4F46E5', hours_per_day || 8, entId, avatarUrl);
@@ -59,10 +60,10 @@ router.post('/resources', (req, res) => {
 router.put('/resources/:id', (req, res) => {
   const { name, email, role, team, color, hours_per_day, avatar } = req.body;
   const entId = req.user?.enterprise_id;
-  if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
-  if (!isAdmin(req.user)) return res.status(403).json({ error: '仅管理员可编辑人员' });
+  if (!entId) return res.status(400).json({ error: L(req, 'common.need_enterprise') });
+  if (!isAdmin(req.user)) return res.status(403).json({ error: L(req, 'resources.edit_admin_only') });
   const oldRes = authz.getResourceInEnterprise(req.params.id, entId);
-  if (!oldRes) return res.status(404).json({ error: '人员不存在' });
+  if (!oldRes) return res.status(404).json({ error: L(req, 'resources.not_found') });
   const avatarUrl = saveAvatarHelper(avatar, oldRes.avatar || '', `resource_${req.params.id}`);
   db.prepare('UPDATE resources SET name=?, email=?, role=?, team=?, color=?, hours_per_day=?, avatar=? WHERE id=? AND enterprise_id=?')
     .run(name, email, role, team, color, hours_per_day, avatarUrl, req.params.id, entId);
@@ -84,10 +85,10 @@ router.put('/resources/:id', (req, res) => {
 
 router.delete('/resources/:id', (req, res) => {
   const entId = req.user?.enterprise_id;
-  if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
-  if (!isAdmin(req.user)) return res.status(403).json({ error: '仅管理员可删除人员' });
+  if (!entId) return res.status(400).json({ error: L(req, 'common.need_enterprise') });
+  if (!isAdmin(req.user)) return res.status(403).json({ error: L(req, 'resources.delete_admin_only') });
   const existing = authz.getResourceInEnterprise(req.params.id, entId);
-  if (!existing) return res.status(404).json({ error: '人员不存在' });
+  if (!existing) return res.status(404).json({ error: L(req, 'resources.not_found') });
   db.prepare('UPDATE resources SET is_active = 0 WHERE id = ? AND enterprise_id = ?').run(req.params.id, entId);
   logAudit(db, {
     enterpriseId: entId,

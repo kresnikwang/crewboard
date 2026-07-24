@@ -3,6 +3,7 @@
  */
 const express = require('express');
 const { logAudit } = require('../../utils/audit');
+const { L } = require('../../utils/server-i18n');
 
 module.exports = function register(router, ctx) {
   const { db, authz, isAdmin, isManagerOrAdmin, saveAvatarHelper, sseBroadcast } = ctx;
@@ -18,9 +19,9 @@ router.get('/clients', (req, res) => {
 router.post('/clients', (req, res) => {
   const { name, color, details } = req.body;
   const entId = req.user?.enterprise_id;
-  if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
+  if (!entId) return res.status(400).json({ error: L(req, 'common.need_enterprise') });
   const userRole = req.user?.role;
-  if (userRole !== 'admin' && userRole !== 'manager') return res.status(403).json({ error: '仅经理及以上可添加客户' });
+  if (userRole !== 'admin' && userRole !== 'manager') return res.status(403).json({ error: L(req, 'clients.add_manager_only') });
   const result = db.prepare('INSERT INTO clients (name, color, details, enterprise_id, created_by) VALUES (?, ?, ?, ?, ?)').run(name, color || '#6366F1', details || '', entId, req.user.id);
   res.json({ id: result.lastInsertRowid });
 });
@@ -28,12 +29,12 @@ router.post('/clients', (req, res) => {
 router.put('/clients/:id', (req, res) => {
   const { name, color, details } = req.body;
   const entId = req.user?.enterprise_id;
-  if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
-  if (!isManagerOrAdmin(req.user)) return res.status(403).json({ error: '仅经理及以上可编辑客户' });
+  if (!entId) return res.status(400).json({ error: L(req, 'common.need_enterprise') });
+  if (!isManagerOrAdmin(req.user)) return res.status(403).json({ error: L(req, 'clients.edit_manager_only') });
   const client = authz.getClientInEnterprise(req.params.id, entId);
-  if (!client) return res.status(404).json({ error: '客户不存在' });
+  if (!client) return res.status(404).json({ error: L(req, 'common.client_not_found') });
   if (req.user.role === 'manager' && client.created_by !== req.user.id) {
-    return res.status(403).json({ error: '经理只能编辑自己创建的客户' });
+    return res.status(403).json({ error: L(req, 'clients.edit_own_only') });
   }
   db.prepare('UPDATE clients SET name=?, color=?, details=? WHERE id=? AND enterprise_id=?')
     .run(name, color || '#6366F1', details || '', req.params.id, entId);
@@ -42,10 +43,10 @@ router.put('/clients/:id', (req, res) => {
 
 router.patch('/clients/:id/archive', (req, res) => {
   const entId = req.user?.enterprise_id;
-  if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
-  if (!isAdmin(req.user)) return res.status(403).json({ error: '仅管理员可归档客户' });
+  if (!entId) return res.status(400).json({ error: L(req, 'common.need_enterprise') });
+  if (!isAdmin(req.user)) return res.status(403).json({ error: L(req, 'clients.archive_admin_only') });
   const client = authz.getClientInEnterprise(req.params.id, entId);
-  if (!client) return res.status(404).json({ error: '客户不存在' });
+  if (!client) return res.status(404).json({ error: L(req, 'common.client_not_found') });
   db.prepare('UPDATE clients SET is_archived = 1 WHERE id = ? AND enterprise_id = ?').run(req.params.id, entId);
   db.prepare('UPDATE projects SET is_archived = 1 WHERE client_id = ? AND enterprise_id = ? AND is_active = 1').run(req.params.id, entId);
   res.json({ ok: true });
@@ -53,10 +54,10 @@ router.patch('/clients/:id/archive', (req, res) => {
 
 router.patch('/clients/:id/unarchive', (req, res) => {
   const entId = req.user?.enterprise_id;
-  if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
-  if (!isAdmin(req.user)) return res.status(403).json({ error: '仅管理员可取消归档客户' });
+  if (!entId) return res.status(400).json({ error: L(req, 'common.need_enterprise') });
+  if (!isAdmin(req.user)) return res.status(403).json({ error: L(req, 'clients.unarchive_admin_only') });
   const client = authz.getClientInEnterprise(req.params.id, entId);
-  if (!client) return res.status(404).json({ error: '客户不存在' });
+  if (!client) return res.status(404).json({ error: L(req, 'common.client_not_found') });
   db.prepare('UPDATE clients SET is_archived = 0 WHERE id = ? AND enterprise_id = ?').run(req.params.id, entId);
   db.prepare('UPDATE projects SET is_archived = 0 WHERE client_id = ? AND enterprise_id = ?').run(req.params.id, entId);
   res.json({ ok: true });
@@ -64,10 +65,10 @@ router.patch('/clients/:id/unarchive', (req, res) => {
 
 router.delete('/clients/:id', (req, res) => {
   const entId = req.user?.enterprise_id;
-  if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
-  if (!isAdmin(req.user)) return res.status(403).json({ error: '仅管理员可删除客户' });
+  if (!entId) return res.status(400).json({ error: L(req, 'common.need_enterprise') });
+  if (!isAdmin(req.user)) return res.status(403).json({ error: L(req, 'clients.delete_admin_only') });
   const client = authz.getClientInEnterprise(req.params.id, entId);
-  if (!client) return res.status(404).json({ error: '客户不存在' });
+  if (!client) return res.status(404).json({ error: L(req, 'common.client_not_found') });
   db.prepare('UPDATE clients SET is_active = 0 WHERE id = ? AND enterprise_id = ?').run(req.params.id, entId);
   res.json({ ok: true });
 });

@@ -3,6 +3,8 @@
  * Keep role checks and enterprise isolation in one place.
  */
 
+const { L } = require('./server-i18n');
+
 const ROLES = Object.freeze({
   ADMIN: 'admin',
   MANAGER: 'manager',
@@ -77,31 +79,31 @@ function getEnterpriseRow(db, enterpriseId) {
 
 function createAuthz(db) {
   function requireAuth(req, res, next) {
-    if (!req.user) return res.status(401).json({ error: '未登录' });
+    if (!req.user) return res.status(401).json({ error: L(req, 'common.not_logged_in') });
     if (req.user.status && req.user.status !== 'active') {
-      return res.status(403).json({ error: '账号已停用' });
+      return res.status(403).json({ error: L(req, 'common.account_disabled') });
     }
     next();
   }
 
   function requireEnterprise(req, res, next) {
-    if (!req.user) return res.status(401).json({ error: '未登录' });
+    if (!req.user) return res.status(401).json({ error: L(req, 'common.not_logged_in') });
     if (!req.user.enterprise_id) {
-      return res.status(400).json({ error: '请先创建或加入企业' });
+      return res.status(400).json({ error: L(req, 'common.need_enterprise') });
     }
     next();
   }
 
   function requireAdmin(req, res, next) {
-    if (!req.user) return res.status(401).json({ error: '未登录' });
-    if (!isAdmin(req.user)) return res.status(403).json({ error: '仅管理员可操作' });
+    if (!req.user) return res.status(401).json({ error: L(req, 'common.not_logged_in') });
+    if (!isAdmin(req.user)) return res.status(403).json({ error: L(req, 'common.admin_only') });
     next();
   }
 
   function requireManager(req, res, next) {
-    if (!req.user) return res.status(401).json({ error: '未登录' });
+    if (!req.user) return res.status(401).json({ error: L(req, 'common.not_logged_in') });
     if (!isManagerOrAdmin(req.user)) {
-      return res.status(403).json({ error: '仅经理及以上可操作' });
+      return res.status(403).json({ error: L(req, 'common.manager_or_above') });
     }
     next();
   }

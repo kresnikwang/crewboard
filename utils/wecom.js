@@ -4,6 +4,8 @@
  * with environment/default fallback for backward compatibility.
  */
 
+const { msg } = require('./server-i18n');
+
 const DEFAULT_WECOM_CORP_ID = process.env.WECOM_CORP_ID || 'wwb089e4801f755a98';
 const DEFAULT_WECOM_AGENT_ID = process.env.WECOM_AGENT_ID || '1000003';
 const DEFAULT_WECOM_SECRET = process.env.WECOM_SECRET || 'y2Ij4aQ2D_am20LaE48xTyaSVu7KtEPBpSnUrbz0dpE';
@@ -33,30 +35,30 @@ function getRuntimeWeComConfig(db, enterpriseId) {
   return normalizeWeComConfig(enterpriseCfg || {});
 }
 
-function validateWeComConfig(config) {
-  if (!config.corpId) return { ok: false, error: '缺少企业微信 Corp ID' };
-  if (!config.agentId) return { ok: false, error: '缺少企业微信 Agent ID' };
-  if (!config.secret) return { ok: false, error: '缺少企业微信 App Secret' };
+function validateWeComConfig(config, lang = 'zh') {
+  if (!config.corpId) return { ok: false, error: msg(lang, 'wecom.missing_corp_id') };
+  if (!config.agentId) return { ok: false, error: msg(lang, 'wecom.missing_agent_id') };
+  if (!config.secret) return { ok: false, error: msg(lang, 'wecom.missing_secret') };
   return { ok: true };
 }
 
-function buildWeComErrorMessage(data, fallback) {
+function buildWeComErrorMessage(data, fallback, lang = 'zh') {
   const errcode = data && typeof data.errcode !== 'undefined' ? data.errcode : null;
-  const errmsg = data && data.errmsg ? data.errmsg : (fallback || '企业微信接口调用失败');
+  const errmsg = data && data.errmsg ? data.errmsg : (fallback || msg(lang, 'wecom.api_failed'));
   if (errcode === 60020) {
-    return '企业微信拒绝了当前服务器 IP，请把服务器出口 IP 加入该应用的可信 IP 白名单';
+    return msg(lang, 'wecom.ip_rejected');
   }
   if (errcode === 40013) {
-    return '企业微信 Corp ID 无效';
+    return msg(lang, 'wecom.invalid_corp_id');
   }
   if (errcode === 40001 || errcode === 42001) {
-    return '企业微信 access_token 无效或已过期';
+    return msg(lang, 'wecom.invalid_token');
   }
   if (errcode === 60111) {
-    return '企业微信应用缺少通讯录相关权限，无法读取成员列表';
+    return msg(lang, 'wecom.no_contacts_perm');
   }
   if (errcode === 48002) {
-    return '企业微信接口权限不足，请检查应用可见范围或接口权限';
+    return msg(lang, 'wecom.insufficient_perm');
   }
   return errmsg;
 }
@@ -81,9 +83,9 @@ function collectWeComEmailCandidates(user) {
   return candidates;
 }
 
-async function getAccessToken(configInput) {
+async function getAccessToken(configInput, lang = 'zh') {
   const config = normalizeWeComConfig(configInput);
-  const valid = validateWeComConfig(config);
+  const valid = validateWeComConfig(config, lang);
   if (!valid.ok) {
     return { ok: false, error: valid.error, errcode: 'config_missing' };
   }
@@ -99,7 +101,7 @@ async function getAccessToken(configInput) {
     const res = await fetch(url);
     const data = await res.json();
     if (data.errcode !== 0) {
-      const error = buildWeComErrorMessage(data, '获取企业微信 access_token 失败');
+      const error = buildWeComErrorMessage(data, msg(lang, 'wecom.get_token_failed'), lang);
       console.error('[WeCom] gettoken failed:', data.errcode, data.errmsg);
       return { ok: false, error, errcode: data.errcode, raw: data };
     }
@@ -111,13 +113,13 @@ async function getAccessToken(configInput) {
     return { ok: true, token: data.access_token, expiresAt: Date.now() + data.expires_in * 1000 };
   } catch (err) {
     console.error('[WeCom] gettoken error:', err.message);
-    return { ok: false, error: `获取企业微信 access_token 失败：${err.message}`, errcode: 'network_error' };
+    return { ok: false, error: msg(lang, 'wecom.get_token_failed_detail', { detail: err.message }), errcode: 'network_error' };
   }
 }
 
 /* ---------- Send text card message to a user ---------- */
-async function sendCardMessage(configInput, userId, title, description, url) {
-  const tokenResult = await getAccessToken(configInput);
+async function sendCardMessage(configInput, userId, title, description, url, lang = 'zh') {
+  const tokenResult = await getAccessToken(configInput, lang);
   if (!tokenResult.ok) return tokenResult;
   const config = normalizeWeComConfig(configInput);
 
@@ -141,7 +143,7 @@ async function sendCardMessage(configInput, userId, title, description, url) {
     });
     const data = await res.json();
     if (data.errcode !== 0) {
-      const error = buildWeComErrorMessage(data, '发送企业微信卡片消息失败');
+      const error = buildWeComErrorMessage(data, msg(lang, 'wecom.send_card_failed'), lang);
       console.error('[WeCom] send message failed:', data.errcode, data.errmsg, 'userId:', userId);
       return { ok: false, error, errcode: data.errcode, raw: data };
     }
@@ -149,13 +151,13 @@ async function sendCardMessage(configInput, userId, title, description, url) {
     return { ok: true };
   } catch (err) {
     console.error('[WeCom] send message error:', err.message);
-    return { ok: false, error: `发送企业微信卡片消息失败：${err.message}`, errcode: 'network_error' };
+    return { ok: false, error: msg(lang, 'wecom.send_card_failed_detail', { detail: err.message }), errcode: 'network_error' };
   }
 }
 
 /* ---------- Send plain text message ---------- */
-async function sendTextMessage(configInput, userId, content) {
-  const tokenResult = await getAccessToken(configInput);
+async function sendTextMessage(configInput, userId, content, lang = 'zh') {
+  const tokenResult = await getAccessToken(configInput, lang);
   if (!tokenResult.ok) return tokenResult;
   const config = normalizeWeComConfig(configInput);
 
@@ -174,7 +176,7 @@ async function sendTextMessage(configInput, userId, content) {
     });
     const data = await res.json();
     if (data.errcode !== 0) {
-      const error = buildWeComErrorMessage(data, '发送企业微信文本消息失败');
+      const error = buildWeComErrorMessage(data, msg(lang, 'wecom.send_text_failed'), lang);
       console.error('[WeCom] send text failed:', data.errcode, data.errmsg, 'userId:', userId);
       return { ok: false, error, errcode: data.errcode, raw: data };
     }
@@ -182,14 +184,14 @@ async function sendTextMessage(configInput, userId, content) {
     return { ok: true };
   } catch (err) {
     console.error('[WeCom] send text error:', err.message);
-    return { ok: false, error: `发送企业微信文本消息失败：${err.message}`, errcode: 'network_error' };
+    return { ok: false, error: msg(lang, 'wecom.send_text_failed_detail', { detail: err.message }), errcode: 'network_error' };
   }
 }
 
 /* ---------- Fetch department user list ---------- */
-async function getDepartmentUsers(configInput, deptId) {
+async function getDepartmentUsers(configInput, deptId, lang = 'zh') {
   const config = normalizeWeComConfig(configInput);
-  const tokenResult = await getAccessToken(config);
+  const tokenResult = await getAccessToken(config, lang);
   if (!tokenResult.ok) return { ok: false, users: [], error: tokenResult.error, errcode: tokenResult.errcode };
 
   const targetDeptId = Math.max(1, parseInt(deptId, 10) || config.departmentId || 1);
@@ -198,7 +200,7 @@ async function getDepartmentUsers(configInput, deptId) {
     const res = await fetch(`https://qyapi.weixin.qq.com/cgi-bin/user/list?access_token=${tokenResult.token}&department_id=${targetDeptId}`);
     const data = await res.json();
     if (data.errcode !== 0) {
-      const error = buildWeComErrorMessage(data, '获取企业微信通讯录失败');
+      const error = buildWeComErrorMessage(data, msg(lang, 'wecom.get_contacts_failed'), lang);
       console.error('[WeCom] get users failed:', data.errcode, data.errmsg);
       return { ok: false, users: [], error, errcode: data.errcode, raw: data };
     }
@@ -218,7 +220,7 @@ async function getDepartmentUsers(configInput, deptId) {
     };
   } catch (err) {
     console.error('[WeCom] get users error:', err.message);
-    return { ok: false, users: [], error: `获取企业微信通讯录失败：${err.message}`, errcode: 'network_error' };
+    return { ok: false, users: [], error: msg(lang, 'wecom.get_contacts_failed_detail', { detail: err.message }), errcode: 'network_error' };
   }
 }
 

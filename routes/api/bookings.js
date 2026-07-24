@@ -5,6 +5,7 @@ const { notifyAll } = require('../webhook');
 const { notifyBookingCreated, notifyBookingUpdated, notifyBookingDeleted } = require('../../utils/wecom');
 const { checkBookingConflicts, shouldBlockConflicts } = require('../../utils/conflicts');
 const { logAudit } = require('../../utils/audit');
+const { L, reqLang } = require('../../utils/server-i18n');
 
 module.exports = function register(router, ctx) {
   const { db, authz, sseBroadcast } = ctx;
@@ -19,13 +20,13 @@ module.exports = function register(router, ctx) {
   // Preview conflicts without writing (optional helper for UI)
   router.post('/bookings/check-conflicts', (req, res) => {
     const entId = req.user?.enterprise_id;
-    if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
-    if (!canBookResource(req.user)) return res.status(403).json({ error: '无权限' });
+    if (!entId) return res.status(400).json({ error: L(req, 'common.need_enterprise') });
+    if (!canBookResource(req.user)) return res.status(403).json({ error: L(req, 'common.forbidden') });
 
     const { resource_id, date, end_date, hours, exclude_booking_id } = req.body;
-    if (!resource_id || !date) return res.status(400).json({ error: '缺少 resource_id 或 date' });
+    if (!resource_id || !date) return res.status(400).json({ error: L(req, 'bookings.missing_resource_or_date') });
     if (!authz.getResourceInEnterprise(resource_id, entId)) {
-      return res.status(400).json({ error: '资源不存在或无权访问' });
+      return res.status(400).json({ error: L(req, 'common.resource_not_found') });
     }
 
     const result = checkBookingConflicts(db, {
@@ -35,6 +36,7 @@ module.exports = function register(router, ctx) {
       hours: hours != null ? hours : 8,
       excludeBookingId: exclude_booking_id || null,
       replaceDayHours: !!exclude_booking_id,
+      lang: reqLang(req),
     });
     res.json(result);
   });
@@ -82,15 +84,15 @@ module.exports = function register(router, ctx) {
    */
   router.post('/bookings/shift', (req, res) => {
     const entId = req.user?.enterprise_id;
-    if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
-    if (!canBookResource(req.user)) return res.status(403).json({ error: '无权限' });
+    if (!entId) return res.status(400).json({ error: L(req, 'common.need_enterprise') });
+    if (!canBookResource(req.user)) return res.status(403).json({ error: L(req, 'common.forbidden') });
 
     const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Boolean) : [];
     const dayDelta = parseInt(req.body.day_delta, 10);
     const force = !!req.body.force;
-    if (!ids.length) return res.status(400).json({ error: '缺少 ids' });
+    if (!ids.length) return res.status(400).json({ error: L(req, 'bookings.missing_ids') });
     if (!Number.isFinite(dayDelta) || dayDelta === 0) {
-      return res.status(400).json({ error: 'day_delta 必须为非零整数' });
+      return res.status(400).json({ error: L(req, 'bookings.bad_day_delta') });
     }
 
     const getBk = db.prepare(`
@@ -101,9 +103,9 @@ module.exports = function register(router, ctx) {
     const bookings = [];
     for (const id of ids) {
       const b = getBk.get(id, entId);
-      if (!b) return res.status(404).json({ error: '预订不存在: ' + id });
+      if (!b) return res.status(404).json({ error: L(req, 'bookings.not_found_id', { id }) });
       if (!canEditBooking(req.user, b)) {
-        return res.status(403).json({ error: '您只能移动自己创建的排程' });
+        return res.status(403).json({ error: L(req, 'bookings.only_move_own') });
       }
       bookings.push(b);
     }
@@ -148,14 +150,14 @@ module.exports = function register(router, ctx) {
         leaveConflicts.push({
           type: 'leave_conflict',
           date: p.new_date,
-          message: `目标日期 ${p.new_date} 有休假`,
+          message: L(req, 'bookings.leave_on_date', { date: p.new_date }),
         });
       }
     }
 
     if (leaveConflicts.length && !force) {
       return res.status(409).json({
-        error: '目标日期与休假冲突',
+        error: L(req, 'bookings.leave_conflict'),
         code: 'booking_conflict',
         reason: 'leave_conflict',
         conflicts: leaveConflicts,
@@ -165,7 +167,7 @@ module.exports = function register(router, ctx) {
     if (conflictDates.length) {
       const uniq = [...new Set(conflictDates)];
       return res.status(400).json({
-        error: '目标日期已有同项目排程: ' + uniq.slice(0, 5).join(', '),
+        error: L(req, 'bookings.dup_project_schedule', { dates: uniq.slice(0, 5).join(', ') }),
         code: 'move_conflict',
         dates: uniq,
       });
@@ -199,11 +201,11 @@ module.exports = function register(router, ctx) {
    */
   router.post('/bookings/batch-delete', (req, res) => {
     const entId = req.user?.enterprise_id;
-    if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
-    if (!canBookResource(req.user)) return res.status(403).json({ error: '无权限' });
+    if (!entId) return res.status(400).json({ error: L(req, 'common.need_enterprise') });
+    if (!canBookResource(req.user)) return res.status(403).json({ error: L(req, 'common.forbidden') });
 
     const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Boolean) : [];
-    if (!ids.length) return res.status(400).json({ error: '缺少 ids' });
+    if (!ids.length) return res.status(400).json({ error: L(req, 'bookings.missing_ids') });
 
     const getBk = db.prepare(`
       SELECT b.*, r.name as rname, p.name as pname FROM bookings b
@@ -214,9 +216,9 @@ module.exports = function register(router, ctx) {
     const rows = [];
     for (const id of ids) {
       const b = getBk.get(id, entId);
-      if (!b) return res.status(404).json({ error: '预订不存在: ' + id });
+      if (!b) return res.status(404).json({ error: L(req, 'bookings.not_found_id', { id }) });
       if (!canEditBooking(req.user, b)) {
-        return res.status(403).json({ error: '您只能删除自己创建的排程' });
+        return res.status(403).json({ error: L(req, 'bookings.only_delete_own') });
       }
       rows.push(b);
     }
@@ -247,16 +249,16 @@ module.exports = function register(router, ctx) {
       is_tentative, notes, force,
     } = req.body;
     const entId = req.user?.enterprise_id;
-    if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
+    if (!entId) return res.status(400).json({ error: L(req, 'common.need_enterprise') });
 
     if (!canBookResource(req.user)) {
-      return res.status(403).json({ error: '您没有创建排程的权限' });
+      return res.status(403).json({ error: L(req, 'bookings.no_create_perm') });
     }
 
     const resource = db.prepare('SELECT id, name FROM resources WHERE id=? AND enterprise_id=?').get(resource_id, entId);
-    if (!resource) return res.status(400).json({ error: '资源不存在或无权访问' });
+    if (!resource) return res.status(400).json({ error: L(req, 'common.resource_not_found') });
     const project = db.prepare('SELECT id, name FROM projects WHERE id=? AND enterprise_id=?').get(project_id, entId);
-    if (!project) return res.status(400).json({ error: '项目不存在或无权访问' });
+    if (!project) return res.status(400).json({ error: L(req, 'common.project_not_found') });
 
     const startDate = date;
     const endDate = end_date || date;
@@ -272,12 +274,13 @@ module.exports = function register(router, ctx) {
       startDate,
       endDate,
       hours: bookHours,
+      lang: reqLang(req),
     });
     const gate = shouldBlockConflicts(conflictResult, { force: !!force });
     if (gate.block) {
       // Currently only leave conflicts block booking (overload is soft warning only)
       return res.status(409).json({
-        error: '所选日期与休假冲突，请调整日期或使用 force 确认',
+        error: L(req, 'bookings.leave_conflict_force'),
         code: 'booking_conflict',
         reason: gate.reason || 'leave_conflict',
         conflicts: conflictResult.conflicts,
@@ -314,7 +317,7 @@ module.exports = function register(router, ctx) {
     const ids = batchInsert();
 
     if (ids.length === 0) {
-      return res.status(400).json({ error: '所选日期已存在该工作范围的排程，无需重复创建' });
+      return res.status(400).json({ error: L(req, 'bookings.duplicate_booking') });
     }
 
     const rangeStr = startDate === endDate ? startDate : `${startDate} ~ ${endDate}`;
@@ -355,16 +358,16 @@ module.exports = function register(router, ctx) {
       is_tentative, notes, split_after, force,
     } = req.body;
     const entId = req.user?.enterprise_id;
-    if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
+    if (!entId) return res.status(400).json({ error: L(req, 'common.need_enterprise') });
 
     const existing = db.prepare(`
       SELECT b.* FROM bookings b
       JOIN resources r ON b.resource_id = r.id
       WHERE b.id=? AND r.enterprise_id=?
     `).get(req.params.id, entId);
-    if (!existing) return res.status(404).json({ error: '预订不存在' });
+    if (!existing) return res.status(404).json({ error: L(req, 'bookings.not_found') });
     if (!canEditBooking(req.user, existing)) {
-      return res.status(403).json({ error: '您只能编辑自己创建的排程' });
+      return res.status(403).json({ error: L(req, 'bookings.only_edit_own') });
     }
 
     // Only update split_after if explicitly provided (visual)
@@ -393,9 +396,9 @@ module.exports = function register(router, ctx) {
     }
 
     const nextResource = authz.getResourceInEnterprise(resource_id, entId);
-    if (!nextResource) return res.status(400).json({ error: '资源不存在或无权访问' });
+    if (!nextResource) return res.status(400).json({ error: L(req, 'common.resource_not_found') });
     const nextProject = authz.getProjectInEnterprise(project_id, entId);
-    if (!nextProject) return res.status(400).json({ error: '项目不存在或无权访问' });
+    if (!nextProject) return res.status(400).json({ error: L(req, 'common.project_not_found') });
 
     const conflictResult = checkBookingConflicts(db, {
       resourceId: resource_id,
@@ -404,6 +407,7 @@ module.exports = function register(router, ctx) {
       hours: hours != null ? hours : existing.hours,
       excludeBookingId: +req.params.id,
       replaceDayHours: false,
+      lang: reqLang(req),
     });
     // On update: projected = other bookings that day + new hours
     // checkBookingConflicts already excludes this booking and adds hours — correct.
@@ -412,7 +416,7 @@ module.exports = function register(router, ctx) {
     if (gate.block) {
       // Only leave conflicts block; overload is returned as soft conflicts on success
       return res.status(409).json({
-        error: '目标日期与休假冲突',
+        error: L(req, 'bookings.leave_conflict'),
         code: 'booking_conflict',
         reason: gate.reason || 'leave_conflict',
         conflicts: conflictResult.conflicts,
@@ -461,7 +465,7 @@ module.exports = function register(router, ctx) {
 
   router.delete('/bookings/:id', (req, res) => {
     const entId = req.user?.enterprise_id;
-    if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
+    if (!entId) return res.status(400).json({ error: L(req, 'common.need_enterprise') });
 
     const booking = db.prepare(`
       SELECT b.*, r.name as rname, p.name as pname FROM bookings b
@@ -469,10 +473,10 @@ module.exports = function register(router, ctx) {
       JOIN projects p ON b.project_id=p.id
       WHERE b.id=? AND r.enterprise_id=?
     `).get(req.params.id, entId);
-    if (!booking) return res.status(404).json({ error: '预订不存在' });
+    if (!booking) return res.status(404).json({ error: L(req, 'bookings.not_found') });
 
     if (!canEditBooking(req.user, booking)) {
-      return res.status(403).json({ error: '您只能删除自己创建的排程' });
+      return res.status(403).json({ error: L(req, 'bookings.only_delete_own') });
     }
 
     db.prepare('DELETE FROM bookings WHERE id = ?').run(req.params.id);

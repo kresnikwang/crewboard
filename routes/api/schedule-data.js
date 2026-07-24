@@ -3,6 +3,7 @@
  */
 const express = require('express');
 const { getHoliday } = require('../../db/holidays');
+const { L } = require('../../utils/server-i18n');
 
 module.exports = function register(router, ctx) {
   const { db, authz, isAdmin, isManagerOrAdmin, saveAvatarHelper, sseBroadcast } = ctx;
@@ -13,7 +14,7 @@ router.get('/schedule-data', (req, res) => {
   const { start, end } = req.query;
   const entId = req.user?.enterprise_id;
   if (!entId) return res.json({ resources: [], bookings: [], leave: [], holidays: {} });
-  if (!start || !end) return res.status(400).json({ error: '缺少日期参数' });
+  if (!start || !end) return res.status(400).json({ error: L(req, 'common.missing_date_params') });
 
   /* Resources */
   const resources = db.prepare(`

@@ -3,6 +3,7 @@
  */
 const express = require('express');
 const { logAudit } = require('../../utils/audit');
+const { L } = require('../../utils/server-i18n');
 
 module.exports = function register(router, ctx) {
   const { db, authz, isAdmin, isManagerOrAdmin, saveAvatarHelper, sseBroadcast } = ctx;
@@ -40,16 +41,16 @@ router.get('/timesheets', (req, res) => {
 
 router.post('/timesheets', (req, res) => {
   const entId = req.user?.enterprise_id;
-  if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
+  if (!entId) return res.status(400).json({ error: L(req, 'common.need_enterprise') });
   const { resource_id, project_id, project_scope_id, date, hours, notes, status } = req.body;
   if (!authz.canAccessResourceAsSelfOrElevated(req.user, resource_id)) {
-    return res.status(403).json({ error: '只能为自己填报工时' });
+    return res.status(403).json({ error: L(req, 'timesheets.own_only') });
   }
   if (!authz.getResourceInEnterprise(resource_id, entId)) {
-    return res.status(400).json({ error: '资源不存在或无权访问' });
+    return res.status(400).json({ error: L(req, 'common.resource_not_found') });
   }
   if (!authz.getProjectInEnterprise(project_id, entId)) {
-    return res.status(400).json({ error: '项目不存在或无权访问' });
+    return res.status(400).json({ error: L(req, 'common.project_not_found') });
   }
   const result = db.prepare('INSERT INTO timesheets (resource_id, project_id, project_scope_id, date, hours, notes, status) VALUES (?,?,?,?,?,?,?)')
     .run(resource_id, project_id, project_scope_id || null, date, hours, notes || '', status || 'draft');
@@ -58,11 +59,11 @@ router.post('/timesheets', (req, res) => {
 
 router.put('/timesheets/:id', (req, res) => {
   const entId = req.user?.enterprise_id;
-  if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
+  if (!entId) return res.status(400).json({ error: L(req, 'common.need_enterprise') });
   const existing = authz.getTimesheetInEnterprise(req.params.id, entId);
-  if (!existing) return res.status(404).json({ error: '工时记录不存在' });
+  if (!existing) return res.status(404).json({ error: L(req, 'timesheets.not_found') });
   if (!authz.canAccessResourceAsSelfOrElevated(req.user, existing.resource_id)) {
-    return res.status(403).json({ error: '只能编辑自己的工时' });
+    return res.status(403).json({ error: L(req, 'timesheets.edit_own_only') });
   }
   const { hours, notes, status, project_scope_id } = req.body;
   db.prepare('UPDATE timesheets SET hours=?, notes=?, status=?, project_scope_id=? WHERE id=?')
@@ -72,11 +73,11 @@ router.put('/timesheets/:id', (req, res) => {
 
 router.delete('/timesheets/:id', (req, res) => {
   const entId = req.user?.enterprise_id;
-  if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
+  if (!entId) return res.status(400).json({ error: L(req, 'common.need_enterprise') });
   const existing = authz.getTimesheetInEnterprise(req.params.id, entId);
-  if (!existing) return res.status(404).json({ error: '工时记录不存在' });
+  if (!existing) return res.status(404).json({ error: L(req, 'timesheets.not_found') });
   if (!authz.canAccessResourceAsSelfOrElevated(req.user, existing.resource_id)) {
-    return res.status(403).json({ error: '只能删除自己的工时' });
+    return res.status(403).json({ error: L(req, 'timesheets.delete_own_only') });
   }
   db.prepare('DELETE FROM timesheets WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
@@ -85,9 +86,9 @@ router.delete('/timesheets/:id', (req, res) => {
 // Batch upsert timesheets for a week
 router.post('/timesheets/batch', (req, res) => {
   const entId = req.user?.enterprise_id;
-  if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
+  if (!entId) return res.status(400).json({ error: L(req, 'common.need_enterprise') });
   const { entries } = req.body; // [{resource_id, project_id, project_scope_id, date, hours, notes}]
-  if (!Array.isArray(entries)) return res.status(400).json({ error: 'entries 无效' });
+  if (!Array.isArray(entries)) return res.status(400).json({ error: L(req, 'timesheets.invalid_entries') });
 
   const insertOrUpdate = db.transaction((items) => {
     const selectStmt = db.prepare('SELECT id FROM timesheets WHERE resource_id=? AND project_id=? AND date=? AND (project_scope_id = ? OR (project_scope_id IS NULL AND ? IS NULL))');
@@ -116,8 +117,8 @@ router.post('/timesheets/batch', (req, res) => {
   try {
     insertOrUpdate(entries);
   } catch (e) {
-    if (e.message === 'FORBIDDEN_RESOURCE') return res.status(403).json({ error: '只能为自己填报工时' });
-    if (e.message === 'BAD_RESOURCE' || e.message === 'BAD_PROJECT') return res.status(400).json({ error: '资源或项目不存在' });
+    if (e.message === 'FORBIDDEN_RESOURCE') return res.status(403).json({ error: L(req, 'timesheets.own_only') });
+    if (e.message === 'BAD_RESOURCE' || e.message === 'BAD_PROJECT') return res.status(400).json({ error: L(req, 'common.resource_or_project_missing') });
     throw e;
   }
   res.json({ ok: true });
@@ -126,16 +127,16 @@ router.post('/timesheets/batch', (req, res) => {
 // Sync timesheets from bookings for a given week (auto-fill empty cells only)
 router.post('/timesheets/sync-from-bookings', (req, res) => {
   const entId = req.user?.enterprise_id;
-  if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
+  if (!entId) return res.status(400).json({ error: L(req, 'common.need_enterprise') });
   const { resource_id, start, end } = req.body;
   if (!resource_id || !start || !end) {
     return res.status(400).json({ error: 'resource_id, start, end required' });
   }
   if (!authz.canAccessResourceAsSelfOrElevated(req.user, resource_id)) {
-    return res.status(403).json({ error: '只能同步自己的工时' });
+    return res.status(403).json({ error: L(req, 'timesheets.sync_own_only') });
   }
   if (!authz.getResourceInEnterprise(resource_id, entId)) {
-    return res.status(400).json({ error: '资源不存在或无权访问' });
+    return res.status(400).json({ error: L(req, 'common.resource_not_found') });
   }
 
   // 1. Aggregate bookings for this resource in the week (group by project+scope+date)

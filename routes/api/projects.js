@@ -3,6 +3,7 @@
  */
 const express = require('express');
 const { logAudit } = require('../../utils/audit');
+const { L } = require('../../utils/server-i18n');
 
 module.exports = function register(router, ctx) {
   const { db, authz, isAdmin, isManagerOrAdmin, saveAvatarHelper, sseBroadcast } = ctx;
@@ -27,9 +28,9 @@ router.get('/projects', (req, res) => {
 router.post('/projects', (req, res) => {
   const { name, client_id, color, code, start_date, end_date, budget_hours, hourly_rate, billable, details } = req.body;
   const entId = req.user?.enterprise_id;
-  if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
+  if (!entId) return res.status(400).json({ error: L(req, 'common.need_enterprise') });
   const userRole = req.user?.role;
-  if (userRole !== 'admin' && userRole !== 'manager') return res.status(403).json({ error: '仅经理及以上可添加项目' });
+  if (userRole !== 'admin' && userRole !== 'manager') return res.status(403).json({ error: L(req, 'projects.add_manager_only') });
   const result = db.prepare('INSERT INTO projects (name, client_id, color, code, start_date, end_date, budget_hours, hourly_rate, billable, details, enterprise_id, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
     .run(name, client_id || null, color || '#8B5CF6', code || '', start_date || null, end_date || null, budget_hours || 0, hourly_rate || 0, billable != null ? (billable ? 1 : 0) : 1, details || '', entId, req.user.id);
   res.json({ id: result.lastInsertRowid });
@@ -46,16 +47,16 @@ router.post('/projects', (req, res) => {
 
 router.put('/projects/:id', (req, res) => {
   const entId = req.user?.enterprise_id;
-  if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
+  if (!entId) return res.status(400).json({ error: L(req, 'common.need_enterprise') });
   const proj = authz.getProjectInEnterprise(req.params.id, entId);
-  if (!proj) return res.status(404).json({ error: '项目不存在' });
+  if (!proj) return res.status(404).json({ error: L(req, 'common.project_missing') });
   if (!canEditProject(req.user, req.params.id)) {
-    return res.status(403).json({ error: '您没有权限编辑该项目' });
+    return res.status(403).json({ error: L(req, 'projects.edit_forbidden') });
   }
   const { name, client_id, color, code, start_date, end_date, budget_hours, hourly_rate, billable, details } = req.body;
   if (client_id) {
     const client = authz.getClientInEnterprise(client_id, entId);
-    if (!client) return res.status(400).json({ error: '客户不存在或无权访问' });
+    if (!client) return res.status(400).json({ error: L(req, 'common.client_not_found_or_denied') });
   }
   db.prepare('UPDATE projects SET name=?, client_id=?, color=?, code=?, start_date=?, end_date=?, budget_hours=?, hourly_rate=?, billable=?, details=? WHERE id=? AND enterprise_id=?')
     .run(name, client_id, color, code || '', start_date, end_date, budget_hours, hourly_rate, billable != null ? (billable ? 1 : 0) : 1, details || '', req.params.id, entId);
@@ -65,10 +66,10 @@ router.put('/projects/:id', (req, res) => {
 
 router.patch('/projects/:id/archive', (req, res) => {
   const entId = req.user?.enterprise_id;
-  if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
-  if (!isAdmin(req.user)) return res.status(403).json({ error: '仅管理员可归档项目' });
+  if (!entId) return res.status(400).json({ error: L(req, 'common.need_enterprise') });
+  if (!isAdmin(req.user)) return res.status(403).json({ error: L(req, 'projects.archive_admin_only') });
   const proj = authz.getProjectInEnterprise(req.params.id, entId);
-  if (!proj) return res.status(404).json({ error: '项目不存在' });
+  if (!proj) return res.status(404).json({ error: L(req, 'common.project_missing') });
   db.prepare('UPDATE projects SET is_archived = 1 WHERE id = ? AND enterprise_id = ?').run(req.params.id, entId);
   res.json({ ok: true });
   sseBroadcast(entId, 'project-change', { action: 'archive' }, req.user?.id);
@@ -76,10 +77,10 @@ router.patch('/projects/:id/archive', (req, res) => {
 
 router.patch('/projects/:id/unarchive', (req, res) => {
   const entId = req.user?.enterprise_id;
-  if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
-  if (!isAdmin(req.user)) return res.status(403).json({ error: '仅管理员可取消归档项目' });
+  if (!entId) return res.status(400).json({ error: L(req, 'common.need_enterprise') });
+  if (!isAdmin(req.user)) return res.status(403).json({ error: L(req, 'projects.unarchive_admin_only') });
   const proj = authz.getProjectInEnterprise(req.params.id, entId);
-  if (!proj) return res.status(404).json({ error: '项目不存在' });
+  if (!proj) return res.status(404).json({ error: L(req, 'common.project_missing') });
   db.prepare('UPDATE projects SET is_archived = 0 WHERE id = ? AND enterprise_id = ?').run(req.params.id, entId);
   res.json({ ok: true });
   sseBroadcast(entId, 'project-change', { action: 'unarchive' }, req.user?.id);
@@ -87,10 +88,10 @@ router.patch('/projects/:id/unarchive', (req, res) => {
 
 router.delete('/projects/:id', (req, res) => {
   const entId = req.user?.enterprise_id;
-  if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
-  if (!isAdmin(req.user)) return res.status(403).json({ error: '仅管理员可删除项目' });
+  if (!entId) return res.status(400).json({ error: L(req, 'common.need_enterprise') });
+  if (!isAdmin(req.user)) return res.status(403).json({ error: L(req, 'projects.delete_admin_only') });
   const proj = authz.getProjectInEnterprise(req.params.id, entId);
-  if (!proj) return res.status(404).json({ error: '项目不存在' });
+  if (!proj) return res.status(404).json({ error: L(req, 'common.project_missing') });
   db.prepare('UPDATE projects SET is_active = 0 WHERE id = ? AND enterprise_id = ?').run(req.params.id, entId);
   res.json({ ok: true });
   sseBroadcast(entId, 'project-change', { action: 'delete' }, req.user?.id);
@@ -100,7 +101,7 @@ router.delete('/projects/:id', (req, res) => {
 // GET /api/projects/:id/scopes - Get all scopes for a project
 router.get('/projects/:id/scopes', (req, res) => {
   const entId = req.user?.enterprise_id;
-  if (!entId) return res.status(401).json({ error: '请先登录并创建或加入企业' });
+  if (!entId) return res.status(401).json({ error: L(req, 'common.need_enterprise_login') });
   const scopes = db.prepare('SELECT * FROM project_scopes WHERE project_id = ? AND enterprise_id = ? ORDER BY name')
     .all(req.params.id, entId);
   res.json(scopes);
@@ -109,16 +110,16 @@ router.get('/projects/:id/scopes', (req, res) => {
 // POST /api/projects/:id/scopes - Create a scope for a project
 router.post('/projects/:id/scopes', (req, res) => {
   const entId = req.user?.enterprise_id;
-  if (!entId) return res.status(401).json({ error: '请先登录并创建或加入企业' });
+  if (!entId) return res.status(401).json({ error: L(req, 'common.need_enterprise_login') });
   if (!canEditProject(req.user, req.params.id)) {
-    return res.status(403).json({ error: '您没有权限修改该项目的工作范围' });
+    return res.status(403).json({ error: L(req, 'projects.scope_edit_forbidden') });
   }
   const { name, description } = req.body;
-  if (!name) return res.status(400).json({ error: '范围名称不能为空' });
+  if (!name) return res.status(400).json({ error: L(req, 'projects.scope_name_empty') });
 
   const trimmedName = name.trim();
   const existing = db.prepare('SELECT id FROM project_scopes WHERE project_id = ? AND name = ? AND enterprise_id = ?').get(req.params.id, trimmedName, entId);
-  if (existing) return res.status(400).json({ error: '该工作范围已存在' });
+  if (existing) return res.status(400).json({ error: L(req, 'projects.scope_exists') });
 
   const result = db.prepare('INSERT INTO project_scopes (project_id, name, description, enterprise_id) VALUES (?, ?, ?, ?)')
     .run(req.params.id, trimmedName, description || '', entId);
@@ -129,19 +130,19 @@ router.post('/projects/:id/scopes', (req, res) => {
 // PUT /api/project-scopes/:id - Edit a project scope
 router.put('/project-scopes/:id', (req, res) => {
   const entId = req.user?.enterprise_id;
-  if (!entId) return res.status(401).json({ error: '请先登录并创建或加入企业' });
+  if (!entId) return res.status(401).json({ error: L(req, 'common.need_enterprise_login') });
   const scope = db.prepare('SELECT * FROM project_scopes WHERE id = ? AND enterprise_id = ?').get(req.params.id, entId);
-  if (!scope) return res.status(404).json({ error: '工作范围不存在' });
+  if (!scope) return res.status(404).json({ error: L(req, 'common.scope_not_found') });
   if (!canEditProject(req.user, scope.project_id)) {
-    return res.status(403).json({ error: '您没有权限修改该项目的工作范围' });
+    return res.status(403).json({ error: L(req, 'projects.scope_edit_forbidden') });
   }
 
   const { name, description } = req.body;
-  if (!name) return res.status(400).json({ error: '范围名称不能为空' });
+  if (!name) return res.status(400).json({ error: L(req, 'projects.scope_name_empty') });
 
   const trimmedName = name.trim();
   const existing = db.prepare('SELECT id FROM project_scopes WHERE project_id = ? AND name = ? AND enterprise_id = ? AND id != ?').get(scope.project_id, trimmedName, entId, req.params.id);
-  if (existing) return res.status(400).json({ error: '该工作范围已存在' });
+  if (existing) return res.status(400).json({ error: L(req, 'projects.scope_exists') });
 
   db.prepare('UPDATE project_scopes SET name = ?, description = ? WHERE id = ?')
     .run(trimmedName, description || '', req.params.id);
@@ -152,11 +153,11 @@ router.put('/project-scopes/:id', (req, res) => {
 // DELETE /api/project-scopes/:id - Delete a project scope
 router.delete('/project-scopes/:id', (req, res) => {
   const entId = req.user?.enterprise_id;
-  if (!entId) return res.status(401).json({ error: '请先登录并创建或加入企业' });
+  if (!entId) return res.status(401).json({ error: L(req, 'common.need_enterprise_login') });
   const scope = db.prepare('SELECT * FROM project_scopes WHERE id = ? AND enterprise_id = ?').get(req.params.id, entId);
-  if (!scope) return res.status(404).json({ error: '工作范围不存在' });
+  if (!scope) return res.status(404).json({ error: L(req, 'common.scope_not_found') });
   if (!canEditProject(req.user, scope.project_id)) {
-    return res.status(403).json({ error: '您没有权限修改该项目的工作范围' });
+    return res.status(403).json({ error: L(req, 'projects.scope_edit_forbidden') });
   }
 
   // Nullify referencing bookings and timesheets, then delete scope — all in one transaction

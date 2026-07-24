@@ -4,6 +4,7 @@
 const express = require('express');
 const { getHoliday } = require('../../db/holidays');
 const { logAudit } = require('../../utils/audit');
+const { L } = require('../../utils/server-i18n');
 
 module.exports = function register(router, ctx) {
   const { db, authz, isAdmin, isManagerOrAdmin, saveAvatarHelper, sseBroadcast } = ctx;
@@ -23,11 +24,11 @@ router.get('/leave', (req, res) => {
 
 router.post('/leave', (req, res) => {
   const entId = req.user?.enterprise_id;
-  if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
-  if (!isManagerOrAdmin(req.user)) return res.status(403).json({ error: '仅经理及以上可登记休假' });
+  if (!entId) return res.status(400).json({ error: L(req, 'common.need_enterprise') });
+  if (!isManagerOrAdmin(req.user)) return res.status(403).json({ error: L(req, 'leave.register_manager_only') });
   const { resource_id, date, type, notes } = req.body;
   if (!authz.getResourceInEnterprise(resource_id, entId)) {
-    return res.status(400).json({ error: '资源不存在或无权访问' });
+    return res.status(400).json({ error: L(req, 'common.resource_not_found') });
   }
   const result = db.prepare('INSERT INTO leave_entries (resource_id, date, type, notes) VALUES (?,?,?,?)')
     .run(resource_id, date, type || 'vacation', notes || '');
@@ -46,12 +47,12 @@ router.post('/leave', (req, res) => {
 // Batch leave creation for date ranges
 router.post('/leave/batch', (req, res) => {
   const entId = req.user?.enterprise_id;
-  if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
-  if (!isManagerOrAdmin(req.user)) return res.status(403).json({ error: '仅经理及以上可登记休假' });
+  if (!entId) return res.status(400).json({ error: L(req, 'common.need_enterprise') });
+  if (!isManagerOrAdmin(req.user)) return res.status(403).json({ error: L(req, 'leave.register_manager_only') });
   const { resource_id, start_date, end_date, type, notes } = req.body;
-  if (!resource_id || !start_date) return res.status(400).json({ error: '缺少必要参数' });
+  if (!resource_id || !start_date) return res.status(400).json({ error: L(req, 'common.missing_required_params') });
   if (!authz.getResourceInEnterprise(resource_id, entId)) {
-    return res.status(400).json({ error: '资源不存在或无权访问' });
+    return res.status(400).json({ error: L(req, 'common.resource_not_found') });
   }
 
   const endDate = end_date || start_date;
@@ -90,15 +91,15 @@ router.post('/leave/batch', (req, res) => {
 // Book public holidays for selected resources and date range (weekdays only)
 router.post('/leave/book-holidays', (req, res) => {
   const entId = req.user?.enterprise_id;
-  if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
-  if (!isManagerOrAdmin(req.user)) return res.status(403).json({ error: '仅经理及以上可登记休假' });
+  if (!entId) return res.status(400).json({ error: L(req, 'common.need_enterprise') });
+  if (!isManagerOrAdmin(req.user)) return res.status(403).json({ error: L(req, 'leave.register_manager_only') });
   const { resource_ids, start_date, end_date } = req.body;
   if (!resource_ids || !Array.isArray(resource_ids) || resource_ids.length === 0 || !start_date || !end_date) {
-    return res.status(400).json({ error: '缺少必要参数' });
+    return res.status(400).json({ error: L(req, 'common.missing_required_params') });
   }
   for (const rid of resource_ids) {
     if (!authz.getResourceInEnterprise(rid, entId)) {
-      return res.status(400).json({ error: '资源不存在或无权访问' });
+      return res.status(400).json({ error: L(req, 'common.resource_not_found') });
     }
   }
 
@@ -138,10 +139,10 @@ router.post('/leave/book-holidays', (req, res) => {
 
 router.put('/leave/:id', (req, res) => {
   const entId = req.user?.enterprise_id;
-  if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
-  if (!isManagerOrAdmin(req.user)) return res.status(403).json({ error: '仅经理及以上可编辑休假' });
+  if (!entId) return res.status(400).json({ error: L(req, 'common.need_enterprise') });
+  if (!isManagerOrAdmin(req.user)) return res.status(403).json({ error: L(req, 'leave.edit_manager_only') });
   const existing = authz.getLeaveInEnterprise(req.params.id, entId);
-  if (!existing) return res.status(404).json({ error: '休假记录不存在' });
+  if (!existing) return res.status(404).json({ error: L(req, 'leave.not_found') });
 
   const { type, notes, date } = req.body;
   const newType = type || existing.type;
@@ -153,7 +154,7 @@ router.put('/leave/:id', (req, res) => {
   if (newDate !== existing.date) {
     const clash = db.prepare('SELECT id FROM leave_entries WHERE resource_id = ? AND date = ? AND id != ?')
       .get(existing.resource_id, newDate, req.params.id);
-    if (clash) return res.status(409).json({ error: '该日期已有休假记录，请选择其他日期' });
+    if (clash) return res.status(409).json({ error: L(req, 'leave.date_taken') });
   }
 
   db.prepare('UPDATE leave_entries SET type = ?, notes = ?, date = ? WHERE id = ?')
@@ -176,10 +177,10 @@ router.put('/leave/:id', (req, res) => {
 
 router.delete('/leave/:id', (req, res) => {
   const entId = req.user?.enterprise_id;
-  if (!entId) return res.status(400).json({ error: '请先创建或加入企业' });
-  if (!isManagerOrAdmin(req.user)) return res.status(403).json({ error: '仅经理及以上可删除休假' });
+  if (!entId) return res.status(400).json({ error: L(req, 'common.need_enterprise') });
+  if (!isManagerOrAdmin(req.user)) return res.status(403).json({ error: L(req, 'leave.delete_manager_only') });
   const existing = authz.getLeaveInEnterprise(req.params.id, entId);
-  if (!existing) return res.status(404).json({ error: '休假记录不存在' });
+  if (!existing) return res.status(404).json({ error: L(req, 'leave.not_found') });
   db.prepare('DELETE FROM leave_entries WHERE id = ?').run(req.params.id);
   logAudit(db, {
     enterpriseId: entId,

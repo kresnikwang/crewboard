@@ -3,10 +3,13 @@
  * Suitable for single-process PM2 fork mode.
  */
 
+const { L } = require('./server-i18n');
+
 function createRateLimiter(options = {}) {
   const windowMs = options.windowMs || 15 * 60 * 1000;
   const max = options.max || 20;
-  const message = options.message || '请求过于频繁，请稍后再试';
+  // message may be a string or (req) => string (for Accept-Language aware messages)
+  const message = options.message || ((req) => L(req, 'rate.too_many'));
   const keyFn = options.keyFn || ((req) => req.ip || req.connection?.remoteAddress || 'unknown');
   const hits = new Map();
 
@@ -34,7 +37,7 @@ function createRateLimiter(options = {}) {
     if (entry.count > max) {
       const retryAfter = Math.ceil((windowMs - (now - entry.start)) / 1000);
       res.setHeader('Retry-After', String(retryAfter));
-      return res.status(429).json({ error: message });
+      return res.status(429).json({ error: typeof message === 'function' ? message(req) : message });
     }
     next();
   };

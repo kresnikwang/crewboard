@@ -5,6 +5,8 @@
  *  - duplicate: same project+scope already booked (handled elsewhere)
  */
 
+const { msg } = require('./server-i18n');
+
 /**
  * Check conflicts for a date range booking on a resource.
  *
@@ -16,6 +18,7 @@
  * @param {number} opts.hours      hours per day being added/set
  * @param {number} [opts.excludeBookingId]  ignore this booking (on update)
  * @param {boolean} [opts.replaceDayHours]  if true, replace same-day total with opts.hours instead of adding
+ * @param {'zh'|'en'} [opts.lang]  language for conflict message text (default 'zh')
  * @returns {{ ok: boolean, conflicts: Array, capacity: object }}
  */
 function checkBookingConflicts(db, opts) {
@@ -26,13 +29,14 @@ function checkBookingConflicts(db, opts) {
     hours,
     excludeBookingId = null,
     replaceDayHours = false,
+    lang = 'zh',
   } = opts;
 
   const resource = db.prepare(
     'SELECT id, name, hours_per_day FROM resources WHERE id = ?'
   ).get(resourceId);
   if (!resource) {
-    return { ok: false, conflicts: [{ type: 'not_found', message: '资源不存在' }], capacity: {} };
+    return { ok: false, conflicts: [{ type: 'not_found', message: msg(lang, 'common.resource_missing') }], capacity: {} };
   }
 
   const capacity = Number(resource.hours_per_day) || 8;
@@ -59,7 +63,7 @@ function checkBookingConflicts(db, opts) {
       severity: 'error',
       date: row.date,
       leave_type: row.type,
-      message: `${resource.name} 在 ${row.date} 已有休假（${row.type || 'leave'}）`,
+      message: msg(lang, 'conflicts.leave_on_date', { name: resource.name, date: row.date, type: row.type || 'leave' }),
     });
   }
 
@@ -98,7 +102,7 @@ function checkBookingConflicts(db, opts) {
         projected_hours: projectedR,
         capacity,
         over_hours: over,
-        message: `${resource.name} 在 ${dateStr} 将排 ${projectedR}h（产能 ${capacity}h，超出 ${over}h）`,
+        message: msg(lang, 'conflicts.overload', { name: resource.name, date: dateStr, projected: projectedR, capacity, over }),
       });
     }
 
