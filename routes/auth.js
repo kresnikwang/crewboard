@@ -663,12 +663,27 @@ module.exports = function(db) {
 
   // Step 1: Request password reset (no auth required)
   router.post('/forgot-password', forgotLimiter, async (req, res) => {
-    const { email } = req.body;
+    const rawEmail = req.body?.email;
+    const email = typeof rawEmail === 'string' ? rawEmail.trim().toLowerCase() : '';
     if (!email) return res.status(400).json({ error: L(req, 'auth.enter_email') });
 
-    const user = db.prepare('SELECT id, name, email FROM users WHERE email = ?').get(email);
+    const user = db.prepare('SELECT id, name, email FROM users WHERE lower(email) = ?').get(email);
     if (!user) {
       // Don't reveal whether email exists — return success either way
+      return res.json({ ok: true, message: L(req, 'auth.reset_sent_if_registered') });
+    }
+
+    // Keep the public response identical, but only send one reset email per
+    // account in a 30-minute window. This is account-scoped so distributed
+    // clients cannot bypass the IP limiter by rotating source addresses.
+    const recentRequest = db.prepare(`
+      SELECT id
+      FROM password_reset_tokens
+      WHERE user_id = ? AND created_at > datetime('now', '-30 minutes')
+      ORDER BY created_at DESC
+      LIMIT 1
+    `).get(user.id);
+    if (recentRequest) {
       return res.json({ ok: true, message: L(req, 'auth.reset_sent_if_registered') });
     }
 

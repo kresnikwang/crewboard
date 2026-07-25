@@ -272,6 +272,7 @@ function migrate(db) {
   try {
     db.exec('CREATE INDEX IF NOT EXISTS idx_prt_token ON password_reset_tokens(token)');
     db.exec('CREATE INDEX IF NOT EXISTS idx_prt_user ON password_reset_tokens(user_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_prt_user_created ON password_reset_tokens(user_id, created_at)');
   } catch (_) {}
 
   // Add source column to timesheets table to track booking-synced entries

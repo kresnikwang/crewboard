@@ -219,6 +219,21 @@ async function main() {
     const resetToken = tokenMatch ? tokenMatch[1] : '';
     assert('链接使用配置的 APP_URL', text.includes(`${APP}/#reset-password?token=`));
 
+    // 1.1b repeated requests for the same account are acknowledged without
+    // sending another email or creating another reset token.
+    const mailCountAfterFirst = sink.messages.length;
+    const tokenCountAfterFirst = db.prepare(
+      'SELECT COUNT(*) AS count FROM password_reset_tokens WHERE user_id = ?'
+    ).get(reg.body.user.id).count;
+    const reqCooldown = await request('POST', '/api/auth/forgot-password', { email: aliceEmail.toUpperCase() });
+    await sleep(300);
+    const tokenCountAfterCooldown = db.prepare(
+      'SELECT COUNT(*) AS count FROM password_reset_tokens WHERE user_id = ?'
+    ).get(reg.body.user.id).count;
+    assert('30分钟冷却期间仍返回 ok', reqCooldown.status === 200 && reqCooldown.body.ok === true);
+    assert('30分钟冷却期间不重复发邮件', sink.messages.length === mailCountAfterFirst);
+    assert('30分钟冷却期间不创建新 token', tokenCountAfterCooldown === tokenCountAfterFirst);
+
     // 1.2 verify token
     const ver = await request('GET', `/api/auth/reset-password/${resetToken}`);
     assert('验证 token 有效', ver.status === 200 && ver.body.ok === true, JSON.stringify(ver.body));
@@ -252,6 +267,11 @@ async function main() {
       .run(newLogin.body.user.id, okToken, new Date(Date.now() + 29 * 60 * 1000).toISOString());
     const okVer = await request('GET', `/api/auth/reset-password/${okToken}`);
     assert('未过期 token 仍然有效', okVer.status === 200, `status=${okVer.status}`);
+
+    // Move the fixture outside the cooldown window before testing token
+    // replacement; waiting 30 minutes would make the test unnecessarily slow.
+    db.prepare("UPDATE password_reset_tokens SET created_at = datetime('now', '-31 minutes') WHERE user_id = ?")
+      .run(newLogin.body.user.id);
 
     // 1.7 unknown email: no enumeration, no mail
     const before = sink.messages.length;
