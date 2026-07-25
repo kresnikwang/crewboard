@@ -87,6 +87,21 @@ pm2 startOrReload ecosystem.config.js --update-env
 - nginx：proxy_pass → 127.0.0.1:3000 ✓
 - pm2 save：已保存最新配置
 
+## pm2 cron_restart 漂移事故（已修复 2026-07-25，必读）
+
+- 2026-07-24 夜间起，pm2 内存中 crewboard 进程残留 `cron_restart: "*/10 * * * *"`
+  （疑为早前事故救火残留），pm2 每 10 分钟强杀重启 crewboard。
+- 连锁反应：auth-watchdog 自检恰好撞上重启窗口 → 21 连 FAIL（fetch failed）→
+  反复 pm2 restart + 告警邮件轰炸（每 10~20 分钟一封）→ 用户整晚体验异常。
+- **修复：必须 `pm2 delete crewboard` 后 `pm2 start ecosystem.config.js --only crewboard`
+  再 `pm2 save`**。`pm2 restart` / `startOrReload` 只合并不替换，清不掉内存中的
+  cron_restart（deploy.sh 的 startOrReload 同样清不掉，勿指望）。
+- 排查口诀：① `pm2 jlist` 里看 `pm2_env.cron_restart` 是否意外存在；
+  ② watchdog 全 FAIL 且均为 "fetch failed"（非 401/403）+ 失败时刻恰在 :X0:00.2 →
+  先怀疑定时强重启，而非真故障。
+- 修复后验证基线：手动 `node scripts/auth-watchdog.js` 应输出 OK；整点 tick 后
+  crewboard pid 不变、restarts 不增、watchdog 日志出现计划内 PASS。
+
 ## Bootstrap 5 迁移（已完成 2026-04-19）
 
 ### 迁移概览
