@@ -4,7 +4,22 @@
 
 ---
 
+## 开发导航
+
+如果你是要修改代码，先从 [开发文档总索引](docs/README.md) 开始：
+
+- [代码地图](docs/architecture/code-map.md)：真实的后端路由、前端模块和源码/生成物边界。
+- [开发工作流](docs/development/workflow.md)：启动、构建、前端合并和交付顺序。
+- [测试指南](docs/development/testing.md)：API、历史脚本和 Playwright 的命令矩阵。
+- [生产部署手册](docs/operations/deployment.md)：`deploy.sh`、PM2 和发布后检查。
+- [安全运行手册](docs/operations/security.md)：认证、密码重置、SSH 和看门狗告警。
+
+根目录的 [AGENTS.md](AGENTS.md) 是 Codex 的仓库级约束；`CLAUDE.md` 只作为兼容入口，不再维护第二份目录说明。
+
+---
+
 ## 目录
+- [开发导航](#开发导航)
 - [核心特性](#核心特性)
 - [技术栈](#技术栈)
 - [目录结构](#目录结构)
@@ -75,7 +90,7 @@
 
 ## 目录结构
 
-以下为项目核心的目录结构：
+以下为项目核心的目录结构。完整且保持最新的代码地图见 [docs/architecture/code-map.md](docs/architecture/code-map.md)。
 ```
 crewboard/
 ├── server.js               # Express 启动文件（挂载路由、初始化 DB、启用 WAL）
@@ -85,10 +100,11 @@ crewboard/
 ├── db/
 │   ├── schema.js           # 数据库建表、多版本幂等迁移及 Seed 演示数据逻辑
 │   ├── holidays.js         # 中国法定节假日预置数据与辅助函数
-│   └── resource-guru.db    # SQLite 数据库文件（生产环境自动生成，不提交 git）
+│   └── resource-guru.db    # SQLite 数据库文件（本地/生产生成，不提交 git）
 ├── routes/
-│   ├── api.js              # 核心业务 API（排班、工时、报表导出、微信同步、SSE）
-│   ├── auth.js             # 企业注册/登录、邀请加入、密码重置、权限控制
+│   ├── api.js              # 兼容入口，实际实现位于 routes/api/
+│   ├── api/                # 按领域拆分的业务 API + shared.js 上下文
+│   ├── auth.js             # 企业注册/登录、邀请加入、密码重置、账号设置
 │   └── webhook.js          # 钉钉/企业微信/飞书 Webhook 消息发送逻辑
 ├── utils/
 │   ├── email.js            # 基于 Nodemailer 的密码重置与邀请邮件发送封装
@@ -102,20 +118,27 @@ crewboard/
 │   │   ├── components.css  # 通用按钮、表格、表单控件及弹窗样式
 │   │   ├── schedule.css    # 核心排班表格、日历 booking 条、休假背景高亮
 │   │   ├── pages.css       # 登录、报表明细、管理后台、企业设置等特有样式
-│   │   └── bootstrap-bridge.css  # 设计令牌与 Bootstrap 默认样式的映射桥接层
+│   │   ├── bootstrap-bridge.css  # 设计令牌与 Bootstrap 默认样式的映射桥接层
+│   │   └── dist/            # 压缩后的浏览器发布产物，不直接编辑
 │   ├── js/
 │   │   ├── core.js         # 前端运行基石（Auth 会话管理、API 请求器、SSE 接收、全局 i18n 渲染）
-│   │   ├── schedule.js     # 资源排程页面（拖拽、Booking 弹窗、周/月日历渲染）
+│   │   ├── schedule/       # 排班源码分片；按数字前缀合并为 schedule.js
+│   │   ├── schedule.js     # 自动生成的排班合并产物，不直接编辑
 │   │   ├── timesheets.js   # 工时表填报页面逻辑
 │   │   ├── reports.js      # 报表统计及详情钻取展示逻辑
 │   │   ├── manage.js       # 人员管理、项目管理、客户管理及存档功能
 │   │   ├── enterprise.js   # 企业设置后台（含成员角色修改、邀请、三方通知配置）
-│   │   └── i18n.js         # 国际化语料包（支持中/英双语，全静态资源匹配）
-│   └── img/                # 系统静态图标及 Logo
+│   │   ├── i18n.js         # 国际化语料包（支持中/英双语，全静态资源匹配）
+│   │   └── dist/            # 压缩后的浏览器发布产物，不直接编辑
+│   ├── vendor/              # Bootstrap 等第三方静态资源
+│   └── img/                 # 系统静态图标及 Logo
 ├── scripts/
-│   └── update-holidays.js  # 法定节假日抓取脚本（调用 timor.tech API 自动生成 db/holidays.js）
-└── tests/
-    └── test_new_project.js  # 自动化测试脚本
+│   ├── bundle-schedule.js  # 合并排班源码
+│   ├── auth-watchdog.js    # 认证自检与告警
+│   └── update-holidays.js  # 法定节假日抓取并生成 db/holidays.js
+├── tests/                  # API/回归/邮件/历史功能测试
+├── e2e/                    # Playwright UI 测试及隔离服务
+└── docs/                   # 开发、架构、部署和安全文档
 ```
 
 ---
@@ -219,6 +242,8 @@ npm run dev
 
 ## 生产环境部署
 
+生产发布的权威流程见 [docs/operations/deployment.md](docs/operations/deployment.md)，本节保留产品 README 中的简要说明。
+
 在生产环境中，建议使用 **Nginx** 作为反向代理并提供 SSL 证书，并配合 **PM2** 进行 Node 进程的常驻管理。
 
 ### 1. PM2 进程配置
@@ -228,8 +253,8 @@ npm run dev
 # 启动应用
 npm run pm2:start
 
-# 优雅重载进程 (无缝平滑重载)
-pm2 startOrReload ecosystem.config.js --update-env
+# 只重载主服务（定时任务不要被误触发）
+pm2 startOrReload ecosystem.config.js --only crewboard --update-env
 
 # 查看实时日志
 npm run pm2:logs
@@ -295,11 +320,11 @@ server {
 1. 自动热备份当前的 SQLite 数据库。
 2. 丢弃部署临时修改（如占位符），拉取最新 `main` 分支代码。
 3. 获取最新的 Git Commit Hash，自动替换前端 [index.html](file:///Users/kresnikwang/Work/crewboard/public/index.html) 中引入的 `?v=__VERSION__` 占位符，触发浏览器端资源强行更新。
-4. 调用 `pm2 reload` 实现零停机平滑重启。
+4. 只 reload `crewboard` 主服务，并按部署手册检查 `/api/health` 和 PM2 状态。
 
 ```bash
 # SSH 连接至服务器并执行部署
-ssh root@your-server-ip "cd /www/wwwroot/your-app-path && bash deploy.sh"
+ssh <production-host-from-ssh-config> "cd /www/wwwroot/resource.skandstudio.com && bash deploy.sh"
 ```
 
 ---
