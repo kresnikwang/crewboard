@@ -13,6 +13,16 @@ function escapeAttr(str) {
   return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 }
 
+// Management mutations must invalidate data used by the schedule modal.
+// The current user's SSE stream intentionally excludes the mutation sender,
+// so relying on project-change events alone leaves this browser stale.
+function invalidateProjectDataCaches() {
+  if (!window.apiCache) return;
+  window.apiCache.invalidatePrefix('/api/projects');
+  window.apiCache.invalidatePrefix('/api/clients');
+  window.apiCache.invalidatePrefix('/api/schedule-data');
+}
+
 function compressResourceAvatar(file, callback) {
   var reader = new FileReader();
   reader.onload = function (e) {
@@ -788,6 +798,7 @@ window.saveClient = async function saveClient(id) {
   try {
     if (id) { await api('/api/clients/' + id, { method: 'PUT', body: payload }); toast(t('manage.client_updated')); }
     else { await api('/api/clients', { method: 'POST', body: payload }); toast(t('manage.client_created')); }
+    invalidateProjectDataCaches();
     closeModal(); loadProjects();
   } catch (err) { toast(t('common.save_failed') + ': ' + err.message, 'error'); }
 };
@@ -797,7 +808,7 @@ window.deleteClient = async function deleteClient(id) {
   var msg = t('manage.confirm_delete_client');
   if (projectCount > 0) msg += '\n' + projectCount + ' ' + t('manage.linked_projects') + '.';
   if (!confirm(msg)) return;
-  try { await api('/api/clients/' + id, { method: 'DELETE' }); toast(t('manage.client_deleted')); loadProjects(); }
+  try { await api('/api/clients/' + id, { method: 'DELETE' }); toast(t('manage.client_deleted')); invalidateProjectDataCaches(); loadProjects(); }
   catch (err) { toast(t('common.delete_failed') + ': ' + err.message, 'error'); }
 };
 
@@ -1016,13 +1027,14 @@ window.saveProject = async function saveProject(id) {
   try {
     if (id) { await api('/api/projects/' + id, { method: 'PUT', body: payload }); toast(t('manage.project_updated')); }
     else { await api('/api/projects', { method: 'POST', body: payload }); toast(t('manage.project_created')); }
+    invalidateProjectDataCaches();
     closeModal(); loadProjects();
   } catch (err) { toast(t('common.save_failed') + ': ' + err.message, 'error'); }
 };
 
 window.deleteProject = async function deleteProject(id) {
   if (!confirm(t('manage.confirm_delete_project'))) return;
-  try { await api('/api/projects/' + id, { method: 'DELETE' }); toast(t('manage.project_deleted')); loadProjects(); }
+  try { await api('/api/projects/' + id, { method: 'DELETE' }); toast(t('manage.project_deleted')); invalidateProjectDataCaches(); loadProjects(); }
   catch (err) { toast(t('common.delete_failed') + ': ' + err.message, 'error'); }
 };
 
@@ -1030,12 +1042,12 @@ window.deleteProject = async function deleteProject(id) {
 window.archiveProject = async function archiveProject(id) {
   var p = state.projects.find(function (p) { return p.id === id; });
   if (!confirm(t('manage.archive_project') + ' "' + (p ? p.name : '') + '"?')) return;
-  try { await api('/api/projects/' + id + '/archive', { method: 'PATCH' }); toast(t('manage.project_archived')); loadProjects(); }
+  try { await api('/api/projects/' + id + '/archive', { method: 'PATCH' }); toast(t('manage.project_archived')); invalidateProjectDataCaches(); loadProjects(); }
   catch (err) { toast(t('manage.archive_failed') + ': ' + err.message, 'error'); }
 };
 
 window.unarchiveProject = async function unarchiveProject(id) {
-  try { await api('/api/projects/' + id + '/unarchive', { method: 'PATCH' }); toast(t('manage.project_restored')); loadProjects(); }
+  try { await api('/api/projects/' + id + '/unarchive', { method: 'PATCH' }); toast(t('manage.project_restored')); invalidateProjectDataCaches(); loadProjects(); }
   catch (err) { toast(t('manage.restore_failed') + ': ' + err.message, 'error'); }
 };
 
@@ -1046,12 +1058,12 @@ window.archiveClient = async function archiveClient(id) {
   if (projectCount > 0) msg += '\n' + projectCount + ' linked projects will also be archived.';
   msg += '\n' + t('common.restore') + '?';
   if (!confirm(msg)) return;
-  try { await api('/api/clients/' + id + '/archive', { method: 'PATCH' }); toast(t('manage.client_archived')); loadProjects(); }
+  try { await api('/api/clients/' + id + '/archive', { method: 'PATCH' }); toast(t('manage.client_archived')); invalidateProjectDataCaches(); loadProjects(); }
   catch (err) { toast(t('manage.archive_failed') + ': ' + err.message, 'error'); }
 };
 
 window.unarchiveClient = async function unarchiveClient(id) {
-  try { await api('/api/clients/' + id + '/unarchive', { method: 'PATCH' }); toast(t('manage.client_restored')); loadProjects(); }
+  try { await api('/api/clients/' + id + '/unarchive', { method: 'PATCH' }); toast(t('manage.client_restored')); invalidateProjectDataCaches(); loadProjects(); }
   catch (err) { toast(t('manage.restore_failed') + ': ' + err.message, 'error'); }
 };
 

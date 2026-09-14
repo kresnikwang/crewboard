@@ -4,6 +4,7 @@ const {
   loginAsAdmin,
   selectProjectInModal,
   ensureResourceSelected,
+  goToPage,
   nextWeekdayDate,
 } = require('./helpers');
 
@@ -84,6 +85,36 @@ test.describe('Schedule UI', () => {
     );
     expect(hit, `expected booking on ${date}`).toBeTruthy();
     expect(Number(hit.hours)).toBe(4);
+  });
+
+  test('管理页新建项目后，排程弹窗立即可选', async ({ page }) => {
+    // Warm the modal's project cache first so this covers the stale-cache path.
+    await page.locator('#btn-add-booking').click();
+    await expect(page.locator('#modal-body')).toBeVisible();
+    await page.locator('#modal-footer .btn-outline').click();
+    await expect(page.locator('#modal-body')).toBeHidden();
+
+    const projectName = '缓存刷新项目-' + Date.now();
+    await goToPage(page, 'projects');
+    await expect(page.locator('#btn-add-new-pc')).toBeVisible();
+    await page.locator('#tab-projects').click();
+    await page.locator('#btn-add-new-pc').click();
+    await page.locator('#proj-name').fill(projectName);
+
+    await Promise.all([
+      page.waitForResponse((response) =>
+        response.url().endsWith('/api/projects') &&
+        response.request().method() === 'POST' &&
+        response.ok()
+      ),
+      page.locator('#btn-save-project').click(),
+    ]);
+    await expect(page.locator('#modal-body')).toBeHidden();
+
+    await goToPage(page, 'schedule');
+    await page.locator('#btn-add-booking').click();
+    await expect(page.locator('#modal-body')).toBeVisible();
+    await selectProjectInModal(page, projectName);
   });
 
   test('本周按钮可点击且网格保持可见', async ({ page }) => {
