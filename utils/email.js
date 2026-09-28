@@ -3,16 +3,24 @@
  */
 const nodemailer = require('nodemailer');
 
-/* ---------- SMTP Configuration ---------- */
-const SMTP_HOST = process.env.SMTP_HOST || 'smtp.exmail.qq.com';
+/* ---------- SMTP Configuration ----------
+ * Credentials are read from the environment only. Never commit real SMTP
+ * passwords here — provide them via the process environment (PM2 env, systemd,
+ * or a .env loader outside the repo). Missing config is a hard send failure,
+ * not a silent fallback to a shared account. */
+const SMTP_HOST = process.env.SMTP_HOST || '';
 const SMTP_PORT = parseInt(process.env.SMTP_PORT || '465', 10);
 const SMTP_SECURE = process.env.SMTP_SECURE !== 'false'; // default true for port 465
-const SMTP_USER = process.env.SMTP_USER || 'resource@skandstudio.com';
-const SMTP_PASS = process.env.SMTP_PASS || 'ABab123.';
-const SMTP_FROM = process.env.SMTP_FROM || '"神马排班 CrewBoard" <resource@skandstudio.com>';
+const SMTP_USER = process.env.SMTP_USER || '';
+const SMTP_PASS = process.env.SMTP_PASS || '';
+const SMTP_FROM = process.env.SMTP_FROM || '"神马排班 CrewBoard" <noreply@localhost>';
 const APP_URL = process.env.APP_URL || 'https://resource.skandstudio.com';
 
 let transporter = null;
+
+function isConfigured() {
+  return !!(SMTP_HOST && SMTP_USER && SMTP_PASS);
+}
 
 function getTransporter() {
   if (!transporter) {
@@ -29,6 +37,11 @@ function getTransporter() {
 
 /* ---------- Send email helper ---------- */
 async function sendMail(to, subject, html) {
+  if (!isConfigured()) {
+    const err = 'SMTP not configured (set SMTP_HOST, SMTP_USER, SMTP_PASS)';
+    console.error('[Email] Failed to send to', to, '-', err);
+    return { ok: false, error: err };
+  }
   try {
     const info = await getTransporter().sendMail({
       from: SMTP_FROM,

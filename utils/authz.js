@@ -223,6 +223,12 @@ function authMiddleware(db) {
                  managed_project_ids, status, must_change_password
           FROM users WHERE id = ?
         `).get(session.user_id);
+        // A disabled/suspended account must lose access immediately, even if it
+        // still holds a valid session token. requireAuth() also checks this,
+        // but it is not mounted on every route, so enforce it here.
+        if (req.user && req.user.status && req.user.status !== 'active') {
+          req.user = null;
+        }
       } else {
         // Anomaly diagnostics (added 2026-07-25 after a live incident where a
         // long-running process could INSERT/DELETE sessions correctly but this

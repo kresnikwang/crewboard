@@ -11,6 +11,7 @@ module.exports = function register(router, ctx) {
 
 // === EXCEL EXPORT ===
 router.get('/export/utilization', async (req, res) => {
+  if (req.user?.role === 'basic') return res.status(403).json({ error: L(req, 'reports.forbidden') });
   const { start, end } = req.query;
   if (!start || !end) return res.status(400).json({ error: L(req, 'common.missing_date_params') });
 
@@ -83,6 +84,7 @@ router.get('/export/utilization', async (req, res) => {
 });
 
 router.get('/export/projects', async (req, res) => {
+  if (req.user?.role === 'basic') return res.status(403).json({ error: L(req, 'reports.forbidden') });
   const { start, end } = req.query;
   if (!start || !end) return res.status(400).json({ error: L(req, 'common.missing_date_params') });
 

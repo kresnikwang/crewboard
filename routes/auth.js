@@ -142,6 +142,9 @@ module.exports = function(db) {
     const user = db.prepare('SELECT * FROM users WHERE phone = ? OR email = ?').get(account, account);
     if (!user) return res.status(401).json({ error: L(req, 'auth.account_not_found') });
     if (!verifyPassword(password, user.password_hash)) return res.status(401).json({ error: L(req, 'auth.wrong_password') });
+    if (user.status && user.status !== 'active') {
+      return res.status(403).json({ error: L(req, 'common.account_disabled') });
+    }
 
     const token = uuidv4();
     const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();

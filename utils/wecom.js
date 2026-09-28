@@ -6,9 +6,13 @@
 
 const { msg } = require('./server-i18n');
 
-const DEFAULT_WECOM_CORP_ID = process.env.WECOM_CORP_ID || 'wwb089e4801f755a98';
-const DEFAULT_WECOM_AGENT_ID = process.env.WECOM_AGENT_ID || '1000003';
-const DEFAULT_WECOM_SECRET = process.env.WECOM_SECRET || 'y2Ij4aQ2D_am20LaE48xTyaSVu7KtEPBpSnUrbz0dpE';
+/** WeCom config comes from the environment only. Enterprise-level settings in
+ * the `enterprises` table take precedence. There is deliberately NO hardcoded
+ * fallback corp/secret: an unconfigured tenant must fail closed rather than
+ * silently sending through a shared application. */
+const ENV_WECOM_CORP_ID = (process.env.WECOM_CORP_ID || '').trim();
+const ENV_WECOM_AGENT_ID = (process.env.WECOM_AGENT_ID || '').trim();
+const ENV_WECOM_SECRET = (process.env.WECOM_SECRET || '').trim();
 const DEFAULT_WECOM_DEPARTMENT_ID = Math.max(1, parseInt(process.env.WECOM_DEPARTMENT_ID, 10) || 1);
 
 /* ---------- Access Token cache (per corp_id + secret) ---------- */
@@ -17,9 +21,9 @@ const _tokenCache = new Map();
 function normalizeWeComConfig(raw) {
   const cfg = raw || {};
   return {
-    corpId: (cfg.corpId || cfg.wecom_corp_id || DEFAULT_WECOM_CORP_ID || '').trim(),
-    agentId: String(cfg.agentId || cfg.wecom_agent_id || DEFAULT_WECOM_AGENT_ID || '').trim(),
-    secret: (cfg.secret || cfg.wecom_secret || DEFAULT_WECOM_SECRET || '').trim(),
+    corpId: (cfg.corpId || cfg.wecom_corp_id || ENV_WECOM_CORP_ID || '').trim(),
+    agentId: String(cfg.agentId || cfg.wecom_agent_id || ENV_WECOM_AGENT_ID || '').trim(),
+    secret: (cfg.secret || cfg.wecom_secret || ENV_WECOM_SECRET || '').trim(),
     departmentId: Math.max(1, parseInt(cfg.departmentId || cfg.wecom_department_id, 10) || DEFAULT_WECOM_DEPARTMENT_ID)
   };
 }

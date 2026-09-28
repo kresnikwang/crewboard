@@ -19,10 +19,11 @@ const fs = require('fs');
 
 const BASE = process.env.WATCHDOG_URL || 'http://127.0.0.1:3000';
 const ACCOUNT = process.env.WATCHDOG_ACCOUNT || 'admin@company.com';
-const envVars = process['env'];
-const pwdEnvKey = 'WATCHDOG_' + 'PASS' + 'WORD';
-const ADMIN_PWD = envVars[pwdEnvKey] || ('adm' + 'in123');
-const ALERT_EMAIL = process.env.WATCHDOG_ALERT_EMAIL || 'kris.wang@skandstudio.com';
+// No default password: the watchdog must be given a real credential via the
+// environment. Without it the check reports "skipped" instead of probing with
+// a guess that would also be a committed production secret.
+const ADMIN_PWD = process.env.WATCHDOG_PASSWORD || '';
+const ALERT_EMAIL = process.env.WATCHDOG_ALERT_EMAIL || '';
 const STATE_FILE = '/tmp/crewboard-auth-watchdog.state.json';
 const RESTART_COOLDOWN_MS = 15 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 10 * 1000;
@@ -76,6 +77,10 @@ function restartCrewboard() {
 }
 
 async function sendAlert(failureDetail, restarted) {
+  if (!ALERT_EMAIL) {
+    log('alert skipped: WATCHDOG_ALERT_EMAIL is not set');
+    return;
+  }
   try {
     const { sendMail } = require('../utils/email');
     const html = `
@@ -94,6 +99,13 @@ async function sendAlert(failureDetail, restarted) {
 }
 
 (async () => {
+  // Misconfiguration guard: without a password the login probe would always
+  // fail and trigger a pm2 restart on every cron tick. Bail out loudly instead.
+  if (!ADMIN_PWD) {
+    log('SKIPPED: WATCHDOG_PASSWORD is not set — cannot run the auth self-check.');
+    log('Set WATCHDOG_PASSWORD (and WATCHDOG_ALERT_EMAIL) in the environment to enable it.');
+    return;
+  }
   let loginToken = null;
   try {
     // Step 1: login (public endpoint — verifies DB read + scrypt + session insert)
