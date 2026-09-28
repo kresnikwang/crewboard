@@ -104,6 +104,16 @@ const MESSAGES = {
   'bookings.leave_conflict_force': { zh: '所选日期与休假冲突，请调整日期或使用 force 确认', en: 'Selected dates conflict with leave; adjust the dates or confirm with force' },
   'bookings.dup_project_schedule': { zh: '目标日期已有同项目排程: {dates}', en: 'Target date already has a schedule for the same project: {dates}' },
   'bookings.duplicate_booking': { zh: '所选日期已存在该工作范围的排程，无需重复创建', en: 'A schedule for this scope already exists on the selected dates' },
+  'bookings.invalid_hours': { zh: '工时必须是 0 到 24 之间的正数', en: 'Hours must be a number greater than 0 and at most 24' },
+  'bookings.invalid_date': { zh: '日期格式无效，应为 YYYY-MM-DD', en: 'Invalid date format, expected YYYY-MM-DD' },
+  'bookings.invalid_date_range': { zh: '结束日期不能早于开始日期', en: 'End date cannot be before start date' },
+  'bookings.end_before_start': { zh: '结束日期不能早于开始日期', en: 'End date cannot be before start date' },
+  'common.invalid_hours': { zh: '工时必须是 0 到 24 之间的正数', en: 'Hours must be a number greater than 0 and at most 24' },
+  'common.invalid_number': { zh: '数值无效', en: 'Invalid number' },
+  'common.invalid_date': { zh: '日期格式无效，应为 YYYY-MM-DD', en: 'Invalid date format, expected YYYY-MM-DD' },
+  'common.name_required': { zh: '名称不能为空', en: 'Name is required' },
+  'common.end_before_start': { zh: '结束日期不能早于开始日期', en: 'End date cannot be before start date' },
+  'common.leave_date_taken': { zh: '该日期已有休假记录', en: 'Leave already exists on that date' },
 
   // ---------- conflict detection (utils/conflicts.js) ----------
   'conflicts.leave_on_date': { zh: '{name} 在 {date} 已有休假（{type}）', en: '{name} has leave on {date} ({type})' },

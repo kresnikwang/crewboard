@@ -4,6 +4,7 @@
 const express = require('express');
 const { logAudit } = require('../../utils/audit');
 const { L } = require('../../utils/server-i18n');
+const { isNonEmptyString } = require('../../utils/validate');
 
 module.exports = function register(router, ctx) {
   const { db, authz, isAdmin, isManagerOrAdmin, saveAvatarHelper, sseBroadcast } = ctx;
@@ -64,9 +65,28 @@ router.put('/resources/:id', (req, res) => {
   if (!isAdmin(req.user)) return res.status(403).json({ error: L(req, 'resources.edit_admin_only') });
   const oldRes = authz.getResourceInEnterprise(req.params.id, entId);
   if (!oldRes) return res.status(404).json({ error: L(req, 'resources.not_found') });
+  if (!isNonEmptyString(name)) return res.status(400).json({ error: L(req, 'common.name_required') });
+  let nextHoursPerDay = oldRes.hours_per_day;
+  if (hours_per_day !== undefined && hours_per_day !== null && hours_per_day !== '') {
+    const hpd = Number(hours_per_day);
+    if (!Number.isFinite(hpd) || hpd <= 0 || hpd > 24) {
+      return res.status(400).json({ error: L(req, 'common.invalid_hours') });
+    }
+    nextHoursPerDay = hpd;
+  }
   const avatarUrl = saveAvatarHelper(avatar, oldRes.avatar || '', `resource_${req.params.id}`);
   db.prepare('UPDATE resources SET name=?, email=?, role=?, team=?, color=?, hours_per_day=?, avatar=? WHERE id=? AND enterprise_id=?')
-    .run(name, email, role, team, color, hours_per_day, avatarUrl, req.params.id, entId);
+    .run(
+      name,
+      email || null,
+      role != null ? role : oldRes.role,
+      team != null ? team : oldRes.team,
+      color || oldRes.color,
+      nextHoursPerDay,
+      avatarUrl,
+      req.params.id,
+      entId
+    );
   if (email) {
     db.prepare('UPDATE users SET avatar = ? WHERE lower(email) = lower(?) AND enterprise_id = ?')
       .run(avatarUrl, email, entId);

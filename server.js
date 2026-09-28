@@ -76,10 +76,32 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes(db));
 app.use('/api', apiRoutes(db));
 
+// Unknown /api/* paths must be JSON 404s, not the SPA shell. Returning HTML
+// made a mistyped or retired endpoint surface as a confusing parse error
+// (and turned genuine outages into 200 responses).
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: 'not_found' });
+});
+
 // Fallback to index.html (no-cache for SPA routing)
 app.get('*', (req, res) => {
   res.setHeader('Cache-Control', 'no-cache');
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Central error handler: keep stack traces out of API responses. Express only
+// forwards thrown errors here, but the previous absence of any handler meant
+// an unexpected SQLite/TypeError surfaced as a 500 HTML page with a full stack.
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  console.error('[error]', req.method, req.originalUrl, '-', err && err.message);
+  if (err && err.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: 'invalid_json' });
+  }
+  if (err && err.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'payload_too_large' });
+  }
+  res.status(500).json({ error: 'internal_error' });
 });
 
 // Session / reset-token cleanup (hourly)

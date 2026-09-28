@@ -4,6 +4,7 @@
 const express = require('express');
 const { logAudit } = require('../../utils/audit');
 const { L } = require('../../utils/server-i18n');
+const { isYmd, isBefore, isNonEmptyString, parseNonNegativeNumber } = require('../../utils/validate');
 
 module.exports = function register(router, ctx) {
   const { db, authz, isAdmin, isManagerOrAdmin, saveAvatarHelper, sseBroadcast } = ctx;
@@ -31,8 +32,17 @@ router.post('/projects', (req, res) => {
   if (!entId) return res.status(400).json({ error: L(req, 'common.need_enterprise') });
   const userRole = req.user?.role;
   if (userRole !== 'admin' && userRole !== 'manager') return res.status(403).json({ error: L(req, 'projects.add_manager_only') });
+  if (!isNonEmptyString(name)) return res.status(400).json({ error: L(req, 'common.name_required') });
+  // Reject a client from another enterprise instead of linking it silently.
+  if (client_id) {
+    const client = authz.getClientInEnterprise(client_id, entId);
+    if (!client) return res.status(400).json({ error: L(req, 'common.client_not_found_or_denied') });
+  }
+  if (start_date && !isYmd(start_date)) return res.status(400).json({ error: L(req, 'common.invalid_date') });
+  if (end_date && !isYmd(end_date)) return res.status(400).json({ error: L(req, 'common.invalid_date') });
+  if (isBefore(end_date, start_date)) return res.status(400).json({ error: L(req, 'common.end_before_start') });
   const result = db.prepare('INSERT INTO projects (name, client_id, color, code, start_date, end_date, budget_hours, hourly_rate, billable, details, enterprise_id, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
-    .run(name, client_id || null, color || '#8B5CF6', code || '', start_date || null, end_date || null, budget_hours || 0, hourly_rate || 0, billable != null ? (billable ? 1 : 0) : 1, details || '', entId, req.user.id);
+    .run(name, client_id || null, color || '#8B5CF6', code || '', start_date || null, end_date || null, parseNonNegativeNumber(budget_hours, 0), parseNonNegativeNumber(hourly_rate, 0), billable != null ? (billable ? 1 : 0) : 1, details || '', entId, req.user.id);
   res.json({ id: result.lastInsertRowid });
   logAudit(db, {
     enterpriseId: entId,
@@ -58,8 +68,25 @@ router.put('/projects/:id', (req, res) => {
     const client = authz.getClientInEnterprise(client_id, entId);
     if (!client) return res.status(400).json({ error: L(req, 'common.client_not_found_or_denied') });
   }
+  if (!isNonEmptyString(name)) return res.status(400).json({ error: L(req, 'common.name_required') });
+  if (start_date && !isYmd(start_date)) return res.status(400).json({ error: L(req, 'common.invalid_date') });
+  if (end_date && !isYmd(end_date)) return res.status(400).json({ error: L(req, 'common.invalid_date') });
+  if (isBefore(end_date, start_date)) return res.status(400).json({ error: L(req, 'common.end_before_start') });
   db.prepare('UPDATE projects SET name=?, client_id=?, color=?, code=?, start_date=?, end_date=?, budget_hours=?, hourly_rate=?, billable=?, details=? WHERE id=? AND enterprise_id=?')
-    .run(name, client_id, color, code || '', start_date, end_date, budget_hours, hourly_rate, billable != null ? (billable ? 1 : 0) : 1, details || '', req.params.id, entId);
+    .run(
+      name,
+      client_id || null,
+      color || proj.color,
+      code != null ? code : proj.code,
+      start_date !== undefined ? start_date : proj.start_date,
+      end_date !== undefined ? end_date : proj.end_date,
+      budget_hours !== undefined ? parseNonNegativeNumber(budget_hours, proj.budget_hours) : proj.budget_hours,
+      hourly_rate !== undefined ? parseNonNegativeNumber(hourly_rate, proj.hourly_rate) : proj.hourly_rate,
+      billable != null ? (billable ? 1 : 0) : proj.billable,
+      details != null ? details : proj.details,
+      req.params.id,
+      entId
+    );
   res.json({ ok: true });
   sseBroadcast(entId, 'project-change', { action: 'update' }, req.user?.id);
 });

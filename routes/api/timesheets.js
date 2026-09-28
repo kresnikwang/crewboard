@@ -4,6 +4,7 @@
 const express = require('express');
 const { logAudit } = require('../../utils/audit');
 const { L } = require('../../utils/server-i18n');
+const { isYmd, parseHours } = require('../../utils/validate');
 
 module.exports = function register(router, ctx) {
   const { db, authz, isAdmin, isManagerOrAdmin, saveAvatarHelper, sseBroadcast } = ctx;
@@ -52,8 +53,11 @@ router.post('/timesheets', (req, res) => {
   if (!authz.getProjectInEnterprise(project_id, entId)) {
     return res.status(400).json({ error: L(req, 'common.project_not_found') });
   }
+  if (!isYmd(date)) return res.status(400).json({ error: L(req, 'common.invalid_date') });
+  const parsedHours = parseHours(hours);
+  if (parsedHours === null) return res.status(400).json({ error: L(req, 'common.invalid_hours') });
   const result = db.prepare('INSERT INTO timesheets (resource_id, project_id, project_scope_id, date, hours, notes, status) VALUES (?,?,?,?,?,?,?)')
-    .run(resource_id, project_id, project_scope_id || null, date, hours, notes || '', status || 'draft');
+    .run(resource_id, project_id, project_scope_id || null, date, parsedHours, notes || '', status || 'draft');
   res.json({ id: result.lastInsertRowid });
 });
 
@@ -66,8 +70,25 @@ router.put('/timesheets/:id', (req, res) => {
     return res.status(403).json({ error: L(req, 'timesheets.edit_own_only') });
   }
   const { hours, notes, status, project_scope_id } = req.body;
-  db.prepare('UPDATE timesheets SET hours=?, notes=?, status=?, project_scope_id=? WHERE id=?')
-    .run(hours, notes, status, project_scope_id || null, req.params.id);
+
+  /* Build the SET list from the fields actually present. Binding them all
+     unconditionally turned a partial body into either a 500 (NOT NULL
+     violation on `hours`) or a silent wipe of the omitted columns. */
+  const sets = [];
+  const params = [];
+  if (hours !== undefined) {
+    const parsed = parseHours(hours);
+    if (parsed === null) return res.status(400).json({ error: L(req, 'common.invalid_hours') });
+    sets.push('hours = ?');
+    params.push(parsed);
+  }
+  if (notes !== undefined) { sets.push('notes = ?'); params.push(notes || ''); }
+  if (status !== undefined) { sets.push('status = ?'); params.push(status); }
+  if (project_scope_id !== undefined) { sets.push('project_scope_id = ?'); params.push(project_scope_id || null); }
+  if (!sets.length) return res.json({ ok: true, unchanged: true });
+
+  db.prepare(`UPDATE timesheets SET ${sets.join(', ')} WHERE id=?`)
+    .run(...params, req.params.id);
   res.json({ ok: true });
 });
 

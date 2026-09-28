@@ -6,6 +6,7 @@ const { notifyBookingCreated, notifyBookingUpdated, notifyBookingDeleted } = req
 const { checkBookingConflicts, shouldBlockConflicts } = require('../../utils/conflicts');
 const { logAudit } = require('../../utils/audit');
 const { L, reqLang } = require('../../utils/server-i18n');
+const { isYmd, parseHours, isBefore } = require('../../utils/validate');
 
 module.exports = function register(router, ctx) {
   const { db, authz, sseBroadcast } = ctx;
@@ -255,6 +256,24 @@ module.exports = function register(router, ctx) {
       return res.status(403).json({ error: L(req, 'bookings.no_create_perm') });
     }
 
+    if (!isYmd(date)) return res.status(400).json({ error: L(req, 'bookings.invalid_date') });
+    if (end_date != null && end_date !== '' && !isYmd(end_date)) {
+      return res.status(400).json({ error: L(req, 'bookings.invalid_date') });
+    }
+    if (isBefore(end_date, date)) {
+      return res.status(400).json({ error: L(req, 'bookings.end_before_start') });
+    }
+    // Reject negative / zero / >24h instead of letting them corrupt
+    // utilisation and revenue totals. Omitting `hours` still means 8h/day,
+    // preserving the previous `hours || 8` default.
+    let requestedHours;
+    if (hours === undefined || hours === null || hours === '') {
+      requestedHours = 8;
+    } else {
+      requestedHours = parseHours(hours);
+      if (requestedHours === null) return res.status(400).json({ error: L(req, 'bookings.invalid_hours') });
+    }
+
     const resource = db.prepare('SELECT id, name FROM resources WHERE id=? AND enterprise_id=?').get(resource_id, entId);
     if (!resource) return res.status(400).json({ error: L(req, 'common.resource_not_found') });
     const project = db.prepare('SELECT id, name FROM projects WHERE id=? AND enterprise_id=?').get(project_id, entId);
@@ -262,7 +281,7 @@ module.exports = function register(router, ctx) {
 
     const startDate = date;
     const endDate = end_date || date;
-    const bookHours = hours || 8;
+    const bookHours = requestedHours;
     const tentative = is_tentative ? 1 : 0;
     const bookNotes = notes || '';
     const createdBy = req.user?.id || null;
@@ -400,11 +419,19 @@ module.exports = function register(router, ctx) {
     const nextProject = authz.getProjectInEnterprise(project_id, entId);
     if (!nextProject) return res.status(400).json({ error: L(req, 'common.project_not_found') });
 
+    if (!isYmd(date)) return res.status(400).json({ error: L(req, 'bookings.invalid_date') });
+    let nextHours = existing.hours;
+    if (hours !== undefined && hours !== null && hours !== '') {
+      const parsed = parseHours(hours);
+      if (parsed === null) return res.status(400).json({ error: L(req, 'bookings.invalid_hours') });
+      nextHours = parsed;
+    }
+
     const conflictResult = checkBookingConflicts(db, {
       resourceId: resource_id,
       startDate: date,
       endDate: date,
-      hours: hours != null ? hours : existing.hours,
+      hours: nextHours,
       excludeBookingId: +req.params.id,
       replaceDayHours: false,
       lang: reqLang(req),
@@ -431,14 +458,14 @@ module.exports = function register(router, ctx) {
       project_id,
       project_scope_id || null,
       date,
-      hours,
+      nextHours,
       is_tentative ? 1 : 0,
       notes || '',
       req.params.id
     );
 
-    notifyAll(db, entId, `排程变更: ${nextResource.name} 在 ${date}「${nextProject.name}」已更新为${hours}小时`);
-    notifyBookingUpdated(db, resource_id, nextProject.name, date, hours, req.user?.name);
+    notifyAll(db, entId, `排程变更: ${nextResource.name} 在 ${date}「${nextProject.name}」已更新为${nextHours}小时`);
+    notifyBookingUpdated(db, resource_id, nextProject.name, date, nextHours, req.user?.name);
 
     logAudit(db, {
       enterpriseId: entId,
@@ -453,7 +480,7 @@ module.exports = function register(router, ctx) {
           date: existing.date,
           hours: existing.hours,
         },
-        after: { resource_id, project_id, date, hours, project_scope_id: project_scope_id || null },
+        after: { resource_id, project_id, date, hours: nextHours, project_scope_id: project_scope_id || null },
         forced: !!force,
         conflicts: conflictResult.conflicts,
       },

@@ -5,6 +5,7 @@ const express = require('express');
 const { getHoliday } = require('../../db/holidays');
 const { logAudit } = require('../../utils/audit');
 const { L } = require('../../utils/server-i18n');
+const { isYmd, isBefore } = require('../../utils/validate');
 
 module.exports = function register(router, ctx) {
   const { db, authz, isAdmin, isManagerOrAdmin, saveAvatarHelper, sseBroadcast } = ctx;
@@ -30,6 +31,13 @@ router.post('/leave', (req, res) => {
   if (!authz.getResourceInEnterprise(resource_id, entId)) {
     return res.status(400).json({ error: L(req, 'common.resource_not_found') });
   }
+  if (!isYmd(date)) return res.status(400).json({ error: L(req, 'common.invalid_date') });
+  // The renderer keeps a single leave entry per resource per day, and a
+  // UNIQUE index enforces it. Check up front so a duplicate is a clean 409
+  // instead of a UNIQUE-constraint 500.
+  const existing = db.prepare('SELECT id FROM leave_entries WHERE resource_id = ? AND date = ?')
+    .get(resource_id, date);
+  if (existing) return res.status(409).json({ error: L(req, 'common.leave_date_taken') });
   const result = db.prepare('INSERT INTO leave_entries (resource_id, date, type, notes) VALUES (?,?,?,?)')
     .run(resource_id, date, type || 'vacation', notes || '');
   res.json({ id: result.lastInsertRowid });
@@ -51,6 +59,12 @@ router.post('/leave/batch', (req, res) => {
   if (!isManagerOrAdmin(req.user)) return res.status(403).json({ error: L(req, 'leave.register_manager_only') });
   const { resource_id, start_date, end_date, type, notes } = req.body;
   if (!resource_id || !start_date) return res.status(400).json({ error: L(req, 'common.missing_required_params') });
+  if (!isYmd(start_date) || (end_date && !isYmd(end_date))) {
+    return res.status(400).json({ error: L(req, 'common.invalid_date') });
+  }
+  if (isBefore(end_date, start_date)) {
+    return res.status(400).json({ error: L(req, 'common.end_before_start') });
+  }
   if (!authz.getResourceInEnterprise(resource_id, entId)) {
     return res.status(400).json({ error: L(req, 'common.resource_not_found') });
   }
@@ -148,6 +162,7 @@ router.put('/leave/:id', (req, res) => {
   const newType = type || existing.type;
   const newNotes = notes !== undefined ? notes : existing.notes;
   const newDate = date || existing.date;
+  if (!isYmd(newDate)) return res.status(400).json({ error: L(req, 'common.invalid_date') });
 
   /* Guard: moving onto a date that already has a leave entry for the same
      resource would create a duplicate (renderer keeps only one per day). */
