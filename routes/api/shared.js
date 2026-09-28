@@ -5,18 +5,41 @@ const fs = require('fs');
 const path = require('path');
 const { createAuthz, isAdmin, isManagerOrAdmin } = require('../../utils/authz');
 
+/**
+ * Delete a previously uploaded file, but only when the stored path really
+ * resolves inside `publicDir`. Avatar/logo URLs come back from the database
+ * and were previously joined straight into a path, so a stored
+ * '/avatars/../../server.js' would unlink a file outside public/.
+ */
+function safeUnlinkUnder(publicDir, urlPath) {
+  if (!urlPath || typeof urlPath !== 'string') return;
+  if (!urlPath.startsWith('/')) return;
+  const root = path.resolve(publicDir);
+  const target = path.resolve(path.join(root, urlPath));
+  // Must stay within publicDir (prefix match on the resolved dir + separator).
+  if (target !== root && !target.startsWith(root + path.sep)) return;
+  try {
+    if (fs.existsSync(target)) fs.unlinkSync(target);
+  } catch (_) { /* best effort */ }
+}
+
+/** Accept only a plain '/avatars/<file>' reference, no traversal segments. */
+function isSafeAssetPath(urlPath) {
+  if (typeof urlPath !== 'string') return false;
+  if (!urlPath.startsWith('/avatars/')) return false;
+  return !urlPath.includes('..') && !urlPath.includes('\\');
+}
+
 function saveAvatarHelper(avatarData, oldAvatarUrl, prefix = 'resource') {
+  const publicDir = path.join(__dirname, '..', '..', 'public');
   if (!avatarData) {
-    if (oldAvatarUrl) {
-      const oldPath = path.join(__dirname, '..', '..', 'public', oldAvatarUrl);
-      if (fs.existsSync(oldPath)) {
-        try { fs.unlinkSync(oldPath); } catch (_) {}
-      }
-    }
+    safeUnlinkUnder(publicDir, oldAvatarUrl);
     return '';
   }
   if (avatarData.startsWith('/avatars/')) {
-    return avatarData;
+    // Only pass through references we recognise; otherwise treat it as "no
+    // change" rather than persisting an attacker-chosen path.
+    return isSafeAssetPath(avatarData) ? avatarData : (oldAvatarUrl || '');
   }
   const match = avatarData.match(/^data:image\/(png|jpeg|jpg|webp);base64,(.+)$/);
   if (!match) return oldAvatarUrl || '';
@@ -26,16 +49,11 @@ function saveAvatarHelper(avatarData, oldAvatarUrl, prefix = 'resource') {
   if (buffer.length > 500 * 1024) {
     return oldAvatarUrl || '';
   }
-  const avatarDir = path.join(__dirname, '..', '..', 'public', 'avatars');
+  const avatarDir = path.join(publicDir, 'avatars');
   if (!fs.existsSync(avatarDir)) {
     fs.mkdirSync(avatarDir, { recursive: true });
   }
-  if (oldAvatarUrl) {
-    const oldPath = path.join(__dirname, '..', '..', 'public', oldAvatarUrl);
-    if (fs.existsSync(oldPath)) {
-      try { fs.unlinkSync(oldPath); } catch (_) {}
-    }
-  }
+  safeUnlinkUnder(publicDir, oldAvatarUrl);
   const filename = `avatar_${prefix}_${Date.now()}.${ext}`;
   const filePath = path.join(avatarDir, filename);
   fs.writeFileSync(filePath, buffer);
@@ -81,6 +99,8 @@ function createApiContext(db) {
 
 module.exports = {
   saveAvatarHelper,
+  safeUnlinkUnder,
+  isSafeAssetPath,
   sseAddClient,
   sseBroadcast,
   createApiContext,

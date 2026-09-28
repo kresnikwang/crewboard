@@ -10,6 +10,7 @@ const {
   authMiddleware,
 } = require('../utils/authz');
 const { createRateLimiter } = require('../utils/rateLimit');
+const { safeUnlinkUnder } = require('./api/shared');
 const { L } = require('../utils/server-i18n');
 const uuidv4 = () => crypto.randomUUID();
 const router = express.Router();
@@ -80,18 +81,22 @@ module.exports = function(db) {
     if (!password || !name || (!phone && !email)) {
       return res.status(400).json({ error: L(req, 'auth.register_missing_fields') });
     }
-    // Check uniqueness
+    // Check uniqueness. Email is compared case-insensitively so the same
+    // address cannot register twice as "A@x.com" and "a@x.com" — which
+    // previously created two accounts, and made password-reset go to
+    // whichever row matched first.
     if (phone) {
       const existing = db.prepare('SELECT id FROM users WHERE phone = ?').get(phone);
       if (existing) return res.status(400).json({ error: L(req, 'auth.phone_registered') });
     }
-    if (email) {
-      const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+    const normalizedEmail = email ? String(email).trim().toLowerCase() : null;
+    if (normalizedEmail) {
+      const existing = db.prepare('SELECT id FROM users WHERE lower(email) = ?').get(normalizedEmail);
       if (existing) return res.status(400).json({ error: L(req, 'auth.email_registered') });
     }
     const hash = hashPassword(password);
     const result = db.prepare('INSERT INTO users (phone, email, password_hash, name, role, status) VALUES (?,?,?,?,?,?)')
-      .run(phone || null, email || null, hash, name, 'basic', 'active');
+      .run(phone || null, normalizedEmail, hash, name, 'basic', 'active');
 
     // Auto-login
     const token = uuidv4();
@@ -107,9 +112,9 @@ module.exports = function(db) {
         SELECT i.*, e.name as enterprise_name
         FROM invitations i
         JOIN enterprises e ON i.enterprise_id = e.id
-        WHERE i.email = ? AND i.status = 'pending'
+        WHERE lower(i.email) = ? AND i.status = 'pending'
         ORDER BY i.created_at DESC LIMIT 1
-      `).get(email);
+      `).get(normalizedEmail);
 
       if (invitation) {
         enterprise_id = invitation.enterprise_id;
@@ -139,7 +144,7 @@ module.exports = function(db) {
     const { account, password } = req.body;
     if (!account || !password) return res.status(400).json({ error: L(req, 'auth.login_missing') });
 
-    const user = db.prepare('SELECT * FROM users WHERE phone = ? OR email = ?').get(account, account);
+    const user = db.prepare('SELECT * FROM users WHERE phone = ? OR lower(email) = lower(?)').get(account, account);
     if (!user) return res.status(401).json({ error: L(req, 'auth.account_not_found') });
     if (!verifyPassword(password, user.password_hash)) return res.status(401).json({ error: L(req, 'auth.wrong_password') });
     if (user.status && user.status !== 'active') {
@@ -378,12 +383,8 @@ module.exports = function(db) {
     }
 
     const oldLogo = db.prepare('SELECT logo_url FROM enterprises WHERE id = ?').get(req.user.enterprise_id)?.logo_url;
-    if (oldLogo) {
-      const oldPath = path.join(__dirname, '..', 'public', oldLogo);
-      if (fs.existsSync(oldPath)) {
-        try { fs.unlinkSync(oldPath); } catch (_) {}
-      }
-    }
+    // Guard the delete: only remove files that live under public/.
+    safeUnlinkUnder(path.join(__dirname, '..', 'public'), oldLogo);
 
     const filename = `logo_${req.user.enterprise_id}_${Date.now()}.${ext}`;
     const filePath = path.join(logosDir, filename);
@@ -451,12 +452,8 @@ module.exports = function(db) {
 
     // Delete old avatar file if exists
     const oldAvatar = db.prepare('SELECT avatar FROM users WHERE id = ?').get(req.user.id)?.avatar;
-    if (oldAvatar) {
-      const oldPath = path.join(__dirname, '..', 'public', oldAvatar);
-      if (fs.existsSync(oldPath)) {
-        try { fs.unlinkSync(oldPath); } catch (_) {}
-      }
-    }
+    // Guard the delete: only remove files that live under public/.
+    safeUnlinkUnder(path.join(__dirname, '..', 'public'), oldAvatar);
 
     // Save new avatar
     const filename = `avatar_${req.user.id}_${Date.now()}.${ext}`;
@@ -566,16 +563,19 @@ module.exports = function(db) {
     if (!req.user?.enterprise_id) return res.status(403).json({ error: L(req, 'common.forbidden') });
     if (!isAdmin(req.user)) return res.status(403).json({ error: L(req, 'common.admin_only') });
 
-    const { email, name } = req.body;
-    if (!email) return res.status(400).json({ error: L(req, 'auth.enter_email') });
+    const { name } = req.body;
+    if (!req.body.email) return res.status(400).json({ error: L(req, 'auth.enter_email') });
+    // Store lowercase so invite lookups match registration and acceptance,
+    // which both compare with lower().
+    const email = String(req.body.email).trim().toLowerCase();
 
     // Check if already invited
-    const existing = db.prepare('SELECT id FROM invitations WHERE email = ? AND enterprise_id = ? AND status = ?')
+    const existing = db.prepare('SELECT id FROM invitations WHERE lower(email) = ? AND enterprise_id = ? AND status = ?')
       .get(email, req.user.enterprise_id, 'pending');
     if (existing) return res.status(400).json({ error: L(req, 'auth.invite_pending_exists') });
 
     // Check if already a member
-    const existingUser = db.prepare('SELECT id FROM users WHERE email = ? AND enterprise_id = ?')
+    const existingUser = db.prepare('SELECT id FROM users WHERE lower(email) = ? AND enterprise_id = ?')
       .get(email, req.user.enterprise_id);
     if (existingUser) return res.status(400).json({ error: L(req, 'auth.invite_already_member') });
 
