@@ -49,6 +49,16 @@ module.exports = {
       out_file: './logs/reminder-schedule.log',
     },
     {
+      name: 'crewboard-reminder-project-code',
+      script: 'scripts/reminder-project-code.js',
+      cron_restart: '0 10 * * 1',   // 每周一 10:00（排在 09:00 排程提醒之后）
+      autorestart: false,
+      watch: false,
+      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+      error_file: './logs/reminder-project-code-error.log',
+      out_file: './logs/reminder-project-code.log',
+    },
+    {
       name: 'crewboard-auth-watchdog',
       script: 'scripts/auth-watchdog.js',
       cron_restart: '*/10 * * * *', // 每 10 分钟自检：登录 + 会话查询

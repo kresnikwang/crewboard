@@ -85,9 +85,9 @@ public/css/style.css + @import 的模块
 ## 数据与后台任务
 
 - 数据库默认文件是 `db/resource-guru.db`，测试使用 `tests/.tmp/` 或 `e2e/.tmp/` 下的临时数据库。
-- `ecosystem.config.js` 定义主服务和定时任务：主服务 `crewboard`、节假日更新、两类提醒、认证看门狗。
+- `ecosystem.config.js` 定义主服务和定时任务：主服务 `crewboard`、节假日更新、三类提醒、认证看门狗。
 - `scripts/auth-watchdog.js` 每 10 分钟验证登录和 `/api/auth/me`；它不代替日志和健康检查。
-- `scripts/reminder-*.js` 发送企业微信提醒；`scripts/wecom-test.js` 是人工诊断脚本。
+- `scripts/reminder-*.js` 发送企业微信提醒（排程、工时、项目编号补全）；`scripts/wecom-test.js` 是人工诊断脚本。
 - `scripts/update-holidays.js` 更新 `db/holidays.js`，不要手动编辑生成区块后再运行更新脚本覆盖。
 
 ## 快速定位命令

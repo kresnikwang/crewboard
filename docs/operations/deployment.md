@@ -47,6 +47,26 @@ pm2 describe crewboard
 pm2 jlist
 ```
 
+新增或修改了定时任务时，还需要把它注册到 PM2（只改文件不会自动生效）：
+
+```bash
+cd /www/wwwroot/resource.skandstudio.com
+pm2 start ecosystem.config.js --only crewboard-reminder-project-code --update-env
+pm2 status
+```
+
+当前定时任务（均来自 `ecosystem.config.js`）：
+
+| 进程 | 脚本 | 时间 |
+| --- | --- | --- |
+| `crewboard-holiday-update` | `scripts/update-holidays.js` | 每年 12/15 09:00 |
+| `crewboard-reminder-schedule` | `scripts/reminder-schedule.js` | 每周一 09:00 |
+| `crewboard-reminder-project-code` | `scripts/reminder-project-code.js` | 每周一 10:00 |
+| `crewboard-reminder-timesheet` | `scripts/reminder-timesheet.js` | 每周五 15:00 |
+| `crewboard-auth-watchdog` | `scripts/auth-watchdog.js` | 每 10 分钟 |
+
+`crewboard-reminder-project-code` 给「创建了缺编号项目」且绑定了企业微信的在职同事发一条汇总提醒。已存档的项目不提醒；`created_by` 为空的历史项目只计数、不发送。首次上线可手动执行 `node scripts/reminder-project-code.js` 确认日志，输出见 `logs/reminder-project-code.log`。
+
 重点确认主进程仍是 `PORT=3000`、`fork`、单实例，并且没有意外的 `cron_restart`。定时任务应分别由 ecosystem 中的任务进程负责，不要让 `crewboard` 主进程承担定时重启。
 
 PM2 的保存列表是服务器状态，不是 Git 文件。修改或修复 PM2 进程列表后，只有在检查完所有进程都正确时才执行 `pm2 save`，避免把过期任务一并持久化。
