@@ -12,6 +12,7 @@
   Object.assign(translations.zh, {
     'common.save': '保存', 'common.cancel': '取消', 'common.delete': '删除',
     'common.edit': '编辑', 'common.create': '新建', 'common.search': '搜索...',
+    'common.open_menu': '打开菜单', 'common.close_menu': '关闭菜单', 'common.close': '关闭',
     'common.loading': '加载中…', 'common.load_failed': '加载失败',
     'common.save_failed': '保存失败', 'common.delete_failed': '删除失败',
     'common.update_failed': '更新失败',
@@ -25,6 +26,7 @@
   Object.assign(translations.en, {
     'common.save': 'Save', 'common.cancel': 'Cancel', 'common.delete': 'Delete',
     'common.edit': 'Edit', 'common.create': 'New', 'common.search': 'Search...',
+    'common.open_menu': 'Open menu', 'common.close_menu': 'Close menu', 'common.close': 'Close',
     'common.loading': 'Loading…', 'common.load_failed': 'Load failed',
     'common.save_failed': 'Save failed', 'common.delete_failed': 'Delete failed',
     'common.update_failed': 'Update failed',
@@ -1001,6 +1003,13 @@
     for (var k = 0; k < titles.length; k++) {
       var tk = titles[k].getAttribute('data-i18n-title');
       if (tk) titles[k].setAttribute('title', t(tk));
+    }
+    // Icon-only controls (search boxes, close buttons) carry no visible text,
+    // so their accessible name has to be translated too.
+    var ariaLabels = document.querySelectorAll('[data-i18n-aria-label]');
+    for (var a = 0; a < ariaLabels.length; a++) {
+      var ak = ariaLabels[a].getAttribute('data-i18n-aria-label');
+      if (ak) ariaLabels[a].setAttribute('aria-label', t(ak));
     }
     var htmls = document.querySelectorAll('[data-i18n-html]');
     for (var m = 0; m < htmls.length; m++) {

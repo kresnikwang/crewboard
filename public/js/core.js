@@ -1297,9 +1297,12 @@ document.querySelectorAll('.lang-btn').forEach(btn => {
 function updateLangToggle() {
   const lang = getLang();
   document.querySelectorAll('.lang-btn').forEach(b => {
-    b.classList.toggle('active', b.dataset.lang === lang);
-    b.style.fontWeight = b.dataset.lang === lang ? '600' : '400';
-    b.style.opacity = b.dataset.lang === lang ? '1' : '0.6';
+    var active = b.dataset.lang === lang;
+    b.classList.toggle('active', active);
+    b.style.fontWeight = active ? '600' : '400';
+    b.style.opacity = active ? '1' : '0.6';
+    // Expose the selected state to assistive tech, not just visually.
+    b.setAttribute('aria-pressed', active ? 'true' : 'false');
   });
 }
 

@@ -296,7 +296,7 @@
   <div class="app" id="main-app" style="display:none">
     <!-- Mobile top bar (hamburger) -->
     <div class="mobile-topbar" id="mobile-topbar">
-      <button class="hamburger-btn" id="hamburger-btn" aria-label="Open menu">
+      <button class="hamburger-btn" id="hamburger-btn" aria-label="Open menu" data-i18n-aria-label="common.open_menu">
         <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M3 5h16M3 11h16M3 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       </button>
       <div class="mobile-logo-container" id="mobile-logo-container" style="color:#fff; display: flex; align-items: center; gap: 8px;">
@@ -309,7 +309,7 @@
     <nav class="sidebar" id="sidebar">
       <div class="sidebar-header">
         <div class="sidebar-enterprise-container" id="sidebar-enterprise-container"></div>
-        <button class="sidebar-close-btn" id="sidebar-close-btn" aria-label="Close menu">
+        <button class="sidebar-close-btn" id="sidebar-close-btn" aria-label="Close menu" data-i18n-aria-label="common.close_menu">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
         </button>
       </div>
@@ -451,7 +451,7 @@
               <span class="input-group-text bg-transparent border-end-0">
                 <svg width="14" height="14" viewBox="0 0 20 20" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M14 14l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
               </span>
-              <input type="text" id="pc-search" class="text-input form-control border-start-0" data-i18n-placeholder="common.search" placeholder="搜索...">
+              <input type="text" id="pc-search" class="text-input form-control border-start-0" data-i18n-placeholder="common.search" data-i18n-aria-label="common.search" aria-label="搜索" placeholder="搜索...">
             </div>
             <button class="btn btn-primary d-flex align-items-center gap-1" id="btn-add-new-pc">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
@@ -486,7 +486,7 @@
       <div class="modal-content" id="modal">
         <div class="modal-header">
           <h2 class="modal-title" id="modal-title"></h2>
-          <button type="button" class="btn-close modal-close" id="modal-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          <button type="button" class="btn-close modal-close" id="modal-close" data-bs-dismiss="modal" aria-label="Close" data-i18n-aria-label="common.close"></button>
         </div>
         <div class="modal-body" id="modal-body"></div>
         <div class="modal-footer" id="modal-footer"></div>
