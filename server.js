@@ -2,6 +2,10 @@ const express = require('express');
 const path = require('path');
 const cors = require('cors');
 const { initDB, seedDemoData } = require('./db/schema');
+// Load .env (gitignored) before anything reads process.env, so SMTP / WeCom /
+// watchdog configuration lives on the server instead of in source. Safe to call
+// multiple times; existing environment variables always win.
+require('./utils/loadEnv')();
 const apiRoutes = require('./routes/api');
 const authRoutes = require('./routes/auth');
 const { authMiddleware, cleanupExpiredAuth } = require('./utils/authz');

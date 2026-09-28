@@ -9,6 +9,34 @@
 - `forgot-password` 同时受 IP 限流和账号维度冷却保护；当前账号冷却策略是 30 分钟最多发送一封。
 - 重置 token、SMTP 密钥、企业微信 secret 和 Webhook URL 不应写入日志、测试输出或文档。
 
+## 运行时密钥配置
+
+凭据不进入仓库。生产通过应用目录下的 `.env` 提供，`server.js` 和 `scripts/*.js`
+启动时用 `utils/loadEnv.js` 读取（无第三方依赖；真实环境变量优先级更高）。
+
+- `.env` 已被 `.gitignore` 忽略；可提交的模板是 `.env.example`。
+- 缺少配置时**失败关闭**：邮件发送与企业微信调用直接报错并记录日志，不会退回到
+  任何共享账号。看门狗没有 `WATCHDOG_PASSWORD` 时输出 `SKIPPED`，不会误重启服务。
+- 部署后确认 `.env` 存在且权限收敛（`chmod 600 .env`，属主为运行 PM2 的用户）。
+- 轮换密钥时只改服务器上的 `.env`，然后 `pm2 restart crewboard --update-env`
+  并重跑看门狗确认。
+
+必需变量：
+
+| 变量 | 用途 | 缺失后果 |
+| --- | --- | --- |
+| `SMTP_HOST` / `SMTP_USER` / `SMTP_PASS` | 密码重置、邀请邮件 | 邮件发送失败，用户收不到重置链接 |
+| `WECOM_CORP_ID` / `WECOM_AGENT_ID` / `WECOM_SECRET` | 排班通知与提醒 | 企业微信推送静默停用 |
+| `WATCHDOG_PASSWORD` / `WATCHDOG_ALERT_EMAIL` | 认证自检与告警 | 自检跳过，故障无法及时发现 |
+
+检查线上是否已配置（只打印变量名，不打印值）：
+
+```bash
+cd /www/wwwroot/resource.skandstudio.com
+sed -E 's/=.*/=<set>/' .env | grep -E '^(SMTP_|WECOM_|WATCHDOG_)'
+```
+
+
 ## 告警处理顺序
 
 收到认证看门狗告警时，按下面顺序保留证据再处理：

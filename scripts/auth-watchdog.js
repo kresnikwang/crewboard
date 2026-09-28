@@ -16,6 +16,8 @@
  */
 const { execSync } = require('child_process');
 const fs = require('fs');
+// Load the gitignored .env so watchdog credentials are not stored in source.
+require('../utils/loadEnv')();
 
 const BASE = process.env.WATCHDOG_URL || 'http://127.0.0.1:3000';
 const ACCOUNT = process.env.WATCHDOG_ACCOUNT || 'admin@company.com';

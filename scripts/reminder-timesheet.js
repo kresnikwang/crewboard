@@ -6,6 +6,8 @@
  * Usage: node scripts/reminder-timesheet.js
  */
 
+// Load the gitignored .env so WeCom credentials are not stored in source.
+require('../utils/loadEnv')();
 const { initDB } = require('../db/schema');
 const { getDepartmentUsers, sendTextMessage } = require('../utils/wecom');
 
