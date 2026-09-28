@@ -484,8 +484,14 @@ window.roleLabel = function roleLabel(role) {
     el.innerHTML =
       '<div class="toast-body d-flex align-items-center gap-2">' +
         '<span class="toast-icon" aria-hidden="true">' + meta.icon + '</span>' +
-        '<span class="toast-msg">' + msg + '</span>' +
+        '<span class="toast-msg"></span>' +
       '</div>';
+    /* Messages are built from server errors and user-entered names (e.g. a
+       resource name inside a conflict message), so they must be inserted as
+       text — concatenating them into innerHTML allowed markup in a name to
+       execute. Assign via textContent instead. */
+    var msgEl = el.querySelector('.toast-msg');
+    if (msgEl) msgEl.textContent = msg == null ? '' : String(msg);
 
     var c = getContainer();
     c.appendChild(el);
@@ -964,9 +970,14 @@ async function enterApp() {
     } else {
       const userInfo = document.getElementById('user-info');
       if (userInfo) {
+        // user.name is user-entered; assign as text, not via innerHTML.
         userInfo.innerHTML =
-          '<div class="user-name">' + user.name + '</div>' +
-          '<div class="user-role">' + window.roleLabel(user.role) + '</div>';
+          '<div class="user-name"></div>' +
+          '<div class="user-role"></div>';
+        const nameEl = userInfo.querySelector('.user-name');
+        if (nameEl) nameEl.textContent = user.name || '';
+        const roleEl = userInfo.querySelector('.user-role');
+        if (roleEl) roleEl.textContent = window.roleLabel(user.role);
       }
     }
   }
@@ -1025,15 +1036,22 @@ function showFirstLoginView(user) {
   // Populate user greeting
   var greetEl = document.getElementById('first-login-user');
   if (greetEl && user) {
+    // user.name / user.email are user-entered, so set them as text rather
+    // than concatenating them into innerHTML.
     greetEl.innerHTML =
       '<div class="first-login-greeting">' +
       '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" style="vertical-align:-2px;margin-right:6px">' +
       '<circle cx="10" cy="7" r="3" stroke="currentColor" stroke-width="1.5"/>' +
       '<path d="M3 18c0-3.3 2.7-6 7-6s7 2.7 7 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>' +
       '</svg>' +
-      (getLang() === 'zh' ? '您好，' : 'Hello, ') + '<strong>' + (user.name || '') + '</strong>' +
-      (user.email ? '<span class="first-login-email"> &lt;' + user.email + '&gt;</span>' : '') +
+      '<span class="first-login-greet-text">' + (getLang() === 'zh' ? '您好，' : 'Hello, ') + '</span>' +
+      '<strong class="first-login-name"></strong>' +
+      '<span class="first-login-email"></span>' +
       '</div>';
+    var nameEl = greetEl.querySelector('.first-login-name');
+    if (nameEl) nameEl.textContent = user.name || '';
+    var mailEl = greetEl.querySelector('.first-login-email');
+    if (mailEl) mailEl.textContent = user.email ? ' <' + user.email + '>' : '';
   }
 
   // Clear fields and errors

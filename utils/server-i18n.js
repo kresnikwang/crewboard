@@ -92,6 +92,7 @@ const MESSAGES = {
   // ---------- bookings ----------
   'bookings.missing_resource_or_date': { zh: '缺少 resource_id 或 date', en: 'Missing resource_id or date' },
   'bookings.missing_ids': { zh: '缺少 ids', en: 'Missing ids' },
+  'bookings.too_many_ids': { zh: '单次最多处理 {max} 条排程', en: 'At most {max} schedules can be processed at once' },
   'bookings.bad_day_delta': { zh: 'day_delta 必须为非零整数', en: 'day_delta must be a non-zero integer' },
   'bookings.not_found': { zh: '预订不存在', en: 'Booking not found' },
   'bookings.not_found_id': { zh: '预订不存在: {id}', en: 'Booking not found: {id}' },

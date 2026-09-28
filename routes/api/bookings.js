@@ -8,6 +8,9 @@ const { logAudit } = require('../../utils/audit');
 const { L, reqLang } = require('../../utils/server-i18n');
 const { isYmd, parseHours, isBefore } = require('../../utils/validate');
 
+/** Upper bound on ids accepted by the batch shift/delete endpoints. */
+const MAX_BATCH_IDS = 500;
+
 module.exports = function register(router, ctx) {
   const { db, authz, sseBroadcast } = ctx;
 
@@ -92,6 +95,12 @@ module.exports = function register(router, ctx) {
     const dayDelta = parseInt(req.body.day_delta, 10);
     const force = !!req.body.force;
     if (!ids.length) return res.status(400).json({ error: L(req, 'bookings.missing_ids') });
+    // The duplicate check binds one placeholder per id; SQLite caps bound
+    // variables per statement, so reject oversized batches with a clear 400
+    // rather than letting a large shift fail mid-query.
+    if (ids.length > MAX_BATCH_IDS) {
+      return res.status(400).json({ error: L(req, 'bookings.too_many_ids', { max: MAX_BATCH_IDS }) });
+    }
     if (!Number.isFinite(dayDelta) || dayDelta === 0) {
       return res.status(400).json({ error: L(req, 'bookings.bad_day_delta') });
     }
@@ -207,6 +216,9 @@ module.exports = function register(router, ctx) {
 
     const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Boolean) : [];
     if (!ids.length) return res.status(400).json({ error: L(req, 'bookings.missing_ids') });
+    if (ids.length > MAX_BATCH_IDS) {
+      return res.status(400).json({ error: L(req, 'bookings.too_many_ids', { max: MAX_BATCH_IDS }) });
+    }
 
     const getBk = db.prepare(`
       SELECT b.*, r.name as rname, p.name as pname FROM bookings b
