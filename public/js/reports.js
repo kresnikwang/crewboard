@@ -544,7 +544,15 @@
     var start = el('report-start').value;
     var end   = el('report-end').value;
     var endpoint = type === 'utilization' ? '/api/export/utilization' : '/api/export/projects';
-    window.open(endpoint + '?start=' + encodeURIComponent(start) + '&end=' + encodeURIComponent(end));
+    // window.open() cannot send an Authorization header, so the session token
+    // has to ride in the query string — authz's `req.query.token` fallback is
+    // what accepts it. Without this the download always failed with 400.
+    var token = (typeof getToken === 'function') ? getToken() : null;
+    var url = endpoint
+      + '?start=' + encodeURIComponent(start)
+      + '&end=' + encodeURIComponent(end)
+      + (token ? '&token=' + encodeURIComponent(token) : '');
+    window.open(url, '_blank');
     toast(t('reports.exporting'), 'success');
   }
 
