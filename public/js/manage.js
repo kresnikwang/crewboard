@@ -462,6 +462,10 @@ window.deleteResource = async function deleteResource(id) {
 
 var pcActiveTab = 'projects';
 var pcSearchQuery = '';
+/* Ids of projects selected in the projects table. A Set keeps toggling cheap
+   and makes "select all" / "clear" trivial. Reset whenever the underlying
+   project list is reloaded so a stale id can never be archived. */
+var pcSelectedProjectIds = new Set();
 
 // Color palette for dropdowns - function to support i18n
 function getColorPalette() {
@@ -552,6 +556,9 @@ window.loadProjects = async function loadProjects() {
     toast(t('manage.load_failed') + ': ' + err.message, 'error');
     return;
   }
+  // The list is authoritative now: never keep a selection that a reload
+  // could have invalidated (archived or removed elsewhere).
+  pcSelectedProjectIds.clear();
   renderPCPage();
   bindPCNewButton();
 };
@@ -608,6 +615,10 @@ function renderPCPage() {
 function renderProjectsTable(container) {
   var permsPC = window.state.permissions || {};
   var canManagePC = !!permsPC.manage_projects;
+  /* Archiving is admin-only on the server (PATCH /projects/:id/archive checks
+     isAdmin), so only surface selection to admins. Showing it to managers
+     produced a button that always failed with 403. */
+  var canArchivePC = !!permsPC.can_admin;
   var query = pcSearchQuery.toLowerCase();
   var filtered = state.projects.filter(function (p) {
     if (!query) return true;
@@ -616,15 +627,36 @@ function renderProjectsTable(container) {
            (p.code && p.code.toLowerCase().indexOf(query) >= 0);
   });
 
+  // Drop selections that are no longer in the active (non-archived) list.
+  var visibleIds = {};
+  filtered.forEach(function (p) { visibleIds[p.id] = true; });
+  pcSelectedProjectIds.forEach(function (id) {
+    if (!visibleIds[id]) pcSelectedProjectIds.delete(id);
+  });
+
+  var bulkBar = canArchivePC ? renderProjectBulkBar() : null;
+  if (bulkBar) container.appendChild(bulkBar);
+
   if (filtered.length === 0) {
-    container.innerHTML = '<div class="empty-hint">' + (query ? t('manage.no_match_projects') : t('manage.no_projects')) + '</div>';
+    var hint = document.createElement('div');
+    hint.className = 'empty-hint';
+    hint.textContent = query ? t('manage.no_match_projects') : t('manage.no_projects');
+    container.appendChild(hint);
     return;
   }
 
   var table = document.createElement('table');
   table.className = 'pc-table table table-hover table-sm align-middle';
+  var allSelected = canArchivePC && filtered.length > 0 &&
+    filtered.every(function (p) { return pcSelectedProjectIds.has(p.id); });
+  var someSelected = canArchivePC && pcSelectedProjectIds.size > 0 && !allSelected;
+  var selectTh = canArchivePC
+    ? '<th class="col-select"><input type="checkbox" class="pc-select-all" aria-label="' +
+      escapeHtml(t('manage.select_all_projects')) + '"' + (allSelected ? ' checked' : '') + '></th>'
+    : '';
+
   table.innerHTML =
-    '<thead><tr>' +
+    '<thead><tr>' + selectTh +
       '<th class="col-code">' + t('manage.project_code') + '</th>' +
       '<th class="col-name">' + t('manage.project_name') + '</th>' +
       '<th class="col-client">' + t('common.client') + '</th>' +
@@ -632,6 +664,19 @@ function renderProjectsTable(container) {
       '<th class="col-billable">' + t('manage.billing') + '</th>' +
       '<th class="col-actions"></th>' +
     '</tr></thead>';
+
+  var selectAllEl = table.querySelector('.pc-select-all');
+  if (selectAllEl) {
+    selectAllEl.indeterminate = someSelected;
+    selectAllEl.addEventListener('change', function () {
+      if (selectAllEl.checked) {
+        filtered.forEach(function (p) { pcSelectedProjectIds.add(p.id); });
+      } else {
+        filtered.forEach(function (p) { pcSelectedProjectIds.delete(p.id); });
+      }
+      renderPCPage();
+    });
+  }
 
   var tbody = document.createElement('tbody');
   filtered.forEach(function (p) {
@@ -641,7 +686,17 @@ function renderProjectsTable(container) {
     if (p.start_date || p.end_date) {
       dateRange = (p.start_date || '—') + ' ~ ' + (p.end_date || '—');
     }
-    tr.innerHTML =
+    var selected = pcSelectedProjectIds.has(p.id);
+    if (selected) tr.classList.add('pc-row-selected');
+    var selectTd = canArchivePC
+      ? '<td class="col-select"><input type="checkbox" class="pc-select-item" data-id="' + p.id +
+        '" aria-label="' + escapeHtml(t('manage.select_project', { name: p.name })) + '"' +
+        (selected ? ' checked' : '') + '></td>'
+      : '';
+    var archiveBtnHtml = canArchivePC
+      ? '<button class="btn-icon btn-archive" title="' + t('common.archive') + '">&#128451;</button>'
+      : '';
+    tr.innerHTML = selectTd +
       '<td class="col-code">' + escapeHtml(p.code || '') + '</td>' +
       '<td class="col-name">' +
         '<div class="col-name-inner">' +
@@ -654,25 +709,104 @@ function renderProjectsTable(container) {
       '<td class="col-billable">' + (p.billable ? 'Yes' : 'No') + '</td>' +
       (canManagePC ? '<td class="col-actions">' +
         '<button class="btn-icon btn-edit" title="' + t('common.edit') + '">&#9998;</button>' +
-        '<button class="btn-icon btn-archive" title="' + t('common.archive') + '">&#128451;</button>' +
+        archiveBtnHtml +
       '</td>' : '<td></td>');
+
     if (canManagePC) {
-      tr.querySelector('.btn-edit').addEventListener('click', function (e) {
+      var editBtn = tr.querySelector('.btn-edit');
+      if (editBtn) editBtn.addEventListener('click', function (e) {
         e.stopPropagation();
         showProjectModal(p.id);
       });
-      tr.querySelector('.btn-archive').addEventListener('click', function (e) {
+      var archiveBtn = tr.querySelector('.btn-archive');
+      if (archiveBtn) archiveBtn.addEventListener('click', function (e) {
         e.stopPropagation();
         archiveProject(p.id);
       });
       // Click row to edit
       tr.addEventListener('click', function () { showProjectModal(p.id); });
     }
+
+    var cb = tr.querySelector('.pc-select-item');
+    if (cb) {
+      // The row itself opens the edit modal, so the checkbox must not
+      // bubble into that handler.
+      cb.addEventListener('click', function (e) { e.stopPropagation(); });
+      cb.addEventListener('change', function () {
+        if (cb.checked) pcSelectedProjectIds.add(p.id);
+        else pcSelectedProjectIds.delete(p.id);
+        renderPCPage();
+      });
+    }
     tbody.appendChild(tr);
   });
   table.appendChild(tbody);
   container.appendChild(table);
 }
+
+/** Sticky action bar shown above the projects table while rows are selected. */
+function renderProjectBulkBar() {
+  var bar = document.createElement('div');
+  bar.className = 'pc-bulk-bar';
+  var count = pcSelectedProjectIds.size;
+
+  var label = document.createElement('span');
+  label.className = 'pc-bulk-count';
+  label.textContent = t('manage.selected_count', { count: count });
+  bar.appendChild(label);
+
+  if (count > 0) {
+    var archiveBtn = document.createElement('button');
+    archiveBtn.className = 'btn btn-warning btn-sm';
+    archiveBtn.id = 'btn-bulk-archive';
+    archiveBtn.textContent = t('manage.bulk_archive');
+    archiveBtn.addEventListener('click', batchArchiveSelectedProjects);
+    bar.appendChild(archiveBtn);
+  }
+
+  var clearBtn = document.createElement('button');
+  clearBtn.className = 'btn btn-outline btn-sm';
+  clearBtn.id = 'btn-bulk-clear';
+  clearBtn.textContent = t('manage.clear_selection');
+  clearBtn.addEventListener('click', function () {
+    pcSelectedProjectIds.clear();
+    renderPCPage();
+  });
+  bar.appendChild(clearBtn);
+
+  return bar;
+}
+
+window.batchArchiveSelectedProjects = async function batchArchiveSelectedProjects() {
+  var ids = Array.from(pcSelectedProjectIds);
+  if (!ids.length) return;
+  var names = state.projects
+    .filter(function (p) { return pcSelectedProjectIds.has(p.id); })
+    .map(function (p) { return p.name; });
+
+  var msg = t('manage.bulk_archive_confirm', { count: ids.length }) + '\n\n' + names.join('\n');
+  msg += '\n\n' + t('common.restore') + '?';
+  if (!confirm(msg)) return;
+
+  var btn = document.getElementById('btn-bulk-archive');
+  if (btn) { btn.disabled = true; btn.textContent = t('common.loading'); }
+  try {
+    var res = await api('/api/projects/batch-archive', { method: 'POST', body: { ids: ids } });
+    var archived = (res && res.archived) || 0;
+    var skipped = (res && res.skipped && res.skipped.length) || 0;
+    if (archived > 0 && skipped > 0) {
+      toast(t('projects.batch_archive_partial', { count: archived, skipped: skipped }), 'info');
+    } else {
+      toast(t('projects.batch_archived', { count: archived }), 'success');
+    }
+    pcSelectedProjectIds.clear();
+    invalidateProjectDataCaches();
+    loadProjects();
+  } catch (err) {
+    toast(t('manage.archive_failed') + ': ' + err.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = t('manage.bulk_archive'); }
+  }
+};
 
 function renderClientsTable(container) {
   var permsClient = window.state.permissions || {};
@@ -1179,6 +1313,9 @@ document.addEventListener('DOMContentLoaded', function () {
   document.querySelectorAll('.pc-tab').forEach(function (tab) {
     tab.addEventListener('click', function () {
       pcActiveTab = tab.dataset.tab;
+      // Selection belongs to the projects tab only; leaving it must not carry
+      // a hidden selection into another tab.
+      pcSelectedProjectIds.clear();
       document.querySelectorAll('.pc-tab').forEach(function (t) {
         t.classList.remove('active');
         // Bootstrap nav-link active state

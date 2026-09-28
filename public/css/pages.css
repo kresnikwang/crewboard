@@ -504,6 +504,30 @@
 .pc-name-text { font-weight: 500; }
 .col-client { min-width: 120px; color: var(--text-secondary); }
 .col-code { min-width: 100px; color: var(--text-secondary); font-family: monospace; font-size: 12px; }
+
+/* ---- Bulk selection (projects table) ---- */
+.col-select { width: 36px; padding-right: 0; }
+.col-select input[type="checkbox"] { margin: 0; cursor: pointer; }
+.pc-row-selected { background: var(--bg, #F5F7FB); }
+.pc-row-selected:hover { background: var(--bg, #F5F7FB); }
+.pc-bulk-bar {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--surface, #fff);
+  border-bottom: 1px solid var(--border, #E8E0D8);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .05);
+}
+.pc-bulk-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-right: auto;
+}
 .col-dates { min-width: 180px; color: var(--text-secondary); font-size: 12px; }
 .col-billable { min-width: 60px; text-align: center; }
 .col-projects { min-width: 100px; color: var(--text-secondary); }

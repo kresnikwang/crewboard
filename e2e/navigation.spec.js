@@ -33,6 +33,74 @@ test.describe('Navigation & pages', () => {
     await expect(page.locator('#tab-projects')).toHaveClass(/active/);
   });
 
+  test('项目表可多选并批量存档', async ({ page }) => {
+    await goToPage(page, 'projects');
+    await page.locator('#tab-projects').click();
+
+    // Seed two throwaway projects through the API so the table has rows.
+    const names = ['E2E批量A', 'E2E批量B'];
+    const created = await page.evaluate(async (names) => {
+      const out = [];
+      for (const name of names) {
+        const r = await api('/api/projects', { method: 'POST', body: { name, code: '' } });
+        out.push({ id: r.id, name });
+      }
+      // Re-render in place; no reload needed (and the stored token would
+      // auto-skip the login page).
+      await window.loadProjects();
+      return out;
+    }, names);
+    await expect(page.locator('.pc-row').first()).toBeVisible();
+
+    // Admin sees the selection column.
+    await expect(page.locator('.pc-select-all')).toBeVisible();
+    const boxes = page.locator('.pc-select-item');
+    for (const p of created) {
+      await page.locator(`.pc-select-item[data-id="${p.id}"]`).check();
+    }
+    await expect(boxes.first()).toBeChecked();
+
+    // Bulk bar reflects the count and offers archive.
+    await expect(page.locator('#btn-bulk-archive')).toBeVisible();
+    await expect(page.locator('.pc-bulk-count')).toContainText('2');
+
+    // Confirm dialog lists both projects.
+    page.once('dialog', (d) => {
+      expect(d.message()).toContain('E2E批量A');
+      expect(d.message()).toContain('E2E批量B');
+      d.accept();
+    });
+    await page.locator('#btn-bulk-archive').click();
+
+    // Both move to the archived tab.
+    await expect(page.locator('#tab-archived')).toContainText('2', { timeout: 10000 });
+    await page.locator('#tab-archived').click();
+    const archived = page.locator('#clients-projects-container');
+    await expect(archived).toContainText('E2E批量A');
+    await expect(archived).toContainText('E2E批量B');
+
+    // Selection is cleared after the operation.
+    await page.locator('#tab-projects').click();
+    await expect(page.locator('.pc-bulk-count')).toContainText('0');
+
+    // Cleanup: restore then delete the seeded projects.
+    await page.evaluate(async (ids) => {
+      for (const id of ids) {
+        await api(`/api/projects/${id}/unarchive`, { method: 'PATCH' });
+        await api(`/api/projects/${id}`, { method: 'DELETE' });
+      }
+    }, created.map((p) => p.id));
+  });
+
+  test('勾选项目不会误触发编辑弹窗', async ({ page }) => {
+    await goToPage(page, 'projects');
+    await page.locator('#tab-projects').click();
+    await expect(page.locator('.pc-row').first()).toBeVisible();
+    // Clicking the checkbox must not open the row's edit modal.
+    await page.locator('.pc-select-item').first().click();
+    await expect(page.locator('#modal-overlay')).toBeHidden();
+  });
+
   test('报表页可生成利用率报表', async ({ page }) => {
     await goToPage(page, 'reports');
     await expect(page.locator('#btn-gen-report')).toBeVisible();

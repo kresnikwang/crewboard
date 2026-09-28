@@ -501,6 +501,10 @@
   // --- manage projects/clients ---
   Object.assign(translations.zh, {
     'manage.projects_tab': '项目', 'manage.clients_tab': '客户', 'manage.archive_tab': '存档',
+    'manage.select_all_projects': '全选项目', 'manage.bulk_archive': '批量存档',
+    'manage.selected_count': '已选 {count} 个项目', 'manage.clear_selection': '清除选择',
+    'manage.bulk_archive_confirm': '确认存档以下 {count} 个项目？',
+    'manage.select_project': '选择项目 {name}',
     'manage.project_name': '项目名称', 'manage.project_code': '项目编号',
     'manage.project_notes': '项目备注', 'manage.client_name': '客户名称',
     'manage.billing': '计费', 'manage.linked_projects': '关联项目', 'manage.period': '周期',
@@ -531,6 +535,10 @@
   });
   Object.assign(translations.en, {
     'manage.projects_tab': 'Projects', 'manage.clients_tab': 'Clients', 'manage.archive_tab': 'Archived',
+    'manage.select_all_projects': 'Select all projects', 'manage.bulk_archive': 'Archive selected',
+    'manage.selected_count': '{count} selected', 'manage.clear_selection': 'Clear selection',
+    'manage.bulk_archive_confirm': 'Archive the following {count} projects?',
+    'manage.select_project': 'Select project {name}',
     'manage.project_name': 'Project Name', 'manage.project_code': 'Project Code',
     'manage.project_notes': 'Project Notes', 'manage.client_name': 'Client Name',
     'manage.billing': 'Billing', 'manage.linked_projects': 'Linked Projects', 'manage.period': 'Period',

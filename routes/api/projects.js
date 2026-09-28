@@ -6,6 +6,9 @@ const { logAudit } = require('../../utils/audit');
 const { L } = require('../../utils/server-i18n');
 const { isYmd, isBefore, isNonEmptyString, parseNonNegativeNumber } = require('../../utils/validate');
 
+/** Upper bound on ids accepted by batch endpoints (mirrors bookings.js). */
+const MAX_BATCH_IDS = 500;
+
 module.exports = function register(router, ctx) {
   const { db, authz, isAdmin, isManagerOrAdmin, saveAvatarHelper, sseBroadcast } = ctx;
 
@@ -99,7 +102,82 @@ router.patch('/projects/:id/archive', (req, res) => {
   if (!proj) return res.status(404).json({ error: L(req, 'common.project_missing') });
   db.prepare('UPDATE projects SET is_archived = 1 WHERE id = ? AND enterprise_id = ?').run(req.params.id, entId);
   res.json({ ok: true });
+  logAudit(db, {
+    enterpriseId: entId,
+    user: req.user,
+    action: 'project.archive',
+    entityType: 'project',
+    entityId: +req.params.id,
+    details: { name: proj.name, code: proj.code || '' },
+  });
   sseBroadcast(entId, 'project-change', { action: 'archive' }, req.user?.id);
+});
+
+/**
+ * Archive many projects in one transaction.
+ * Body: { ids: number[] }
+ *
+ * Same admin-only rule as the single-project endpoint. Every id is validated
+ * against the caller's enterprise, so a mixed/cross-tenant payload reports
+ * exactly which ids were rejected instead of silently archiving a subset.
+ */
+router.post('/projects/batch-archive', (req, res) => {
+  const entId = req.user?.enterprise_id;
+  if (!entId) return res.status(400).json({ error: L(req, 'common.need_enterprise') });
+  if (!isAdmin(req.user)) return res.status(403).json({ error: L(req, 'projects.archive_admin_only') });
+
+  const ids = Array.isArray(req.body.ids)
+    ? Array.from(new Set(req.body.ids.map(Number).filter((n) => Number.isInteger(n) && n > 0)))
+    : [];
+  if (!ids.length) return res.status(400).json({ error: L(req, 'projects.missing_ids') });
+  if (ids.length > MAX_BATCH_IDS) {
+    return res.status(400).json({ error: L(req, 'projects.too_many_ids', { max: MAX_BATCH_IDS }) });
+  }
+
+  const placeholders = ids.map(() => '?').join(',');
+  const found = db.prepare(`
+    SELECT id, name, code, is_archived FROM projects
+    WHERE enterprise_id = ? AND id IN (${placeholders})
+  `).all(entId, ...ids);
+  const foundIds = new Set(found.map((p) => p.id));
+  const notFound = ids.filter((id) => !foundIds.has(id));
+  if (notFound.length) {
+    return res.status(404).json({
+      error: L(req, 'common.project_missing'),
+      code: 'project_not_found',
+      ids: notFound,
+    });
+  }
+
+  const toArchive = found.filter((p) => !p.is_archived);
+  if (!toArchive.length) {
+    return res.json({ ok: true, archived: 0, ids: [], skipped: found.map((p) => p.id) });
+  }
+
+  const archiveAll = db.transaction(() => {
+    const stmt = db.prepare('UPDATE projects SET is_archived = 1 WHERE id = ? AND enterprise_id = ?');
+    for (const p of toArchive) stmt.run(p.id, entId);
+  });
+  archiveAll();
+
+  for (const p of toArchive) {
+    logAudit(db, {
+      enterpriseId: entId,
+      user: req.user,
+      action: 'project.archive',
+      entityType: 'project',
+      entityId: p.id,
+      details: { name: p.name, code: p.code || '', bulk: true },
+    });
+  }
+
+  res.json({
+    ok: true,
+    archived: toArchive.length,
+    ids: toArchive.map((p) => p.id),
+    skipped: found.filter((p) => p.is_archived).map((p) => p.id),
+  });
+  sseBroadcast(entId, 'project-change', { action: 'batch-archive', ids: toArchive.map((p) => p.id) }, req.user?.id);
 });
 
 router.patch('/projects/:id/unarchive', (req, res) => {
