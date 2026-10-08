@@ -935,6 +935,43 @@
     'enterprise.tz_city.los_angeles': 'Los Angeles'
   });
 
+  Object.assign(translations.zh, {
+    'common.skip_content': '跳到主要内容',
+    'common.previous_week': '上一周',
+    'common.next_week': '下一周',
+    'common.previous_month': '上个月',
+    'common.next_month': '下个月',
+    'common.start_date': '开始日期',
+    'common.end_date': '结束日期',
+    'common.retry': '重试',
+    'common.remove_item': '移除 {name}',
+    'common.scroll_table': '左右滑动查看完整表格，首列保持固定',
+    'timesheets.cell_label': '{project}，{date}，工时（小时）',
+    'timesheets.notes_label': '{project}，{date}，备注',
+    'reports.type': '报表类型',
+    'reports.loading_charts': '数据已加载，正在加载图表…',
+    'reports.charts_unavailable': '图表暂时无法加载，您仍可查看下方数据或导出报表。',
+    'reports.invalid_range': '结束日期不能早于开始日期'
+  });
+  Object.assign(translations.en, {
+    'common.skip_content': 'Skip to main content',
+    'common.previous_week': 'Previous week',
+    'common.next_week': 'Next week',
+    'common.previous_month': 'Previous month',
+    'common.next_month': 'Next month',
+    'common.start_date': 'Start date',
+    'common.end_date': 'End date',
+    'common.retry': 'Retry',
+    'common.remove_item': 'Remove {name}',
+    'common.scroll_table': 'Scroll horizontally to see all columns. The first column stays fixed.',
+    'timesheets.cell_label': '{project}, {date}, hours worked',
+    'timesheets.notes_label': '{project}, {date}, notes',
+    'reports.type': 'Report type',
+    'reports.loading_charts': 'Data loaded. Loading charts…',
+    'reports.charts_unavailable': 'Charts are unavailable. You can still view the data below or export the report.',
+    'reports.invalid_range': 'End date must be on or after start date'
+  });
+
   // ==================== Utility Functions ====================
 
   function getLang() {

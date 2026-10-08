@@ -3,13 +3,12 @@ window.saveBooking = async function (id) {
   var totalH = parseFloat(document.getElementById('bk-hours').value) || 0;
 
   var projectId = parseInt(document.getElementById('bk-project').value, 10);
-  if (!projectId) {
-    toast(t('schedule.select_project'), 'error');
-    return;
-  }
-
   var resourceIds = getSelectedResourceIds();
-  if (resourceIds.length === 0) { toast(t('schedule.search_resource'), 'error'); return; }
+  if (!window.validateFields([
+    { id: 'bk-resource-search', valid: resourceIds.length > 0, message: t('schedule.search_resource') },
+    { id: 'bk-project-search', valid: !!projectId, message: t('schedule.select_project') },
+    { id: 'bk-hours', valid: totalH > 0 && Number.isFinite(totalH), message: t('schedule.invalid_hours') }
+  ])) return;
 
   var scopeSelect = document.getElementById('bk-scope');
   var projectScopeId = scopeSelect && scopeSelect.value ? parseInt(scopeSelect.value, 10) : null;

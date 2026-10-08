@@ -59,7 +59,7 @@ module.exports = require('./api/index');
 | `public/js/dist/*.min.js` | 浏览器实际加载的压缩 JS | 由 `npm run build` 或部署脚本生成 |
 | `public/css/style.css` | CSS 总入口，导入模块 | 修改 `base/layout/components/schedule/pages` 等源码 |
 | `public/css/*.css` | 样式模块 | 不直接编辑 `public/css/dist/` |
-| `public/css/dist/*.min.css` | 发布 CSS 产物 | 部署脚本使用 `cleancss` 生成主要产物 |
+| `public/css/dist/*.min.css` | 发布 CSS 产物 | `npm run build` 或部署脚本生成 |
 | `public/vendor/`、`public/fonts/` | 第三方静态资源 | 生产部署会检查缺失资源 |
 
 ### 源码与产物
@@ -76,11 +76,11 @@ public/js/*.js
              └─ public/js/dist/*.min.js
 
 public/css/style.css + @import 的模块
-        └─ deploy.sh + cleancss
+        └─ npm run build / deploy.sh
              └─ public/css/dist/style.min.css
 ```
 
-本地 `npm run build` 当前负责排班合并和 JS 压缩；生产 `deploy.sh` 还会压缩 CSS 并注入静态资源版本号。
+本地 `npm run build` 负责 CSS 压缩（`scripts/build-css.js`）、排班合并和 JS 压缩；生产 `deploy.sh` 也会压缩 CSS 并注入静态资源版本号。
 
 ## 数据与后台任务
 

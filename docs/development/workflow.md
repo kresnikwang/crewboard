@@ -37,7 +37,7 @@ SEED_DEMO=1 npm start
 2. 运行 `npm run bundle:schedule`，确认生成 `public/js/schedule.js`。
 3. 运行 `npm run build`，更新 `public/js/dist/`。
 4. 其他页面直接修改 `public/js/*.js` 后运行 `npm run build`。
-5. 样式修改 `public/css/*.css` 源文件；生产部署阶段会生成 CSS 压缩产物。
+5. 样式修改 `public/css/*.css` 源文件；运行 `npm run build` 同时生成 CSS 和 JavaScript 发布产物。CSS 构建入口为 `scripts/build-css.js`，生产部署仍由 `deploy.sh` 生成压缩产物。
 
 不要直接改 `public/js/dist/`、`public/css/dist/` 或部署后被注入版本号的 `public/index.html`。
 

@@ -45,7 +45,7 @@
     /* Basic users: always view own resource only */
     if (!canViewOthers && myResourceId) {
       state.tsResourceId = myResourceId;
-    } else if (!state.tsResourceId && resources.length) {
+    } else if ((!state.tsResourceId || !resources.some(function (r) { return r.id === state.tsResourceId; })) && resources.length) {
       /* Managers default to their own resource if available */
       var ownRes = myResourceId && resources.find(function (r) { return r.id === myResourceId; });
       state.tsResourceId = ownRes ? ownRes.id : resources[0].id;
@@ -55,15 +55,16 @@
     if (selectEl) {
       if (!canViewOthers) {
         /* Hide selector for basic users — they can only see themselves */
-        selectEl.parentElement && (selectEl.parentElement.style.display = 'none');
+        selectEl.style.display = 'none';
       } else {
-        selectEl.parentElement && (selectEl.parentElement.style.display = '');
+        selectEl.style.display = '';
         selectEl.innerHTML = resources.map(function (r) {
           var sel = r.id === state.tsResourceId ? ' selected' : '';
           return '<option value="' + r.id + '"' + sel + '>' + esc(r.name) + '</option>';
         }).join('');
         selectEl.onchange = function () {
           state.tsResourceId = parseInt(selectEl.value, 10);
+          window.syncPageUrl();
           window.loadTimesheets();
         };
       }
@@ -82,6 +83,7 @@
 
     /* ---- parallel data fetch ---- */
     var rid = state.tsResourceId;
+    if (state.currentPage === 'timesheets') window.syncPageUrl(true);
     var results = await Promise.all([
       api('/api/projects'),
       api('/api/timesheets?start=' + startStr + '&end=' + endStr + '&resource_id=' + rid),
@@ -341,12 +343,12 @@
      Table builder
      -------------------------------------------------- */
   function buildTable(days, rows, tsMap, tsSourceMap, scheduleMap, notesMap) {
-    var html = '<table class="ts-table"><thead><tr><th>' + t('timesheets.project') + '</th>';
+    var html = '<p class="table-scroll-hint">' + t('common.scroll_table') + '</p><div class="ts-table-wrap" tabindex="0" role="region" aria-label="' + esc(t('timesheets.title')) + '"><table class="ts-table"><thead><tr><th scope="col">' + t('timesheets.project') + '</th>';
 
     days.forEach(function (d, idx) {
       var isWeekend = d.getDay() === 0 || d.getDay() === 6;
       var weekendCls = isWeekend ? ' ts-weekend' : '';
-      html += '<th class="' + weekendCls.trim() + '">' + shortDay(d) + '<br>' + fmtDate(d) + '</th>';
+      html += '<th scope="col" class="' + weekendCls.trim() + '">' + shortDay(d) + '<br>' + fmtDate(d) + '</th>';
     });
     html += '<th>' + t('timesheets.total') + '</th></tr></thead><tbody>';
 
@@ -398,6 +400,7 @@
         html += '<td class="' + weekendCls.trim() + '">' +
           '<div class="ts-cell-wrap">' +
           '<input type="number" class="ts-input' + varClass + syncedClass + '"' +
+          ' aria-label="' + esc(t('timesheets.cell_label', { project: r.name, date: dateStr })).replace(/"/g, '&quot;') + '"' +
           ' data-project="' + r.project_id + '"' +
           ' data-project-scope="' + (r.project_scope_id || '') + '"' +
           ' data-date="' + dateStr + '"' +
@@ -407,6 +410,7 @@
           ' placeholder="' + placeholder + '"' +
           ' min="0" max="24" step="0.5">' +
           '<button type="button" class="ts-notes-btn' + (notes ? ' ts-notes-active' : '') + '"' +
+          ' aria-label="' + esc(t('timesheets.notes_label', { project: r.name, date: dateStr })).replace(/"/g, '&quot;') + '"' +
           ' data-project="' + r.project_id + '" data-project-scope="' + (r.project_scope_id || '') + '" data-date="' + dateStr + '"' +
           ' title="' + (notes ? esc(notes) : t('timesheets.add_notes')) + '">' +
           '<svg width="12" height="12" viewBox="0 0 16 16" fill="none">' +
@@ -432,7 +436,7 @@
     });
     html += '<td id="ts-week-total">' + weekTotal + '</td></tr>';
 
-    html += '</tbody></table>';
+    html += '</tbody></table></div>';
     html += '<div class="ts-footer">' +
       '<span class="ts-sync-hint">' + t('timesheets.sync_hint') + '</span>' +
       '<button class="btn btn-primary" id="ts-save">' + t('timesheets.save_hours') + '</button>' +
@@ -718,18 +722,21 @@
     if (prevBtn) {
       prevBtn.addEventListener('click', function () {
         state.tsWeekStart = addDays(state.tsWeekStart, -7);
+        window.syncPageUrl();
         window.loadTimesheets();
       });
     }
     if (nextBtn) {
       nextBtn.addEventListener('click', function () {
         state.tsWeekStart = addDays(state.tsWeekStart, 7);
+        window.syncPageUrl();
         window.loadTimesheets();
       });
     }
     if (todayBtn) {
       todayBtn.addEventListener('click', function () {
         state.tsWeekStart = getMonday(new Date());
+        window.syncPageUrl();
         window.loadTimesheets();
       });
     }

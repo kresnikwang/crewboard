@@ -161,7 +161,9 @@ window.loadResources = async function loadResources() {
   if (state.resources.length === 0) {
     html = '<div class="empty-hint">' + t('manage.no_resources') + '</div>';
   }
-  container.innerHTML = html;
+  container.innerHTML = state.resources.length
+    ? '<p class="table-scroll-hint">' + t('common.scroll_table') + '</p><div class="resource-table-wrap" tabindex="0" role="region" aria-label="' + escapeHtml(t('manage.resources_title')) + '">' + html + '</div>'
+    : html;
 
   /* 权限下拉事件 */
   container.querySelectorAll('.res-role-select').forEach(function (sel) {
@@ -400,7 +402,7 @@ window.showResourceModal = async function showResourceModal(id) {
 
 window.saveResource = async function saveResource(id) {
   var name = document.getElementById('res-name').value.trim();
-  if (!name) { toast(t('manage.enter_name'), 'error'); return; }
+  if (!window.validateFields([{ id: 'res-name', valid: !!name, message: t('manage.enter_name') }])) return;
   var colorEl = document.getElementById('rg-color-value');
   var avatarImg = document.querySelector('#res-avatar-preview img');
   var avatarVal = avatarImg ? avatarImg.src : '';
@@ -635,7 +637,7 @@ function renderProjectsTable(container) {
   });
 
   var bulkBar = canArchivePC ? renderProjectBulkBar() : null;
-  if (bulkBar) container.appendChild(bulkBar);
+  if (bulkBar && pcSelectedProjectIds.size > 0) container.appendChild(bulkBar);
 
   if (filtered.length === 0) {
     var hint = document.createElement('div');
@@ -923,7 +925,7 @@ window.showClientModal = function showClientModal(id) {
 
 window.saveClient = async function saveClient(id) {
   var name = document.getElementById('client-name').value.trim();
-  if (!name) { toast(t('manage.enter_client_name'), 'error'); return; }
+  if (!window.validateFields([{ id: 'client-name', valid: !!name, message: t('manage.enter_client_name') }])) return;
   var payload = {
     name: name,
     color: document.getElementById('client-color').value,
@@ -1136,7 +1138,7 @@ window.showProjectModal = async function showProjectModal(id) {
 
 window.saveProject = async function saveProject(id) {
   var name = document.getElementById('proj-name').value.trim();
-  if (!name) { toast(t('manage.enter_project_name'), 'error'); return; }
+  if (!window.validateFields([{ id: 'proj-name', valid: !!name, message: t('manage.enter_project_name') }])) return;
 
   var clientId = document.getElementById('proj-client').value;
   /* Derive color from selected client */

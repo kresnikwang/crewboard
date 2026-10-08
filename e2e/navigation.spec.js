@@ -81,7 +81,7 @@ test.describe('Navigation & pages', () => {
 
     // Selection is cleared after the operation.
     await page.locator('#tab-projects').click();
-    await expect(page.locator('.pc-bulk-count')).toContainText('0');
+    await expect(page.locator('.pc-bulk-bar')).toHaveCount(0);
 
     // Cleanup: restore then delete the seeded projects.
     await page.evaluate(async (ids) => {

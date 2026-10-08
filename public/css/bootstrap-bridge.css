@@ -23,7 +23,7 @@
 :root {
   /* --- 主色系 --- */
   --bs-primary:           var(--primary);   /* = --primary (品牌蓝) */
-  --bs-primary-rgb:       59, 125, 221;
+  --bs-primary-rgb:       46, 107, 196;
   --bs-primary-text-emphasis:  var(--primary-hover);
   --bs-primary-bg-subtle: var(--primary-light);   /* = --primary-light */
   --bs-primary-border-subtle: var(--primary-light);
@@ -45,8 +45,8 @@
   /* --- 文字 --- */
   --bs-body-color:        #1A1A1A;   /* = --text */
   --bs-body-color-rgb:    26, 26, 26;
-  --bs-secondary-color:   #6B7280;   /* = --text-secondary */
-  --bs-tertiary-color:    #9CA3AF;   /* = --text-tertiary */
+  --bs-secondary-color:   var(--text-secondary);
+  --bs-tertiary-color:    var(--text-tertiary);
   --bs-emphasis-color:    #1A1A1A;
 
   /* --- 边框 --- */
@@ -72,7 +72,7 @@
 
   /* --- 链接 --- */
   --bs-link-color:        var(--primary);
-  --bs-link-color-rgb:    59, 125, 221;
+  --bs-link-color-rgb:    46, 107, 196;
   --bs-link-hover-color:  var(--primary-hover);
 
   /* --- 组件 --- */
@@ -1016,7 +1016,7 @@ body.modal-open {
 .ts-input {
   /* 强制保持 style.css 的精确尺寸和样式 */
   width: 60px !important;
-  padding: 4px 6px !important;
+  padding: 4px 22px 4px 4px !important;
   font-size: 13px !important;
   border: 1px solid var(--border) !important;
   border-radius: 4px !important;
@@ -1231,11 +1231,13 @@ body.modal-open {
     width: 240px;
     z-index: 1040;
     transform: translateX(-100%);
+    visibility: hidden;
     transition: transform .25s ease;
     box-shadow: 4px 0 24px rgba(0,0,0,.25);
   }
   .sidebar.sidebar-open {
     transform: translateX(0);
+    visibility: visible;
   }
 
   /* 显示 sidebar 关闭按钮 */
@@ -1517,8 +1519,8 @@ body.modal-open {
 }
 
 .hamburger-btn {
-  min-width: 40px;
-  min-height: 40px;
+  min-width: 44px;
+  min-height: 44px;
   border-radius: 8px;
 }
 
@@ -1526,4 +1528,44 @@ body.modal-open {
   min-width: 40px;
   min-height: 40px;
   border-radius: 8px;
+}
+
+/* Data controls: contain wide tables and keep actions discoverable. */
+#page-projects .header-actions .search-box { width: 240px; flex: 0 1 240px; }
+#page-projects .header-actions .search-box .form-control { min-width: 0; width: 0; }
+#page-projects .pc-table tbody td { padding-top: 12px; padding-bottom: 12px; }
+#page-projects .pc-table tbody tr { height: auto; }
+#page-projects .pc-table .col-actions { width: 110px; min-width: 110px; white-space: nowrap; }
+.pc-table tbody tr:focus-within .col-actions .btn-icon,
+.pc-row-archived:focus-within .col-actions button { opacity: 1; }
+.ms-option.keyboard-active { background: var(--primary-light); outline: 2px solid var(--primary); outline-offset: -2px; }
+.ms-chip-remove { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; min-height: 24px; border: 0; background: transparent; color: inherit; border-radius: 4px; }
+.ms-selected:focus-within { border-color: var(--primary); box-shadow: var(--focus-ring); }
+.ts-notes-btn { width: 24px; height: 24px; top: 5px; }
+.ts-cell-wrap:focus-within .ts-notes-btn { opacity: 1; }
+.report-chart-status { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; margin-bottom: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text-secondary); }
+.report-chart-status p { margin: 0; }
+.card:hover, .section-card:hover, .summary-card.card:hover { transform: none; }
+@media (max-width: 1100px) {
+  .table-scroll-hint { display: block; }
+}
+@media (max-width: 768px) {
+  #page-projects .header-actions .search-box { width: 100%; flex-basis: 100%; }
+  .ts-table { min-width: 868px; }
+  .ts-table th:first-child { width: 132px; }
+  .ts-table-wrap { scroll-padding-inline-start: 132px; }
+  .ts-table th, .ts-table td { padding-left: 8px; padding-right: 8px; }
+  .ts-input { font-size: 16px !important; min-height: 40px; }
+  .ts-notes-btn { top: 8px; opacity: .85; }
+  .res-table th:first-child { width: 180px !important; min-width: 180px; }
+  .schedule-table th:first-child { width: 132px; min-width: 132px; }
+  .schedule-table td:first-child { padding-left: 12px; padding-right: 8px; }
+  .schedule-table .resource-cell { gap: 6px; }
+  .schedule-table .resource-avatar { width: 28px; height: 28px; }
+  .schedule-grid { scroll-padding-inline-start: 132px; }
+  .btn-icon { min-width: 40px; min-height: 40px; }
+  .col-actions .btn-icon, .pc-row-archived .col-actions button { opacity: 1; }
+  .ts-footer .ts-sync-hint { flex: 1 1 180px; }
+  .report-chart-status { flex-wrap: wrap; }
+  .auth-form .form-control, .ms-search { font-size: 16px; }
 }

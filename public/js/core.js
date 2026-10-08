@@ -533,6 +533,129 @@ window.roleLabel = function roleLabel(role) {
   };
 })();
 
+// --------------- Form feedback and searchable pickers ---------------
+window.clearFieldError = function clearFieldError(field) {
+  if (typeof field === 'string') field = document.getElementById(field);
+  if (!field) return;
+  var errorId = field.id + '-error';
+  var error = document.getElementById(errorId);
+  if (error) error.remove();
+  field.removeAttribute('aria-invalid');
+  var descriptions = (field.getAttribute('aria-describedby') || '').split(/\s+/).filter(function (id) { return id && id !== errorId; });
+  if (descriptions.length) field.setAttribute('aria-describedby', descriptions.join(' '));
+  else field.removeAttribute('aria-describedby');
+};
+
+window.setFieldError = function setFieldError(field, message) {
+  if (typeof field === 'string') field = document.getElementById(field);
+  if (!field) return;
+  window.clearFieldError(field);
+  var error = document.createElement('p');
+  error.id = field.id + '-error';
+  error.className = 'field-error';
+  error.setAttribute('role', 'alert');
+  error.textContent = message;
+  (field.closest('.ms-picker, .input-with-icon') || field).insertAdjacentElement('afterend', error);
+  field.setAttribute('aria-invalid', 'true');
+  field.setAttribute('aria-describedby', ((field.getAttribute('aria-describedby') || '') + ' ' + error.id).trim());
+};
+
+window.validateFields = function validateFields(checks) {
+  var firstInvalid = null;
+  checks.forEach(function (check) {
+    var field = document.getElementById(check.id);
+    if (!field) return;
+    window.clearFieldError(field);
+    if (!check.valid) {
+      window.setFieldError(field, check.message);
+      if (!firstInvalid) firstInvalid = field;
+    }
+  });
+  if (firstInvalid) firstInvalid.focus();
+  return !firstInvalid;
+};
+
+window.initAccessiblePicker = function initAccessiblePicker(picker, label, multiple) {
+  var input = picker.querySelector('.ms-search');
+  var dropdown = picker.querySelector('.ms-dropdown');
+  if (!input || !dropdown) return;
+  input.setAttribute('role', 'combobox');
+  input.setAttribute('aria-label', label);
+  input.setAttribute('aria-autocomplete', 'list');
+  input.setAttribute('aria-controls', dropdown.id);
+  dropdown.setAttribute('role', 'listbox');
+  dropdown.setAttribute('aria-label', label);
+  if (multiple) dropdown.setAttribute('aria-multiselectable', 'true');
+  var active = null;
+  var options = Array.from(dropdown.querySelectorAll('.ms-option'));
+  options.forEach(function (option, index) {
+    option.id = dropdown.id + '-option-' + index;
+    option.setAttribute('role', 'option');
+  });
+  // Keep focus on the combobox until the option's click selects its value.
+  dropdown.addEventListener('mousedown', function (event) { event.preventDefault(); });
+  function setActive(option) {
+    if (active) active.classList.remove('keyboard-active');
+    active = option;
+    if (active) {
+      active.classList.add('keyboard-active');
+      input.setAttribute('aria-activedescendant', active.id);
+      active.scrollIntoView({ block: 'nearest' });
+    } else input.removeAttribute('aria-activedescendant');
+  }
+  function sync() {
+    var open = dropdown.classList.contains('open');
+    input.setAttribute('aria-expanded', open ? 'true' : 'false');
+    options.forEach(function (option) {
+      var selected = option.classList.contains('selected') ? 'true' : 'false';
+      if (option.getAttribute('aria-selected') !== selected) option.setAttribute('aria-selected', selected);
+    });
+    if (!open || (active && active.style.display === 'none')) setActive(null);
+  }
+  input.addEventListener('keydown', function (event) {
+    var visible = options.filter(function (option) { return option.style.display !== 'none'; });
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      dropdown.classList.add('open');
+      var index = visible.indexOf(active);
+      index = event.key === 'ArrowDown' ? (index + 1) % visible.length : (index <= 0 ? visible.length - 1 : index - 1);
+      setActive(visible[index] || null);
+    } else if (event.key === 'Enter' && dropdown.classList.contains('open')) {
+      event.preventDefault();
+      if (active) { active.click(); window.clearFieldError(input); }
+    } else if (event.key === 'Escape' && dropdown.classList.contains('open')) {
+      event.preventDefault();
+      event.stopPropagation();
+      dropdown.classList.remove('open');
+    } else if (event.key === 'Tab') {
+      dropdown.classList.remove('open');
+    }
+    sync();
+  });
+  picker.addEventListener('focusout', function (event) {
+    if (!picker.contains(event.relatedTarget)) { dropdown.classList.remove('open'); sync(); }
+  });
+  picker.addEventListener('click', function (event) {
+    if (event.target.closest('.ms-option, .ms-chip-remove')) window.clearFieldError(input);
+  });
+  var observer = new MutationObserver(sync);
+  observer.observe(dropdown, { attributes: true, subtree: true, attributeFilter: ['class', 'style'] });
+  document.getElementById('modal-overlay').addEventListener('hidden.bs.modal', function () { observer.disconnect(); }, { once: true });
+  sync();
+};
+
+document.addEventListener('input', function (event) {
+  if (event.target.getAttribute('aria-invalid') === 'true') window.clearFieldError(event.target);
+});
+document.addEventListener('click', function (event) {
+  document.querySelectorAll('.ms-picker').forEach(function (picker) {
+    if (!picker.contains(event.target)) {
+      var dropdown = picker.querySelector('.ms-dropdown');
+      if (dropdown) dropdown.classList.remove('open');
+    }
+  });
+});
+
 // --------------- Modal (Bootstrap 5 实现) ---------------
 // 全局单例：在页面生命周期内复用同一个 Bootstrap Modal 实例
 var _bsModalInstance = null;
@@ -574,6 +697,12 @@ window.showModal = function showModal(title, bodyHtml, footerHtml) {
   document.getElementById('modal-title').textContent = title;
   document.getElementById('modal-body').innerHTML = bodyHtml || '';
   document.getElementById('modal-footer').innerHTML = footerHtml || '';
+  document.querySelectorAll('#modal-body input:not([type="hidden"]), #modal-body select, #modal-body textarea').forEach(function (field) {
+    if (field.getAttribute('aria-label') || (field.labels && field.labels.length)) return;
+    var group = field.closest('.bk-field-body, .form-group');
+    var label = group && group.querySelector('.bk-field-label, label');
+    if (label) field.setAttribute('aria-label', label.textContent.trim());
+  });
 
   var instance = _getModalInstance();
   if (instance) {
@@ -663,6 +792,7 @@ function showAuthView(view) {
   var errForgot = document.getElementById('auth-error-forgot');
   var errReset = document.getElementById('auth-error-reset');
   var successForgot = document.getElementById('auth-success-forgot');
+  document.querySelectorAll('#auth-page [aria-invalid="true"]').forEach(window.clearFieldError);
   if (errLogin) errLogin.textContent = '';
   if (errReg) errReg.textContent = '';
   if (errFirst) errFirst.textContent = '';
@@ -722,18 +852,25 @@ function showAuthError(msg, view) {
   };
   var id = idMap[view] || 'auth-error-login';
   var el = document.getElementById(id);
-  if (el) el.textContent = msg;
+  if (el) { el.setAttribute('role', 'alert'); el.textContent = msg; }
 }
 
 function initLoginHandler() {
-  document.getElementById('btn-login').addEventListener('click', async () => {
+  var form = document.getElementById('form-login');
+  var button = document.getElementById('btn-login');
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (button.disabled) return;
     showAuthError('', 'login');
     const account = document.getElementById('login-account').value.trim();
     const password = document.getElementById('login-password').value;
-    if (!account || !password) {
-      showAuthError(t('auth.err_empty_login'), 'login');
-      return;
-    }
+    if (!window.validateFields([
+      { id: 'login-account', valid: !!account, message: t('auth.login_id_placeholder') },
+      { id: 'login-password', valid: !!password, message: t('auth.login_pwd_placeholder') }
+    ])) return;
+    button.disabled = true;
+    form.setAttribute('aria-busy', 'true');
+    button.textContent = t('common.loading');
     try {
       const data = await api('/api/auth/login', {
         method: 'POST',
@@ -770,6 +907,11 @@ function initLoginHandler() {
       }
     } catch (err) {
       showAuthError(err.message || t('auth.err_login_failed'), 'login');
+      document.getElementById('auth-error-login').focus();
+    } finally {
+      button.disabled = false;
+      form.removeAttribute('aria-busy');
+      button.textContent = t('auth.login_btn');
     }
   });
 }
@@ -830,11 +972,20 @@ function initSidebarUserMenu() {
   userInfo.addEventListener('click', function (e) {
     e.stopPropagation();
     dropdown.classList.toggle('open');
+    userInfo.setAttribute('aria-expanded', dropdown.classList.contains('open') ? 'true' : 'false');
+  });
+  userInfo.addEventListener('keydown', function (event) {
+    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); userInfo.click(); }
+    if (event.key === 'Escape') { dropdown.classList.remove('open'); userInfo.setAttribute('aria-expanded', 'false'); }
+  });
+  dropdown.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') { dropdown.classList.remove('open'); userInfo.setAttribute('aria-expanded', 'false'); userInfo.focus(); }
   });
 
   if (accountBtn) {
     accountBtn.addEventListener('click', function () {
       dropdown.classList.remove('open');
+      userInfo.setAttribute('aria-expanded', 'false');
       window.loadPage('account');
     });
   }
@@ -842,6 +993,7 @@ function initSidebarUserMenu() {
   // Close dropdown on outside click
   document.addEventListener('click', function () {
     dropdown.classList.remove('open');
+    userInfo.setAttribute('aria-expanded', 'false');
   });
   dropdown.addEventListener('click', function (e) {
     e.stopPropagation();
@@ -892,13 +1044,72 @@ const PAGE_LOADERS = {
   account:    () => window.loadAccount    && window.loadAccount(),
 };
 
-window.loadPage = function loadPage(page) {
+function parseRouteDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) return null;
+  var parts = value.split('-').map(Number);
+  var date = new Date(parts[0], parts[1] - 1, parts[2]);
+  return fmt(date) === value ? date : null;
+}
+
+function readPageRoute() {
+  var parts = location.hash.slice(1).split('?');
+  if (!Object.prototype.hasOwnProperty.call(PAGE_LOADERS, parts[0])) return null;
+  return { page: parts[0], params: new URLSearchParams(parts[1] || '') };
+}
+
+window.syncPageUrl = function syncPageUrl(replace) {
+  var page = window.state.currentPage;
+  var params = new URLSearchParams();
+  if (page === 'schedule' && state.scheduleWeekStart) {
+    params.set('start', fmt(state.scheduleWeekStart));
+    params.set('view', state.scheduleView || 'week');
+  } else if (page === 'timesheets' && state.tsWeekStart) {
+    params.set('start', fmt(state.tsWeekStart));
+    if (state.tsResourceId) params.set('resource', state.tsResourceId);
+  } else if (page === 'reports') {
+    ['start', 'end', 'type'].forEach(function (key) {
+      var input = document.getElementById('report-' + key);
+      if (input && input.value) params.set(key, input.value);
+    });
+  }
+  var hash = '#' + page + (params.size ? '?' + params.toString() : '');
+  if (location.hash !== hash) history[replace ? 'replaceState' : 'pushState'](null, '', hash);
+};
+
+window.loadPage = function loadPage(page, options) {
+  options = options || {};
+  var permissions = state.permissions || {};
+  var access = { resources: permissions.manage_resources, projects: permissions.manage_projects, reports: permissions.view_reports, enterprise: !state.user?.enterprise_id || permissions.can_admin };
+  if (!Object.prototype.hasOwnProperty.call(PAGE_LOADERS, page) || (Object.prototype.hasOwnProperty.call(access, page) && !access[page])) page = 'schedule';
+  if (state.user && !state.user.enterprise_id) page = 'enterprise';
+  var route = options.route;
+  if (route && route.page === page) {
+    var start = parseRouteDate(route.params.get('start'));
+    if (page === 'schedule') {
+      if (start) state.scheduleWeekStart = getMonday(start);
+      var view = route.params.get('view');
+      if (view === 'week' || view === 'month') state.scheduleView = view;
+      document.querySelectorAll('.view-btn').forEach(function (button) { button.classList.toggle('active', button.dataset.view === state.scheduleView); });
+    } else if (page === 'timesheets') {
+      if (start) state.tsWeekStart = getMonday(start);
+      var resource = Number(route.params.get('resource'));
+      if (Number.isSafeInteger(resource) && resource > 0) state.tsResourceId = resource;
+    } else if (page === 'reports') {
+      var end = parseRouteDate(route.params.get('end'));
+      if (start) document.getElementById('report-start').value = fmt(start);
+      if (end) document.getElementById('report-end').value = fmt(end);
+      var type = route.params.get('type');
+      if (type === 'projects' || type === 'utilization') document.getElementById('report-type').value = type;
+    }
+  }
   window.state.currentPage = page;
   try { sessionStorage.setItem('crewboard_last_page', page); } catch(_) {}
 
   // Toggle active nav item
   document.querySelectorAll('.nav-item').forEach(item => {
     item.classList.toggle('active', item.dataset.page === page);
+    if (item.dataset.page === page) item.setAttribute('aria-current', 'page');
+    else item.removeAttribute('aria-current');
   });
 
   // Toggle visible page
@@ -909,11 +1120,14 @@ window.loadPage = function loadPage(page) {
   // Call the page loader
   const loader = PAGE_LOADERS[page];
   if (loader) loader();
+  window.syncPageUrl(options.replace || options.history === false);
 };
 
 function initNavigation() {
   document.querySelectorAll('.nav-item[data-page]').forEach(item => {
-    item.addEventListener('click', () => {
+    item.addEventListener('click', (event) => {
+      if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
       window.loadPage(item.dataset.page);
     });
   });
@@ -1015,7 +1229,8 @@ async function enterApp() {
   } else {
     var lastPage = 'schedule';
     try { lastPage = sessionStorage.getItem('crewboard_last_page') || 'schedule'; } catch(_) {}
-    window.loadPage(lastPage);
+    var route = readPageRoute();
+    window.loadPage(route ? route.page : lastPage, { route: route, replace: true });
   }
 
   // Connect SSE for real-time updates
@@ -1284,6 +1499,9 @@ window.addEventListener('hashchange', function () {
   var hash = window.location.hash;
   if (hash.indexOf('#reset-password') === 0 || hash.indexOf('#register') === 0) {
     handleHashRoute();
+  } else if (state.user && document.getElementById('main-app').style.display !== 'none') {
+    var route = readPageRoute();
+    if (route) window.loadPage(route.page, { route: route, history: false });
   }
 });
 
@@ -1343,16 +1561,36 @@ document.addEventListener('DOMContentLoaded', () => {
       sidebar.classList.add('sidebar-open');
       overlay.classList.add('sidebar-overlay-visible');
       document.body.style.overflow = 'hidden';
+      hamburger.setAttribute('aria-expanded', 'true');
+      document.getElementById('main-content').inert = true;
+      if (closeBtn) closeBtn.focus();
     }
     function closeSidebar() {
       sidebar.classList.remove('sidebar-open');
       overlay.classList.remove('sidebar-overlay-visible');
       document.body.style.overflow = '';
+      hamburger.setAttribute('aria-expanded', 'false');
+      document.getElementById('main-content').inert = false;
+      hamburger.focus();
     }
 
     hamburger.addEventListener('click', openSidebar);
     overlay.addEventListener('click', closeSidebar);
     if (closeBtn) closeBtn.addEventListener('click', closeSidebar);
+    hamburger.setAttribute('aria-controls', 'sidebar');
+    hamburger.setAttribute('aria-expanded', 'false');
+    sidebar.addEventListener('keydown', function (event) {
+      if (!sidebar.classList.contains('sidebar-open')) return;
+      if (event.key === 'Escape') { event.preventDefault(); closeSidebar(); return; }
+      if (event.key !== 'Tab') return;
+      var controls = Array.from(sidebar.querySelectorAll('a[href], button, [tabindex="0"]')).filter(function (el) { return el.getClientRects().length && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden'; });
+      var first = controls[0], last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    });
+    window.matchMedia('(min-width: 769px)').addEventListener('change', function (event) {
+      if (event.matches && sidebar.classList.contains('sidebar-open')) closeSidebar();
+    });
 
     // Auto-close sidebar when a nav item is clicked on mobile
     document.querySelectorAll('.nav-item').forEach(function(item) {

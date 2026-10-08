@@ -6,6 +6,7 @@ window.loadSchedule = async function loadSchedule() {
   if (!state.scheduleWeekStart) {
     state.scheduleWeekStart = getMonday(new Date());
   }
+  if (state.currentPage === 'schedule') window.syncPageUrl(true);
 
   var isMonth = state.scheduleView === 'month';
   var days;
@@ -34,6 +35,13 @@ window.loadSchedule = async function loadSchedule() {
   /* Update today button label */
   var todayBtn = document.getElementById('schedule-today');
   if (todayBtn) todayBtn.textContent = isMonth ? t('schedule.this_month') : t('schedule.this_week');
+  ['prev', 'next'].forEach(function (direction) {
+    var button = document.getElementById('schedule-' + direction);
+    if (!button) return;
+    var key = 'common.' + (direction === 'prev' ? 'previous_' : 'next_') + (isMonth ? 'month' : 'week');
+    button.dataset.i18nAriaLabel = key;
+    button.setAttribute('aria-label', t(key));
+  });
 
   /* Single aggregated request with SWR caching.
      Returns cached data instantly on view/page switches;
@@ -64,6 +72,7 @@ window.loadSchedule = async function loadSchedule() {
     if (state.currentPage === 'schedule') scheduleLoadSchedule({ immediate: true });
     return;
   }
+  var changedView = _renderedScheduleKey !== viewKey;
   _renderedScheduleKey = viewKey;
 
   var resources = schedData.resources;
@@ -132,6 +141,12 @@ window.loadSchedule = async function loadSchedule() {
     } else {
       grid.scrollTop = prevScrollTop;
       grid.scrollLeft = prevScrollLeft;
+      if (window.innerWidth <= 768 && (changedView || grid._mobileTodayView !== viewKey)) {
+        var today = grid.querySelector('.schedule-table th.today');
+        var firstColumn = grid.querySelector('.schedule-table th:first-child');
+        grid.scrollLeft = today && firstColumn ? Math.max(0, today.offsetLeft - firstColumn.offsetWidth) : 0;
+        grid._mobileTodayView = viewKey;
+      }
     }
   });
 

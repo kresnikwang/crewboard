@@ -365,7 +365,7 @@ function buildResourceField(resources, prefix, selectedIds) {
       chipsHtml += '<span class="ms-chip" data-id="' + r.id + '">' +
         '<span class="ms-chip-avatar" style="background:' + (r.color || '#3B7DDD') + '">' + esc(r.name.charAt(0)) + '</span>' +
         esc(r.name) +
-        '<span class="ms-chip-remove" data-id="' + r.id + '">&times;</span>' +
+        '<button type="button" class="ms-chip-remove" aria-label="' + escAttr(t('common.remove_item', { name: r.name })) + '" data-id="' + r.id + '">&times;</button>' +
       '</span>';
     }
   });
@@ -474,9 +474,9 @@ function initMultiSelect(prefix) {
             var avatarEl = opt.querySelector('.ms-option-avatar');
             var bg = avatarEl.style.background;
             var chipHtml = '<span class="ms-chip" data-id="' + rid + '">' +
-              '<span class="ms-chip-avatar" style="background:' + bg + '">' + name.charAt(0) + '</span>' +
-              name +
-              '<span class="ms-chip-remove" data-id="' + rid + '">&times;</span>' +
+              '<span class="ms-chip-avatar" style="background:' + bg + '">' + esc(name.charAt(0)) + '</span>' +
+              esc(name) +
+              '<button type="button" class="ms-chip-remove" aria-label="' + escAttr(t('common.remove_item', { name: name })) + '" data-id="' + rid + '">&times;</button>' +
             '</span>';
             searchInput.insertAdjacentHTML('beforebegin', chipHtml);
           }
@@ -501,9 +501,9 @@ function initMultiSelect(prefix) {
       var avatarEl = opt.querySelector('.ms-option-avatar');
       var bg = avatarEl.style.background;
       var chipHtml = '<span class="ms-chip" data-id="' + rid + '">' +
-        '<span class="ms-chip-avatar" style="background:' + bg + '">' + name.charAt(0) + '</span>' +
-        name +
-        '<span class="ms-chip-remove" data-id="' + rid + '">&times;</span>' +
+        '<span class="ms-chip-avatar" style="background:' + bg + '">' + esc(name.charAt(0)) + '</span>' +
+        esc(name) +
+        '<button type="button" class="ms-chip-remove" aria-label="' + escAttr(t('common.remove_item', { name: name })) + '" data-id="' + rid + '">&times;</button>' +
       '</span>';
       searchInput.insertAdjacentHTML('beforebegin', chipHtml);
     }
@@ -529,10 +529,7 @@ function initMultiSelect(prefix) {
     if (!dropdown.classList.contains('open')) dropdown.classList.add('open');
   });
 
-  /* Close on outside click */
-  document.addEventListener('click', function (e) {
-    if (!picker.contains(e.target)) dropdown.classList.remove('open');
-  });
+  window.initAccessiblePicker(picker, t('schedule.staff_multiselect'), true);
 }
 
 /* Get selected resource IDs from multi-select */
@@ -648,9 +645,9 @@ function buildTimeFields(dateVal, endDateVal, hoursVal, isEdit) {
       modeToggle +
       '<div class="bk-date-row" id="bk-date-range">' +
         '<label>' + t('common.from') + '</label>' +
-        '<input type="date" id="bk-date-start" class="text-input form-control form-control-sm" value="' + dateVal + '" onchange="window._updateBkTotal()">' +
+        '<input type="date" aria-label="' + escAttr(t('common.start_date')) + '" id="bk-date-start" class="text-input form-control form-control-sm" value="' + dateVal + '" onchange="window._updateBkTotal()">' +
         '<label>' + t('common.to') + '</label>' +
-        '<input type="date" id="bk-date-end" class="text-input form-control form-control-sm" value="' + (isEdit ? dateVal : endDateVal) + '" onchange="window._updateBkTotal()">' +
+        '<input type="date" aria-label="' + escAttr(t('common.end_date')) + '" id="bk-date-end" class="text-input form-control form-control-sm" value="' + (isEdit ? dateVal : endDateVal) + '" onchange="window._updateBkTotal()">' +
       '</div>' +
       pickPanel +
       '<div class="bk-total" id="bk-total"></div>' +
@@ -1041,9 +1038,7 @@ function initProjectSelect(selectedProjectId) {
     if (!dropdown.classList.contains('open')) dropdown.classList.add('open');
   });
 
-  document.addEventListener('click', function (e) {
-    if (!picker.contains(e.target)) dropdown.classList.remove('open');
-  });
+  window.initAccessiblePicker(picker, t('schedule.project_client'), false);
 
   if (selectedProjectId) hiddenInput.value = selectedProjectId;
 }

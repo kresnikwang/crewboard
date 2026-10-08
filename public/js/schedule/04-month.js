@@ -258,6 +258,7 @@ document.addEventListener('DOMContentLoaded', function () {
       } else {
         state.scheduleWeekStart = addDays(state.scheduleWeekStart, -7);
       }
+      window.syncPageUrl();
       window.loadSchedule();
     });
   }
@@ -272,6 +273,7 @@ document.addEventListener('DOMContentLoaded', function () {
       } else {
         state.scheduleWeekStart = addDays(state.scheduleWeekStart, 7);
       }
+      window.syncPageUrl();
       window.loadSchedule();
     });
   }
@@ -283,6 +285,7 @@ document.addEventListener('DOMContentLoaded', function () {
       } else {
         state.scheduleWeekStart = getMonday(new Date());
       }
+      window.syncPageUrl();
       window.loadSchedule();
     });
   }
@@ -310,6 +313,7 @@ document.addEventListener('DOMContentLoaded', function () {
       /* Invalidate schedule cache so the new view fetches fresh data
          for its own date range (week vs month have different end dates) */
       if (window.apiCache) window.apiCache.invalidatePrefix('/api/schedule-data');
+      window.syncPageUrl();
       window.loadSchedule();
     });
   }

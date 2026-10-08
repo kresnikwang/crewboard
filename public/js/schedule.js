@@ -185,6 +185,7 @@
     if (!state.scheduleWeekStart) {
       state.scheduleWeekStart = getMonday(new Date());
     }
+    if (state.currentPage === 'schedule') window.syncPageUrl(true);
 
     var isMonth = state.scheduleView === 'month';
     var days;
@@ -213,6 +214,13 @@
     /* Update today button label */
     var todayBtn = document.getElementById('schedule-today');
     if (todayBtn) todayBtn.textContent = isMonth ? t('schedule.this_month') : t('schedule.this_week');
+    ['prev', 'next'].forEach(function (direction) {
+      var button = document.getElementById('schedule-' + direction);
+      if (!button) return;
+      var key = 'common.' + (direction === 'prev' ? 'previous_' : 'next_') + (isMonth ? 'month' : 'week');
+      button.dataset.i18nAriaLabel = key;
+      button.setAttribute('aria-label', t(key));
+    });
 
     /* Single aggregated request with SWR caching.
        Returns cached data instantly on view/page switches;
@@ -243,6 +251,7 @@
       if (state.currentPage === 'schedule') scheduleLoadSchedule({ immediate: true });
       return;
     }
+    var changedView = _renderedScheduleKey !== viewKey;
     _renderedScheduleKey = viewKey;
 
     var resources = schedData.resources;
@@ -311,6 +320,12 @@
       } else {
         grid.scrollTop = prevScrollTop;
         grid.scrollLeft = prevScrollLeft;
+        if (window.innerWidth <= 768 && (changedView || grid._mobileTodayView !== viewKey)) {
+          var today = grid.querySelector('.schedule-table th.today');
+          var firstColumn = grid.querySelector('.schedule-table th:first-child');
+          grid.scrollLeft = today && firstColumn ? Math.max(0, today.offsetLeft - firstColumn.offsetWidth) : 0;
+          grid._mobileTodayView = viewKey;
+        }
       }
     });
 
@@ -1893,6 +1908,7 @@
         } else {
           state.scheduleWeekStart = addDays(state.scheduleWeekStart, -7);
         }
+        window.syncPageUrl();
         window.loadSchedule();
       });
     }
@@ -1907,6 +1923,7 @@
         } else {
           state.scheduleWeekStart = addDays(state.scheduleWeekStart, 7);
         }
+        window.syncPageUrl();
         window.loadSchedule();
       });
     }
@@ -1918,6 +1935,7 @@
         } else {
           state.scheduleWeekStart = getMonday(new Date());
         }
+        window.syncPageUrl();
         window.loadSchedule();
       });
     }
@@ -1945,6 +1963,7 @@
         /* Invalidate schedule cache so the new view fetches fresh data
            for its own date range (week vs month have different end dates) */
         if (window.apiCache) window.apiCache.invalidatePrefix('/api/schedule-data');
+        window.syncPageUrl();
         window.loadSchedule();
       });
     }
@@ -2519,7 +2538,7 @@
         chipsHtml += '<span class="ms-chip" data-id="' + r.id + '">' +
           '<span class="ms-chip-avatar" style="background:' + (r.color || '#3B7DDD') + '">' + esc(r.name.charAt(0)) + '</span>' +
           esc(r.name) +
-          '<span class="ms-chip-remove" data-id="' + r.id + '">&times;</span>' +
+          '<button type="button" class="ms-chip-remove" aria-label="' + escAttr(t('common.remove_item', { name: r.name })) + '" data-id="' + r.id + '">&times;</button>' +
         '</span>';
       }
     });
@@ -2628,9 +2647,9 @@
               var avatarEl = opt.querySelector('.ms-option-avatar');
               var bg = avatarEl.style.background;
               var chipHtml = '<span class="ms-chip" data-id="' + rid + '">' +
-                '<span class="ms-chip-avatar" style="background:' + bg + '">' + name.charAt(0) + '</span>' +
-                name +
-                '<span class="ms-chip-remove" data-id="' + rid + '">&times;</span>' +
+                '<span class="ms-chip-avatar" style="background:' + bg + '">' + esc(name.charAt(0)) + '</span>' +
+                esc(name) +
+                '<button type="button" class="ms-chip-remove" aria-label="' + escAttr(t('common.remove_item', { name: name })) + '" data-id="' + rid + '">&times;</button>' +
               '</span>';
               searchInput.insertAdjacentHTML('beforebegin', chipHtml);
             }
@@ -2655,9 +2674,9 @@
         var avatarEl = opt.querySelector('.ms-option-avatar');
         var bg = avatarEl.style.background;
         var chipHtml = '<span class="ms-chip" data-id="' + rid + '">' +
-          '<span class="ms-chip-avatar" style="background:' + bg + '">' + name.charAt(0) + '</span>' +
-          name +
-          '<span class="ms-chip-remove" data-id="' + rid + '">&times;</span>' +
+          '<span class="ms-chip-avatar" style="background:' + bg + '">' + esc(name.charAt(0)) + '</span>' +
+          esc(name) +
+          '<button type="button" class="ms-chip-remove" aria-label="' + escAttr(t('common.remove_item', { name: name })) + '" data-id="' + rid + '">&times;</button>' +
         '</span>';
         searchInput.insertAdjacentHTML('beforebegin', chipHtml);
       }
@@ -2683,10 +2702,7 @@
       if (!dropdown.classList.contains('open')) dropdown.classList.add('open');
     });
 
-    /* Close on outside click */
-    document.addEventListener('click', function (e) {
-      if (!picker.contains(e.target)) dropdown.classList.remove('open');
-    });
+    window.initAccessiblePicker(picker, t('schedule.staff_multiselect'), true);
   }
 
   /* Get selected resource IDs from multi-select */
@@ -2802,9 +2818,9 @@
         modeToggle +
         '<div class="bk-date-row" id="bk-date-range">' +
           '<label>' + t('common.from') + '</label>' +
-          '<input type="date" id="bk-date-start" class="text-input form-control form-control-sm" value="' + dateVal + '" onchange="window._updateBkTotal()">' +
+          '<input type="date" aria-label="' + escAttr(t('common.start_date')) + '" id="bk-date-start" class="text-input form-control form-control-sm" value="' + dateVal + '" onchange="window._updateBkTotal()">' +
           '<label>' + t('common.to') + '</label>' +
-          '<input type="date" id="bk-date-end" class="text-input form-control form-control-sm" value="' + (isEdit ? dateVal : endDateVal) + '" onchange="window._updateBkTotal()">' +
+          '<input type="date" aria-label="' + escAttr(t('common.end_date')) + '" id="bk-date-end" class="text-input form-control form-control-sm" value="' + (isEdit ? dateVal : endDateVal) + '" onchange="window._updateBkTotal()">' +
         '</div>' +
         pickPanel +
         '<div class="bk-total" id="bk-total"></div>' +
@@ -3195,9 +3211,7 @@
       if (!dropdown.classList.contains('open')) dropdown.classList.add('open');
     });
 
-    document.addEventListener('click', function (e) {
-      if (!picker.contains(e.target)) dropdown.classList.remove('open');
-    });
+    window.initAccessiblePicker(picker, t('schedule.project_client'), false);
 
     if (selectedProjectId) hiddenInput.value = selectedProjectId;
   }
@@ -3431,13 +3445,12 @@
     var totalH = parseFloat(document.getElementById('bk-hours').value) || 0;
 
     var projectId = parseInt(document.getElementById('bk-project').value, 10);
-    if (!projectId) {
-      toast(t('schedule.select_project'), 'error');
-      return;
-    }
-
     var resourceIds = getSelectedResourceIds();
-    if (resourceIds.length === 0) { toast(t('schedule.search_resource'), 'error'); return; }
+    if (!window.validateFields([
+      { id: 'bk-resource-search', valid: resourceIds.length > 0, message: t('schedule.search_resource') },
+      { id: 'bk-project-search', valid: !!projectId, message: t('schedule.select_project') },
+      { id: 'bk-hours', valid: totalH > 0 && Number.isFinite(totalH), message: t('schedule.invalid_hours') }
+    ])) return;
 
     var scopeSelect = document.getElementById('bk-scope');
     var projectScopeId = scopeSelect && scopeSelect.value ? parseInt(scopeSelect.value, 10) : null;

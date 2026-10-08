@@ -14,6 +14,8 @@
   /* ---- current report data cache (for drill-down) ---- */
   var _lastStart = '';
   var _lastEnd   = '';
+  var _reportGeneration = 0;
+  var _chartPromise = null;
 
   // --------------- Helpers ---------------
 
@@ -27,10 +29,10 @@
   }
 
   function utilColor(pct) {
-    if (pct > 90) return '#e74c3c';
-    if (pct > 70) return '#27ae60';
-    if (pct > 40) return '#f39c12';
-    return '#95a5a6';
+    if (pct > 90) return '#B42318';
+    if (pct > 70) return '#15803D';
+    if (pct > 40) return '#995C00';
+    return '#667085';
   }
 
   function pctText(val) {
@@ -46,6 +48,69 @@
   function destroyCharts() {
     if (_utilChart) { try { _utilChart.destroy(); } catch (_) {} _utilChart = null; }
     if (_projChart) { try { _projChart.destroy(); } catch (_) {} _projChart = null; }
+  }
+
+  function ensureChartLibrary() {
+    if (window.Chart) return Promise.resolve();
+    if (_chartPromise) return _chartPromise;
+    _chartPromise = new Promise(function (resolve, reject) {
+      var script = document.createElement('script');
+      var timer = setTimeout(fail, 8000);
+      function fail() {
+        clearTimeout(timer);
+        script.remove();
+        reject(new Error('chart_unavailable'));
+      }
+      script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+      script.onload = function () { clearTimeout(timer); if (window.Chart) resolve(); else fail(); };
+      script.onerror = fail;
+      document.head.appendChild(script);
+    }).catch(function (error) { _chartPromise = null; throw error; });
+    return _chartPromise;
+  }
+
+  function drawReportCharts(draw, generation) {
+    var container = el('report-container');
+    var charts = container.querySelector('.report-charts');
+    if (!charts) return;
+    var oldStatus = container.querySelector('.report-chart-status');
+    if (oldStatus) oldStatus.remove();
+    var status = document.createElement('div');
+    status.className = 'report-chart-status';
+    status.setAttribute('role', 'status');
+    var message = document.createElement('p');
+    message.textContent = t('reports.loading_charts');
+    status.appendChild(message);
+    charts.before(status);
+    charts.style.display = 'none';
+    ensureChartLibrary().then(function () {
+      if (generation !== _reportGeneration) return;
+      charts.style.display = '';
+      status.remove();
+      draw();
+    }).catch(function () {
+      if (generation !== _reportGeneration) return;
+      message.textContent = t('reports.charts_unavailable');
+      var retry = document.createElement('button');
+      retry.type = 'button';
+      retry.className = 'btn btn-outline btn-sm';
+      retry.textContent = t('common.retry');
+      retry.addEventListener('click', function () { drawReportCharts(draw, generation); });
+      status.appendChild(retry);
+    });
+  }
+
+  function beginReport(container) {
+    el('btn-gen-report').disabled = true;
+    container.setAttribute('aria-busy', 'true');
+    container.innerHTML = '<p class="report-loading" role="status">' + t('common.loading') + '</p>';
+    return ++_reportGeneration;
+  }
+
+  function finishReport(generation) {
+    if (generation !== _reportGeneration) return;
+    el('btn-gen-report').disabled = false;
+    el('report-container').removeAttribute('aria-busy');
   }
 
   // --------------- Quick Date Presets ---------------
@@ -126,10 +191,11 @@
 
   function renderUtilizationReport(start, end) {
     var container = el('report-container');
-    container.innerHTML = '<p class="report-loading">' + t('common.loading') + '</p>';
+    var generation = beginReport(container);
 
     api('/api/reports/utilization?start=' + encodeURIComponent(start) + '&end=' + encodeURIComponent(end))
       .then(function (data) {
+        if (generation !== _reportGeneration) return;
         var summary = data.summary || {};
         var rows = data.rows || data.data || [];
 
@@ -195,14 +261,15 @@
         });
 
         /* ---- Draw charts after DOM is ready ---- */
-        requestAnimationFrame(function () {
+        drawReportCharts(function () {
           drawUtilBarChart(rows);
           drawUtilPieChart(summary);
-        });
+        }, generation);
       })
       .catch(function (err) {
-        el('report-container').innerHTML = '<p class="error">' + t('common.load_failed') + '：' + esc(err.message) + '</p>';
-      });
+        if (generation !== _reportGeneration) return;
+        el('report-container').innerHTML = '<p class="error" role="alert">' + t('common.load_failed') + '：' + esc(err.message) + '</p>';
+      }).finally(function () { finishReport(generation); });
   }
 
   /* ---- Drill-down: resource -> projects ---- */
@@ -310,10 +377,11 @@
 
   function renderProjectReport(start, end) {
     var container = el('report-container');
-    container.innerHTML = '<p class="report-loading">' + t('common.loading') + '</p>';
+    var generation = beginReport(container);
 
     api('/api/reports/projects?start=' + encodeURIComponent(start) + '&end=' + encodeURIComponent(end))
       .then(function (data) {
+        if (generation !== _reportGeneration) return;
         var summary = data.summary || {};
         var rows = data.rows || [];
 
@@ -387,14 +455,15 @@
         });
 
         /* ---- Draw charts ---- */
-        requestAnimationFrame(function () {
+        drawReportCharts(function () {
           drawProjectBudgetChart(rows);
           drawProjectCompareChart(rows);
-        });
+        }, generation);
       })
       .catch(function (err) {
-        el('report-container').innerHTML = '<p class="error">' + t('common.load_failed') + '：' + esc(err.message) + '</p>';
-      });
+        if (generation !== _reportGeneration) return;
+        el('report-container').innerHTML = '<p class="error" role="alert">' + t('common.load_failed') + '：' + esc(err.message) + '</p>';
+      }).finally(function () { finishReport(generation); });
   }
 
   function toggleProjectDrill(row, projectId, start, end) {
@@ -527,7 +596,11 @@
     var type  = el('report-type').value;
     var start = el('report-start').value;
     var end   = el('report-end').value;
-    if (!start || !end) { toast(t('reports.select_range'), 'error'); return; }
+    if (!window.validateFields([
+      { id: 'report-start', valid: !!start, message: t('reports.select_range') },
+      { id: 'report-end', valid: !!end && (!start || end >= start), message: start && end && end < start ? t('reports.invalid_range') : t('reports.select_range') }
+    ])) return;
+    if (state.currentPage === 'reports') window.syncPageUrl();
     _lastStart = start;
     _lastEnd   = end;
     if (type === 'utilization') {
@@ -572,15 +645,8 @@
       endInput.value = fmt(new Date(now2.getFullYear(), now2.getMonth() + 1, 0));
     }
 
-    /* Ensure Chart.js is loaded */
-    if (!window.Chart) {
-      var script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
-      script.onload = function () { generateReport(); };
-      document.head.appendChild(script);
-    } else {
-      generateReport();
-    }
+    // Data does not depend on the optional chart library.
+    generateReport();
   };
 
   // --------------- Event Listeners ---------------

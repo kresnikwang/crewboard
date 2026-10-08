@@ -9,7 +9,7 @@
   text-align: center; letter-spacing: .5px;
   box-shadow: 0 1px 0 rgba(255,255,255,.80), 0 8px 18px rgba(30,58,110,.04);
 }
-.schedule-table th:first-child { text-align: left; padding-left: 16px; width: 180px; min-width: 180px; position: sticky; left: 0; z-index: 11; }
+.schedule-table th:first-child { text-align: left; padding-left: 16px; width: 180px; min-width: 180px; position: sticky; left: 0; z-index: 11; background: var(--surface); }
 .schedule-table th.today { color: var(--primary); }
 .schedule-table th.today::after {
   content: ''; position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%);
@@ -50,7 +50,7 @@
 .booking-cell.drag-end,
 .m-day-cell.drag-end { border-top-right-radius: 4px; border-bottom-right-radius: 4px; }
 .booking-block {
-  padding: 4px 6px 4px 8px; border-radius: 5px; font-size: 11px; margin-bottom: 2px;
+  padding: 4px 6px 4px 8px; border-radius: 5px; font-size: 12px; margin-bottom: 2px;
   cursor: grab; transition: opacity .15s var(--ease-out), filter .15s var(--ease-out), box-shadow .15s var(--ease-out), transform .1s var(--ease-out); line-height: 1.3; white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis; position: relative;
   height: 24px; box-sizing: border-box; color: #374151;
@@ -96,7 +96,7 @@
 .booking-block .booking-hours { font-weight: 600; color: #374151; }
 .booking-block .booking-project { color: #374151; }
 .booking-block.moving { opacity: 0.4; cursor: grabbing; transform: scale(0.96); }
-.booking-block.tentative { opacity: .5; border: 1.5px dashed; }
+.booking-block.tentative { opacity: 1; border: 1.5px dashed; }
 /* Resize handles — 默认不可见且不接收鼠标事件，hover 时激活 */
 .booking-block .resize-handle {
   position: absolute; right: -2px; top: 0; bottom: 0; width: 10px; cursor: ew-resize; opacity: 0;

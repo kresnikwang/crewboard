@@ -127,22 +127,22 @@
             <h1 data-i18n="auth.login_title">欢迎回来</h1>
             <p data-i18n="auth.login_desc">登录您的账号以继续使用神马排班</p>
           </div>
-          <div class="auth-form active" id="form-login">
+          <form class="auth-form active" id="form-login" novalidate>
             <div class="form-group mb-3">
               <label class="form-label" for="login-account" data-i18n="auth.login_id_label">手机号 / 邮箱</label>
               <div class="input-with-icon">
                 <svg class="input-icon" width="18" height="18" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="7" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M3 18c0-3.3 2.7-6 7-6s7 2.7 7 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-                <input type="text" id="login-account" class="text-input form-control" data-i18n-placeholder="auth.login_id_placeholder" placeholder="请输入手机号或邮箱">
+                <input type="text" id="login-account" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" class="text-input form-control" data-i18n-placeholder="auth.login_id_placeholder" placeholder="请输入手机号或邮箱">
               </div>
             </div>
             <div class="form-group mb-3">
               <label class="form-label" for="login-password" data-i18n="auth.login_pwd_label">密码</label>
               <div class="input-with-icon">
                 <svg class="input-icon" width="18" height="18" viewBox="0 0 20 20" fill="none"><rect x="4" y="9" width="12" height="9" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M7 9V6a3 3 0 016 0v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-                <input type="password" id="login-password" class="text-input form-control" data-i18n-placeholder="auth.login_pwd_placeholder" placeholder="请输入密码">
+                <input type="password" id="login-password" name="password" autocomplete="current-password" class="text-input form-control" data-i18n-placeholder="auth.login_pwd_placeholder" placeholder="请输入密码">
               </div>
             </div>
-            <button class="btn btn-primary btn-block w-100 d-flex justify-content-center" id="btn-login" data-i18n="auth.login_btn">登录</button>
+            <button class="btn btn-primary btn-block w-100 d-flex justify-content-center" id="btn-login" type="submit" data-i18n="auth.login_btn">登录</button>
             <div style="text-align:center;margin-top:8px;">
               <a href="#" id="link-forgot-password" style="font-size:13px;color:var(--text-secondary);text-decoration:none;" data-i18n="auth.forgot_password">忘记密码？</a>
             </div>
@@ -150,8 +150,8 @@
               <svg width="14" height="14" viewBox="0 0 20 20" fill="none" style="vertical-align:-2px;margin-right:4px"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 9v5M10 6.5v.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
               <span data-i18n="auth.login_demo">演示账号: admin@company.com / admin123</span>
             </div>
-          </div>
-          <div class="auth-error" id="auth-error-login"></div>
+          </form>
+          <div class="auth-error" id="auth-error-login" role="alert" tabindex="-1"></div>
           <div class="auth-switch">
             <span data-i18n="auth.no_account">还没有账号？</span><a href="#" id="link-to-register" data-i18n="auth.register_link">立即注册</a>
           </div>
@@ -294,6 +294,7 @@
 
   <!-- MAIN APP -->
   <div class="app" id="main-app" style="display:none">
+    <a class="skip-link" href="#main-content" data-i18n="common.skip_content">跳到主要内容</a>
     <!-- Mobile top bar (hamburger) -->
     <div class="mobile-topbar" id="mobile-topbar">
       <button class="hamburger-btn" id="hamburger-btn" aria-label="Open menu" data-i18n-aria-label="common.open_menu">
@@ -314,30 +315,30 @@
         </button>
       </div>
       <ul class="nav-menu">
-        <li class="nav-item active" data-page="schedule">
+        <li><a class="nav-item active" data-page="schedule" href="#schedule">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="3" width="16" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M2 7h16M6 1v4M14 1v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           <span data-i18n="nav.schedule">资源排程</span>
-        </li>
-        <li class="nav-item" data-page="timesheets">
+        </a></li>
+        <li><a class="nav-item" data-page="timesheets" href="#timesheets">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           <span data-i18n="nav.timesheets">工时表</span>
-        </li>
-        <li class="nav-item" data-page="reports">
+        </a></li>
+        <li><a class="nav-item" data-page="reports" href="#reports">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 17V9h3v8H3zM8.5 17V5h3v12h-3zM14 17V2h3v15h-3z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           <span data-i18n="nav.reports">报表</span>
-        </li>
-        <li class="nav-item" data-page="resources">
+        </a></li>
+        <li><a class="nav-item" data-page="resources" href="#resources">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="7" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M3 18c0-3.3 2.7-6 7-6s7 2.7 7 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           <span data-i18n="nav.resources">人员管理</span>
-        </li>
-        <li class="nav-item" data-page="projects">
+        </a></li>
+        <li><a class="nav-item" data-page="projects" href="#projects">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M2 5a2 2 0 012-2h4l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V5z" stroke="currentColor" stroke-width="1.5"/></svg>
           <span data-i18n="nav.projects">客户 & 项目</span>
-        </li>
-        <li class="nav-item" data-page="enterprise">
+        </a></li>
+        <li><a class="nav-item" data-page="enterprise" href="#enterprise">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="4" width="16" height="13" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M7 4V2h6v2M10 9v4M8 11h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           <span data-i18n="nav.enterprise">企业管理</span>
-        </li>
+        </a></li>
 
       </ul>
       <div class="lang-switch" id="lang-toggle">
@@ -346,7 +347,7 @@
       </div>
       <div class="sidebar-footer">
         <div class="sidebar-user-menu" id="sidebar-user-menu">
-          <div class="user-info" id="user-info" title="账号管理" data-i18n-title="nav.account"></div>
+          <div class="user-info" id="user-info" role="button" tabindex="0" aria-expanded="false" aria-controls="sidebar-dropdown" title="账号管理" data-i18n-title="nav.account"></div>
           <div class="sidebar-dropdown" id="sidebar-dropdown">
             <button class="sidebar-dropdown-item" id="btn-account" data-i18n="nav.account">
               <svg width="16" height="16" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="7" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M3 18c0-3.3 2.7-6 7-6s7 2.7 7 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
@@ -361,7 +362,7 @@
       </div>
     </nav>
 
-    <main class="main-content">
+    <main class="main-content" id="main-content" tabindex="-1">
       <!-- Schedule Page -->
       <div class="page" id="page-schedule">
         <div class="page-header">
@@ -371,9 +372,9 @@
               <button class="view-btn btn btn-outline active" data-view="week" data-i18n="schedule.week_view">周视图</button>
               <button class="view-btn btn btn-outline" data-view="month" data-i18n="schedule.month_view">月视图</button>
             </div>
-            <button class="btn btn-outline" id="schedule-prev"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+            <button class="btn btn-outline" id="schedule-prev" aria-label="上一周" data-i18n-aria-label="common.previous_week"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
             <button class="btn btn-outline" id="schedule-today" data-i18n="schedule.this_week">本周</button>
-            <button class="btn btn-outline" id="schedule-next"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+            <button class="btn btn-outline" id="schedule-next" aria-label="下一周" data-i18n-aria-label="common.next_week"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
             <span class="date-range" id="schedule-range"></span>
             <button class="btn btn-primary" id="btn-add-booking" data-i18n="schedule.new_booking">+ 新建预订</button>
           </div>
@@ -386,11 +387,11 @@
         <div class="page-header">
           <h1 data-i18n="timesheets.title">工时表</h1>
           <div class="header-actions">
-            <button class="btn btn-outline" id="ts-prev"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+            <button class="btn btn-outline" id="ts-prev" aria-label="上一周" data-i18n-aria-label="common.previous_week"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
             <button class="btn btn-outline" id="ts-today" data-i18n="timesheets.this_week">本周</button>
-            <button class="btn btn-outline" id="ts-next"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+            <button class="btn btn-outline" id="ts-next" aria-label="下一周" data-i18n-aria-label="common.next_week"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
             <span class="date-range" id="ts-range"></span>
-            <select id="ts-resource-select" class="select-input form-select form-select-sm"></select>
+            <select id="ts-resource-select" aria-label="人员" data-i18n-aria-label="schedule.resource" class="select-input form-select form-select-sm"></select>
             <button class="btn btn-outline" id="ts-copy-from-schedule" title="将本周排程工时复制到工时表" data-i18n-title="timesheets.copy_tooltip">
               <svg width="15" height="15" viewBox="0 0 20 20" fill="none" style="margin-right:4px;vertical-align:-2px"><rect x="3" y="3" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M7 7h10v10H7z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
               <span data-i18n="timesheets.copy_from_schedule">从排程复制</span>
@@ -405,7 +406,7 @@
         <div class="page-header">
           <h1 data-i18n="reports.title">报表</h1>
           <div class="header-actions">
-            <select id="report-type" class="select-input form-select form-select-sm">
+            <select id="report-type" aria-label="报表类型" data-i18n-aria-label="reports.type" class="select-input form-select form-select-sm">
               <option value="utilization" data-i18n="reports.utilization">利用率报表</option>
               <option value="projects" data-i18n="reports.project_report">项目报表</option>
             </select>
@@ -417,9 +418,9 @@
               <button class="btn btn-sm btn-ghost" data-preset="this_quarter" data-i18n="reports.this_quarter">本季度</button>
               <button class="btn btn-sm btn-ghost" data-preset="this_year" data-i18n="reports.this_year">今年</button>
             </div>
-            <input type="date" id="report-start" class="date-input form-control form-control-sm">
+            <input type="date" id="report-start" aria-label="开始日期" data-i18n-aria-label="common.start_date" class="date-input form-control form-control-sm">
             <span data-i18n="common.to">至</span>
-            <input type="date" id="report-end" class="date-input form-control form-control-sm">
+            <input type="date" id="report-end" aria-label="结束日期" data-i18n-aria-label="common.end_date" class="date-input form-control form-control-sm">
             <button class="btn btn-primary" id="btn-gen-report" data-i18n="reports.generate">生成报表</button>
             <button class="btn btn-outline" id="btn-export-excel" data-i18n="reports.export_excel">导出 Excel</button>
           </div>
