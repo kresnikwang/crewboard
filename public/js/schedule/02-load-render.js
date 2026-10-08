@@ -22,6 +22,8 @@ window.loadSchedule = async function loadSchedule() {
 
   var startStr = fmt(days[0]);
   var endStr   = fmt(days[days.length - 1]);
+  var viewKey = scheduleViewKey();
+  ++_scheduleRenderGeneration;
 
   /* Update range label */
   var rangeEl = document.getElementById('schedule-range');
@@ -56,6 +58,13 @@ window.loadSchedule = async function loadSchedule() {
     loadSchedule._isLoading = false;
     return;
   }
+
+  if (viewKey !== scheduleViewKey() || state.currentPage !== 'schedule') {
+    loadSchedule._isLoading = false;
+    if (state.currentPage === 'schedule') scheduleLoadSchedule({ immediate: true });
+    return;
+  }
+  _renderedScheduleKey = viewKey;
 
   var resources = schedData.resources;
   var bookings  = schedData.bookings;
@@ -169,21 +178,35 @@ window.refreshScheduleRows = async function refreshScheduleRows(resourceIds) {
   var endStr = fmt(days[days.length - 1]);
   var url = '/api/schedule-data?start=' + startStr + '&end=' + endStr;
 
-  var schedData = await api(url);
-  // Keep SWR cache warm with fresh data
-  if (window.apiCache && window.apiCache._set) {
-    /* optional */
+  var viewKey = scheduleViewKey();
+  var generation = _scheduleRenderGeneration;
+  if (_renderedScheduleKey !== viewKey || window.loadSchedule._isLoading) {
+    scheduleLoadSchedule({ immediate: true });
+    return;
   }
-
-  var resources = schedData.resources;
-  var bookings = schedData.bookings;
-  var leave = schedData.leave;
-  var holidays = schedData.holidays || {};
-
+  var uniq = Object.create(null);
+  resourceIds.forEach(function (id) { uniq[Number(id)] = true; });
+  var rids = Object.keys(uniq).map(Number);
+  if (rids.length > 500) { scheduleLoadSchedule({ immediate: true }); return; }
+  var partial = await api(url + '&resource_ids=' + rids.join(','));
+  // A full render, navigation, or account switch may have happened while awaiting.
+  if (viewKey !== scheduleViewKey() || generation !== _scheduleRenderGeneration || state.currentPage !== 'schedule') {
+    if (state.currentPage === 'schedule') scheduleLoadSchedule({ immediate: true });
+    return;
+  }
+  function keepOtherRows(row) { return !uniq[row.resource_id]; }
+  var bookings = _allBookings.filter(keepOtherRows).concat(partial.bookings);
+  var leave = _allLeave.filter(keepOtherRows).concat(partial.leave);
+  var resources = (state.resources || []).map(function (row) {
+    return partial.resources.find(function (fresh) { return fresh.id === row.id; }) || row;
+  });
+  var holidays = partial.holidays || {};
   state.resources = resources;
   _allBookings = bookings;
   _allLeave = leave;
   rebuildBookingIndex(bookings);
+  // The cache contains a complete view, never just the refreshed subset.
+  if (window.apiCache) window.apiCache.set(url, { resources: resources, bookings: bookings, leave: leave, holidays: holidays });
 
   var bMap = {};
   bookings.forEach(function (b) {
@@ -196,13 +219,9 @@ window.refreshScheduleRows = async function refreshScheduleRows(resourceIds) {
     lMap[l.resource_id + '_' + l.date] = l;
   });
 
-  var uniq = {};
-  resourceIds.forEach(function (id) { uniq[id] = true; });
-  var rids = Object.keys(uniq).map(Number);
-
   var missing = false;
   rids.forEach(function (rid) {
-    var r = resources.find(function (x) { return x.id === rid; });
+    var r = partial.resources.find(function (x) { return x.id === rid; });
     if (!r) {
       missing = true;
       return;
@@ -224,7 +243,8 @@ window.refreshScheduleRows = async function refreshScheduleRows(resourceIds) {
   });
 
   if (missing) {
-    // Row not in DOM (filtered out / view changed) — full reload
+    // Missing/new/inactive rows require a fresh complete resource list.
+    if (window.apiCache) window.apiCache.invalidate(url);
     scheduleLoadSchedule({ immediate: true });
   }
 };

@@ -71,6 +71,15 @@ pm2 status
 
 PM2 的保存列表是服务器状态，不是 Git 文件。修改或修复 PM2 进程列表后，只有在检查完所有进程都正确时才执行 `pm2 save`，避免把过期任务一并持久化。
 
+## Nginx 压缩与实时推送配置
+
+仓库 `nginx.conf` 是站点配置参考，由服务器面板维护的实际配置不会被 `deploy.sh` 自动替换。应用更新可正常发布，Nginx 调整需要另行合并到该站点配置并执行 `nginx -t`，成功后 reload。
+
+- 普通 JSON/JS/CSS 已启用 gzip，参考配置补充 `gzip_comp_level 5`、`gzip_vary on`、`gzip_proxied any`。使用带 `Accept-Encoding: gzip` 的请求检查 `Content-Encoding` 和 `Vary`。
+- `/api/sse` 使用独立 location，关闭压缩、缓冲和代理缓存，读取超时 1 小时；Node 每 30 秒发心跳。其他请求仍按普通代理处理。
+- JS/CSS 保留 ETag 协商缓存。当前资源文件名可变，仅有查询参数版本号，尚不使用 `immutable` 长期缓存；升级为内容哈希文件名后再调整。
+- 排班聚合接口支持可选 `resource_ids=1,2`，局部查询仍受企业隔离约束；日期范围最多 366 天，人员列表最多 500 个 ID。
+
 ## 回滚思路
 
 1. 先保留当前数据库备份和 PM2 日志。

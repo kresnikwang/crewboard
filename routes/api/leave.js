@@ -49,7 +49,7 @@ router.post('/leave', (req, res) => {
     entityId: result.lastInsertRowid,
     details: { resource_id, date, type: type || 'vacation' },
   });
-  sseBroadcast(entId, 'schedule-change', { action: 'leave-create' }, req.user?.id);
+  sseBroadcast(entId, 'schedule-change', { action: 'leave-create', resource_ids: [+resource_id] }, req.user?.id);
 });
 
 // Batch leave creation for date ranges
@@ -99,7 +99,7 @@ router.post('/leave/batch', (req, res) => {
 
   const count = batchInsert();
   res.json({ ok: true, count });
-  sseBroadcast(req.user?.enterprise_id, 'schedule-change', { action: 'leave-batch' }, req.user?.id);
+  sseBroadcast(req.user?.enterprise_id, 'schedule-change', { action: 'leave-batch', resource_ids: [+resource_id] }, req.user?.id);
 });
 
 // Book public holidays for selected resources and date range (weekdays only)
@@ -148,7 +148,7 @@ router.post('/leave/book-holidays', (req, res) => {
 
   const result = batchInsert();
   res.json({ ok: true, count: result.totalCount, bookedHolidays: result.bookedHolidays });
-  sseBroadcast(req.user?.enterprise_id, 'schedule-change', { action: 'leave-batch' }, req.user?.id);
+  sseBroadcast(req.user?.enterprise_id, 'schedule-change', { action: 'leave-batch', resource_ids: resource_ids.map(Number) }, req.user?.id);
 });
 
 router.put('/leave/:id', (req, res) => {
@@ -187,7 +187,7 @@ router.put('/leave/:id', (req, res) => {
     },
   });
   res.json({ ok: true });
-  sseBroadcast(entId, 'schedule-change', { action: 'leave-update' }, req.user?.id);
+  sseBroadcast(entId, 'schedule-change', { action: 'leave-update', resource_ids: [existing.resource_id] }, req.user?.id);
 });
 
 router.delete('/leave/:id', (req, res) => {
@@ -206,7 +206,7 @@ router.delete('/leave/:id', (req, res) => {
     details: { resource_id: existing.resource_id, date: existing.date, type: existing.type },
   });
   res.json({ ok: true });
-  sseBroadcast(entId, 'schedule-change', { action: 'leave-delete' }, req.user?.id);
+  sseBroadcast(entId, 'schedule-change', { action: 'leave-delete', resource_ids: [existing.resource_id] }, req.user?.id);
 });
 
 };

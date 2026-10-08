@@ -24,23 +24,7 @@
       window.apiCache.invalidatePrefix('/api/schedule-data');
       window.apiCache.invalidatePrefix('/api/bookings');
     }
-    if (window.loadSchedule) window.loadSchedule._isLoading = false;
-
-    var rids = null;
-    if (resourceIds != null) {
-      rids = (Array.isArray(resourceIds) ? resourceIds : [resourceIds])
-        .map(function (x) { return parseInt(x, 10); })
-        .filter(function (x) { return !!x; });
-    }
-
-    if (rids && rids.length && typeof window.refreshScheduleRows === 'function') {
-      window.refreshScheduleRows(rids).catch(function (err) {
-        console.warn('[reloadAfterMutation] partial refresh failed, full reload', err);
-        scheduleLoadSchedule({ immediate: true });
-      });
-      return;
-    }
-    scheduleLoadSchedule({ immediate: true });
+    scheduleLoadSchedule({ immediate: true, resourceIds: resourceIds });
   }
 
   /* ---- cached bookings & leave used by edit lookup ---- */
@@ -117,22 +101,64 @@
    * opts.delay: ms (default 280 for SSE).
    */
   var _loadScheduleTimer = null;
+  var _scheduleRefreshRunning = false;
+  var _pendingFullSchedule = false;
+  var _pendingScheduleRows = Object.create(null);
+  var _renderedScheduleKey = null;
+  var _scheduleRenderGeneration = 0;
+
+  function scheduleViewKey() {
+    if (!state.scheduleWeekStart) return null;
+    var start = state.scheduleWeekStart;
+    var count = state.scheduleView === 'month' ? MONTH_WEEKS * 7 : 7;
+    var user = state.user || {};
+    return [user.id, user.enterprise_id, state.scheduleView, fmt(start), fmt(addDays(start, count - 1))].join(':');
+  }
+
   function scheduleLoadSchedule(opts) {
     opts = opts || {};
-    var delay = opts.delay != null ? opts.delay : 280;
-    if (opts.immediate) {
-      if (_loadScheduleTimer) {
-        clearTimeout(_loadScheduleTimer);
-        _loadScheduleTimer = null;
-      }
-      if (typeof window.loadSchedule === 'function') window.loadSchedule();
+    var ids = opts.resourceIds == null ? [] : (Array.isArray(opts.resourceIds) ? opts.resourceIds : [opts.resourceIds]);
+    ids = ids.map(Number).filter(function (id) { return Number.isSafeInteger(id) && id > 0; });
+    if (ids.length) ids.forEach(function (id) { _pendingScheduleRows[id] = true; });
+    else _pendingFullSchedule = true;
+    if (_loadScheduleTimer) clearTimeout(_loadScheduleTimer);
+    _loadScheduleTimer = setTimeout(runScheduledRefresh, opts.immediate ? 0 : (opts.delay != null ? opts.delay : 280));
+  }
+
+  async function runScheduledRefresh() {
+    _loadScheduleTimer = null;
+    if (state.currentPage !== 'schedule') {
+      _pendingFullSchedule = false;
+      _pendingScheduleRows = Object.create(null);
       return;
     }
-    if (_loadScheduleTimer) clearTimeout(_loadScheduleTimer);
-    _loadScheduleTimer = setTimeout(function () {
-      _loadScheduleTimer = null;
-      if (typeof window.loadSchedule === 'function') window.loadSchedule();
-    }, delay);
+    // Retain queued IDs while a refresh is running, including events received
+    // after its request started. Never let two partial responses overwrite each other.
+    if (_scheduleRefreshRunning || window.loadSchedule._isLoading) {
+      _loadScheduleTimer = setTimeout(runScheduledRefresh, 60);
+      return;
+    }
+    var ids = Object.keys(_pendingScheduleRows).map(Number);
+    var full = _pendingFullSchedule || !ids.length;
+    _pendingFullSchedule = false;
+    _pendingScheduleRows = Object.create(null);
+    _scheduleRefreshRunning = true;
+    try {
+      if (full) {
+        // A preceding partial request may have warmed a snapshot after a global
+        // resource/project event invalidated it. Fetch the complete view afresh.
+        if (window.apiCache) window.apiCache.invalidatePrefix('/api/schedule-data');
+        await window.loadSchedule();
+      } else await window.refreshScheduleRows(ids);
+    } catch (err) {
+      console.warn('[schedule] row refresh failed; reload current view', err);
+      if (state.currentPage === 'schedule') _pendingFullSchedule = true;
+    } finally {
+      _scheduleRefreshRunning = false;
+      if ((_pendingFullSchedule || Object.keys(_pendingScheduleRows).length) && !_loadScheduleTimer) {
+        _loadScheduleTimer = setTimeout(runScheduledRefresh, 0);
+      }
+    }
   }
   window.scheduleLoadSchedule = scheduleLoadSchedule;
 
@@ -175,6 +201,8 @@
 
     var startStr = fmt(days[0]);
     var endStr   = fmt(days[days.length - 1]);
+    var viewKey = scheduleViewKey();
+    ++_scheduleRenderGeneration;
 
     /* Update range label */
     var rangeEl = document.getElementById('schedule-range');
@@ -209,6 +237,13 @@
       loadSchedule._isLoading = false;
       return;
     }
+
+    if (viewKey !== scheduleViewKey() || state.currentPage !== 'schedule') {
+      loadSchedule._isLoading = false;
+      if (state.currentPage === 'schedule') scheduleLoadSchedule({ immediate: true });
+      return;
+    }
+    _renderedScheduleKey = viewKey;
 
     var resources = schedData.resources;
     var bookings  = schedData.bookings;
@@ -322,21 +357,35 @@
     var endStr = fmt(days[days.length - 1]);
     var url = '/api/schedule-data?start=' + startStr + '&end=' + endStr;
 
-    var schedData = await api(url);
-    // Keep SWR cache warm with fresh data
-    if (window.apiCache && window.apiCache._set) {
-      /* optional */
+    var viewKey = scheduleViewKey();
+    var generation = _scheduleRenderGeneration;
+    if (_renderedScheduleKey !== viewKey || window.loadSchedule._isLoading) {
+      scheduleLoadSchedule({ immediate: true });
+      return;
     }
-
-    var resources = schedData.resources;
-    var bookings = schedData.bookings;
-    var leave = schedData.leave;
-    var holidays = schedData.holidays || {};
-
+    var uniq = Object.create(null);
+    resourceIds.forEach(function (id) { uniq[Number(id)] = true; });
+    var rids = Object.keys(uniq).map(Number);
+    if (rids.length > 500) { scheduleLoadSchedule({ immediate: true }); return; }
+    var partial = await api(url + '&resource_ids=' + rids.join(','));
+    // A full render, navigation, or account switch may have happened while awaiting.
+    if (viewKey !== scheduleViewKey() || generation !== _scheduleRenderGeneration || state.currentPage !== 'schedule') {
+      if (state.currentPage === 'schedule') scheduleLoadSchedule({ immediate: true });
+      return;
+    }
+    function keepOtherRows(row) { return !uniq[row.resource_id]; }
+    var bookings = _allBookings.filter(keepOtherRows).concat(partial.bookings);
+    var leave = _allLeave.filter(keepOtherRows).concat(partial.leave);
+    var resources = (state.resources || []).map(function (row) {
+      return partial.resources.find(function (fresh) { return fresh.id === row.id; }) || row;
+    });
+    var holidays = partial.holidays || {};
     state.resources = resources;
     _allBookings = bookings;
     _allLeave = leave;
     rebuildBookingIndex(bookings);
+    // The cache contains a complete view, never just the refreshed subset.
+    if (window.apiCache) window.apiCache.set(url, { resources: resources, bookings: bookings, leave: leave, holidays: holidays });
 
     var bMap = {};
     bookings.forEach(function (b) {
@@ -349,13 +398,9 @@
       lMap[l.resource_id + '_' + l.date] = l;
     });
 
-    var uniq = {};
-    resourceIds.forEach(function (id) { uniq[id] = true; });
-    var rids = Object.keys(uniq).map(Number);
-
     var missing = false;
     rids.forEach(function (rid) {
-      var r = resources.find(function (x) { return x.id === rid; });
+      var r = partial.resources.find(function (x) { return x.id === rid; });
       if (!r) {
         missing = true;
         return;
@@ -377,7 +422,8 @@
     });
 
     if (missing) {
-      // Row not in DOM (filtered out / view changed) — full reload
+      // Missing/new/inactive rows require a fresh complete resource list.
+      if (window.apiCache) window.apiCache.invalidate(url);
       scheduleLoadSchedule({ immediate: true });
     }
   };

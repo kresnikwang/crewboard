@@ -1,5 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
+const scrypt = require('util').promisify(crypto.scrypt);
 const fs = require('fs');
 const path = require('path');
 const { sendMail, passwordResetEmail, invitationEmail, APP_URL } = require('../utils/email');
@@ -58,10 +59,23 @@ function enterpriseForUser(db, user) {
 module.exports = function(db) {
   const authLimiter = createRateLimiter({
     windowMs: 15 * 60 * 1000,
-    max: 30,
+    max: 300,
     message: (req) => L(req, 'rate.login_throttled'),
     keyFn: (req) => 'login:' + (req.ip || req.body?.account || 'unknown'),
   });
+  // Known email/phone aliases share the user ID bucket; unknown accounts are normalized.
+  const loginAccountLimiter = createRateLimiter({
+    windowMs: 15 * 60 * 1000,
+    max: 30,
+    message: (req) => L(req, 'rate.login_throttled'),
+    keyFn: (req) => req.loginUser ? 'login-user:' + req.loginUser.id : 'login-account:' + req.loginAccount.toLowerCase(),
+  });
+  const findLoginUser = db.prepare('SELECT * FROM users WHERE phone = ? OR lower(email) = lower(?)');
+  function resolveLoginAccount(req, res, next) {
+    req.loginAccount = typeof req.body.account === 'string' ? req.body.account.trim() : '';
+    req.loginUser = req.loginAccount ? findLoginUser.get(req.loginAccount, req.loginAccount) : null;
+    next();
+  }
   const forgotLimiter = createRateLimiter({
     windowMs: 15 * 60 * 1000,
     max: 10,
@@ -139,27 +153,39 @@ module.exports = function(db) {
     });
   });
 
-  // Login
-  router.post('/login', authLimiter, (req, res) => {
-    const { account, password } = req.body;
-    if (!account || !password) return res.status(400).json({ error: L(req, 'auth.login_missing') });
-
-    const user = db.prepare('SELECT * FROM users WHERE phone = ? OR lower(email) = lower(?)').get(account, account);
-    if (!user) return res.status(401).json({ error: L(req, 'auth.account_not_found') });
-    if (!verifyPassword(password, user.password_hash)) return res.status(401).json({ error: L(req, 'auth.wrong_password') });
-    if (user.status && user.status !== 'active') {
-      return res.status(403).json({ error: L(req, 'common.account_disabled') });
-    }
-
-    const token = uuidv4();
-    const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-    db.prepare('INSERT INTO sessions (token, user_id, expires_at) VALUES (?,?,?)').run(token, user.id, expires);
-
-    res.json({
-      token,
-      user: publicUser(user),
-      enterprise: enterpriseForUser(db, user),
-    });
+  // Express 4 needs explicit rejection forwarding for async handlers.
+  router.post('/login', authLimiter, resolveLoginAccount, loginAccountLimiter, (req, res, next) => {
+    (async () => {
+      const { password } = req.body;
+      const account = req.loginAccount;
+      if (!account || typeof password !== 'string' || !password) {
+        return res.status(400).json({ error: L(req, 'auth.login_missing') });
+      }
+      const initialUser = req.loginUser;
+      if (!initialUser) return res.status(401).json({ error: L(req, 'auth.account_not_found') });
+      const stored = initialUser.password_hash;
+      if (!stored || !stored.includes(':')) return res.status(401).json({ error: L(req, 'auth.wrong_password') });
+      const [salt, hash] = stored.split(':');
+      // Keep the existing hash format/cost; expensive work runs in libuv's pool.
+      const check = await scrypt(password, salt, 64);
+      const expected = Buffer.from(hash, 'hex');
+      if (check.length !== expected.length || !crypto.timingSafeEqual(check, expected)) {
+        return res.status(401).json({ error: L(req, 'auth.wrong_password') });
+      }
+      // Account changes can now interleave with verification. Never issue a
+      // session using a password or account state invalidated while awaiting.
+      const user = findLoginUser.get(account, account);
+      if (!user || user.id !== initialUser.id || user.password_hash !== stored) {
+        return res.status(401).json({ error: L(req, 'auth.wrong_password') });
+      }
+      if (user.status && user.status !== 'active') {
+        return res.status(403).json({ error: L(req, 'common.account_disabled') });
+      }
+      const token = uuidv4();
+      const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      db.prepare('INSERT INTO sessions (token, user_id, expires_at) VALUES (?,?,?)').run(token, user.id, expires);
+      res.json({ token, user: publicUser(user), enterprise: enterpriseForUser(db, user) });
+    })().catch(next);
   });
 
   // Logout

@@ -11,6 +11,19 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const crypto = require('crypto');
+// Deterministically change account state during asynchronous verification.
+let duringLoginVerification = null;
+const originalScrypt = crypto.scrypt;
+crypto.scrypt = function (...args) {
+  const callback = args.pop();
+  originalScrypt(...args, (err, key) => {
+    const hook = duringLoginVerification;
+    duringLoginVerification = null;
+    if (hook) { const injected = hook(); if (injected) err = injected; }
+    callback(err, key);
+  });
+};
 
 const TS = Date.now();
 const TMP_DIR = path.join(__dirname, '.tmp');
@@ -104,6 +117,7 @@ async function main() {
 
   // Boot server after env is set
   const { server, db } = require('../server');
+  crypto.scrypt = originalScrypt;
 
   // wait until listening
   await new Promise((resolve, reject) => {
@@ -326,6 +340,69 @@ async function main() {
     const basicAudit = await request('GET', '/api/audit-logs', null, aBasic.token);
     assert('basic 不能查审计', basicAudit.status === 403, `status=${basicAudit.status}`);
 
+
+    // Filtered schedule reads must retain the tenant boundary for every collection.
+    const schedulePath = '/api/schedule-data?start=2030-01-01&end=2030-03-31';
+    const partial = await request('GET', schedulePath + '&resource_ids=' + aRes.body.id, null, a.token);
+    assert('排班局部读取只返回指定人员', partial.status === 200 && partial.body.resources.length === 1 &&
+      partial.body.resources[0].id === aRes.body.id && partial.body.bookings.length > 0 &&
+      partial.body.bookings.every(x => x.resource_id === aRes.body.id) &&
+      partial.body.leave.every(x => x.resource_id === aRes.body.id));
+    const crossPartial = await request('GET', schedulePath + '&resource_ids=' + bRes.body.id, null, a.token);
+    assert('局部排班不能读取其他企业', crossPartial.status === 200 &&
+      ['resources', 'bookings', 'leave'].every(k => crossPartial.body[k].length === 0));
+    for (const ids of ['', '1,bad', '-1', '1.2', Array(501).fill('1').join(',')]) {
+      const invalid = await request('GET', schedulePath + '&resource_ids=' + ids, null, a.token);
+      assert('拒绝无效/超量排班人员列表 ' + ids.slice(0, 15), invalid.status === 400);
+    }
+    for (const range of ['start=2030-02-30&end=2030-03-01', 'start=2030-03-01&end=2030-02-01',
+      'start=2020-01-01&end=2030-01-01']) {
+      const invalid = await request('GET', '/api/schedule-data?' + range, null, a.token);
+      assert('拒绝无效/过长排班日期范围', invalid.status === 400);
+    }
+
+    const originalB = db.prepare('SELECT * FROM users WHERE id=?').get(b.user.id);
+    const bSessionsBefore = db.prepare('SELECT COUNT(*) AS n FROM sessions WHERE user_id=?').get(b.user.id).n;
+    for (const [change, expected] of [
+      [() => { db.prepare("UPDATE users SET status='disabled' WHERE id=?").run(b.user.id); }, 403],
+      [() => { db.prepare("UPDATE users SET password_hash='changed:hash' WHERE id=?").run(b.user.id); }, 401],
+      [() => { db.prepare("UPDATE users SET email='changed@example.test' WHERE id=?").run(b.user.id); }, 401],
+      [() => new Error('synthetic crypto failure'), 500],
+    ]) {
+      duringLoginVerification = change;
+      const race = await request('POST', '/api/auth/login', { account: b.user.email, password: 'Test1234!' });
+      assert('异步校验期间状态变化/异常不会签发会话 ' + expected, race.status === expected && !race.body.token);
+      duringLoginVerification = null;
+      db.prepare('UPDATE users SET status=?, password_hash=?, email=? WHERE id=?')
+        .run(originalB.status, originalB.password_hash, originalB.email, b.user.id);
+    }
+    assert('失效校验未新增会话', db.prepare('SELECT COUNT(*) AS n FROM sessions WHERE user_id=?').get(b.user.id).n === bSessionsBefore);
+
+    console.log('\n📋 Shared-IP login limits');
+    const sharedIp = await Promise.all(Array.from({ length: 40 }, (_, i) =>
+      request('POST', '/api/auth/login', { account: `unknown-${TS}-${i}@example.test`, password: 'wrong' })));
+    assert('同一 IP 超过 30 次不同账号请求仍可登录校验', sharedIp.every(r => r.status === 401));
+    const unknownAccount = `limit-${TS}@example.test`;
+    for (let i = 0; i < 30; i++) {
+      const r = await request('POST', '/api/auth/login', {
+        account: i % 2 ? '  ' + unknownAccount.toUpperCase() + '  ' : unknownAccount, password: 'wrong',
+      });
+      assert('账号限制前 30 次允许校验 ' + i, r.status === 401);
+    }
+    const accountBlocked = await request('POST', '/api/auth/login', { account: unknownAccount, password: 'wrong' });
+    assert('账号大小写/空白不能绕过限流', accountBlocked.status === 429 && +accountBlocked.headers['retry-after'] > 0);
+    // An existing account's phone and email must share the same bucket.
+    db.prepare('UPDATE users SET phone=? WHERE id=?').run('18800001111', a.user.id);
+    const aliasHits = await Promise.all(Array.from({ length: 31 }, (_, i) =>
+      request('POST', '/api/auth/login', { account: i % 2 ? '18800001111' : a.user.email, password: 'wrong' })));
+    assert('邮箱和手机号共用账号限制', aliasHits.filter(r => r.status === 401).length === 30 &&
+      aliasHits.filter(r => r.status === 429).length === 1);
+    let ipBlocked;
+    for (let i = 0; i < 300; i++) {
+      const r = await request('POST', '/api/auth/login', { account: `ip-limit-${TS}-${i}@example.test`, password: 'wrong' });
+      if (r.status === 429) { ipBlocked = r; break; }
+    }
+    assert('共享 IP 仍有 300 次上限', ipBlocked && +ipBlocked.headers['x-ratelimit-limit'] === 300);
 
     // ── Health ────────────────────────────────────────────────────────
     const health = await request('GET', '/api/health');

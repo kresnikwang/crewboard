@@ -33,32 +33,6 @@ app.set('trust proxy', 1);
 app.use(cors());
 app.use(express.json({ limit: '2mb' }));
 
-// Static files with caching in production
-if (NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, 'public'), {
-    maxAge: 0,        // 不依赖 max-age，改用 ETag 协商缓存
-    etag: true,       // 启用 ETag，文件变化时浏览器会重新请求
-    lastModified: true,
-    setHeaders: (res, filePath) => {
-      if (filePath.endsWith('.html')) {
-        // HTML 文件：完全不缓存，每次必须重新请求
-        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-        res.setHeader('Pragma', 'no-cache');
-        res.setHeader('Expires', '0');
-      } else if (filePath.match(/\.(js|css)$/)) {
-        // JS/CSS：带 ?v=hash 版本号，允许缓存但必须 revalidate
-        // 部署时 deploy.sh 会更新版本号，触发浏览器重新下载
-        res.setHeader('Cache-Control', 'public, no-cache, must-revalidate');
-      } else if (filePath.match(/\.(png|jpg|jpeg|gif|ico|svg|woff2?)$/)) {
-        // 图片/字体：长期缓存（不常变动）
-        res.setHeader('Cache-Control', 'public, max-age=2592000');
-      }
-    }
-  }));
-} else {
-  app.use(express.static(path.join(__dirname, 'public')));
-}
-
 // Auth middleware - attaches req.user if valid token
 app.use('/api', authMiddleware(db));
 
@@ -86,6 +60,34 @@ app.use('/api', apiRoutes(db));
 app.use('/api', (req, res) => {
   res.status(404).json({ error: 'not_found' });
 });
+
+// Handle APIs before static files: express.static performs filesystem work,
+// which would otherwise queue behind concurrent scrypt jobs in libuv's pool.
+// Static files with caching in production
+if (NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, 'public'), {
+    maxAge: 0,        // 不依赖 max-age，改用 ETag 协商缓存
+    etag: true,       // 启用 ETag，文件变化时浏览器会重新请求
+    lastModified: true,
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.html')) {
+        // HTML 文件：完全不缓存，每次必须重新请求
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+      } else if (filePath.match(/\.(js|css)$/)) {
+        // JS/CSS：带 ?v=hash 版本号，允许缓存但必须 revalidate
+        // 部署时 deploy.sh 会更新版本号，触发浏览器重新下载
+        res.setHeader('Cache-Control', 'public, no-cache, must-revalidate');
+      } else if (filePath.match(/\.(png|jpg|jpeg|gif|ico|svg|woff2?)$/)) {
+        // 图片/字体：长期缓存（不常变动）
+        res.setHeader('Cache-Control', 'public, max-age=2592000');
+      }
+    }
+  }));
+} else {
+  app.use(express.static(path.join(__dirname, 'public')));
+}
 
 // Fallback to index.html (no-cache for SPA routing)
 app.get('*', (req, res) => {

@@ -90,6 +90,8 @@ const MESSAGES = {
   'auth.reset_link_invalid': { zh: '链接无效或已过期，请重新申请', en: 'Link is invalid or expired, please request a new one' },
 
   // ---------- bookings ----------
+  'schedule.range_too_large': { zh: '排班查询最多支持 366 天', en: 'Schedule queries support at most 366 days' },
+  'schedule.invalid_resource_ids': { zh: '人员列表必须包含 1 至 500 个有效 ID', en: 'Resource list must contain 1 to 500 valid IDs' },
   'bookings.missing_resource_or_date': { zh: '缺少 resource_id 或 date', en: 'Missing resource_id or date' },
   'bookings.missing_ids': { zh: '缺少 ids', en: 'Missing ids' },
   'bookings.too_many_ids': { zh: '单次最多处理 {max} 条排程', en: 'At most {max} schedules can be processed at once' },

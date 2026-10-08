@@ -380,7 +380,7 @@ module.exports = function register(router, ctx) {
       conflicts: conflictResult.conflicts,
       forced: !!force,
     });
-    sseBroadcast(entId, 'schedule-change', { action: 'create', ids }, req.user?.id);
+    sseBroadcast(entId, 'schedule-change', { action: 'create', ids, resource_ids: [resource.id] }, req.user?.id);
   });
 
   router.put('/bookings/:id', (req, res) => {
@@ -406,14 +406,14 @@ module.exports = function register(router, ctx) {
       db.prepare('UPDATE bookings SET split_after=? WHERE id=?')
         .run(split_after ? 1 : 0, req.params.id);
       res.json({ ok: true });
-      sseBroadcast(entId, 'schedule-change', { action: 'update', id: +req.params.id }, req.user?.id);
+      sseBroadcast(entId, 'schedule-change', { action: 'update', id: +req.params.id, resource_ids: [existing.resource_id] }, req.user?.id);
       return;
     }
     if (typeof split_after !== 'undefined' && hours == null && date == null && !resource_id) {
       db.prepare('UPDATE bookings SET split_after=? WHERE id=?')
         .run(split_after ? 1 : 0, req.params.id);
       res.json({ ok: true });
-      sseBroadcast(entId, 'schedule-change', { action: 'update', id: +req.params.id }, req.user?.id);
+      sseBroadcast(entId, 'schedule-change', { action: 'update', id: +req.params.id, resource_ids: [existing.resource_id] }, req.user?.id);
       return;
     }
 
@@ -422,7 +422,7 @@ module.exports = function register(router, ctx) {
       db.prepare('UPDATE bookings SET split_after=? WHERE id=?')
         .run(split_after ? 1 : 0, req.params.id);
       res.json({ ok: true });
-      sseBroadcast(entId, 'schedule-change', { action: 'update', id: +req.params.id }, req.user?.id);
+      sseBroadcast(entId, 'schedule-change', { action: 'update', id: +req.params.id, resource_ids: [existing.resource_id] }, req.user?.id);
       return;
     }
 
@@ -499,7 +499,7 @@ module.exports = function register(router, ctx) {
     });
 
     res.json({ ok: true, conflicts: conflictResult.conflicts, forced: !!force });
-    sseBroadcast(entId, 'schedule-change', { action: 'update', id: +req.params.id }, req.user?.id);
+    sseBroadcast(entId, 'schedule-change', { action: 'update', id: +req.params.id, resource_ids: [...new Set([existing.resource_id, nextResource.id])] }, req.user?.id);
   });
 
   router.delete('/bookings/:id', (req, res) => {
@@ -539,6 +539,6 @@ module.exports = function register(router, ctx) {
     });
 
     res.json({ ok: true });
-    sseBroadcast(entId, 'schedule-change', { action: 'delete', id: +req.params.id }, req.user?.id);
+    sseBroadcast(entId, 'schedule-change', { action: 'delete', id: +req.params.id, resource_ids: [booking.resource_id] }, req.user?.id);
   });
 };

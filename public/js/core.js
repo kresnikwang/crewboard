@@ -212,26 +212,33 @@ window.apiBookingWithConflictConfirm = async function apiBookingWithConflictConf
     // Dedup: if already fetching this URL, return same promise
     if (_inflight[url]) return _inflight[url];
 
-    _inflight[url] = api(url).then(function (data) {
-      _cache[url] = { data: data, timestamp: Date.now() };
-      delete _inflight[url];
+    var request = api(url).then(function (data) {
+      // Invalidating a request cannot cancel fetch, but it must prevent an old
+      // response from replacing a newer complete/partial schedule snapshot.
+      if (_inflight[url] === request) {
+        _cache[url] = { data: data, timestamp: Date.now() };
+        delete _inflight[url];
+      }
       return data;
     }).catch(function (err) {
-      delete _inflight[url];
+      if (_inflight[url] === request) delete _inflight[url];
       throw err;
     });
-    return _inflight[url];
+    _inflight[url] = request;
+    return request;
   }
 
   function _revalidate(url, onRevalidate) {
     if (_inflight[url]) return; // already revalidating
-    _inflight[url] = api(url).then(function (data) {
+    var request = api(url).then(function (data) {
+      if (_inflight[url] !== request) return;
       _cache[url] = { data: data, timestamp: Date.now() };
       delete _inflight[url];
       if (typeof onRevalidate === 'function') onRevalidate(data);
     }).catch(function () {
-      delete _inflight[url];
+      if (_inflight[url] === request) delete _inflight[url];
     });
+    _inflight[url] = request;
   }
 
   window.apiCache = {
@@ -252,6 +259,7 @@ window.apiBookingWithConflictConfirm = async function apiBookingWithConflictConf
     invalidateAll: function () { _cache = {}; _inflight = {}; },
     /** Manually set cache for a URL (useful after mutation) */
     set: function (url, data) {
+      delete _inflight[url];
       _cache[url] = { data: data, timestamp: Date.now() };
     },
     /** Check if URL is cached and fresh */
@@ -291,9 +299,11 @@ window.apiBookingWithConflictConfirm = async function apiBookingWithConflictConf
 
       // Debounce re-render: multi-user / multi-tenant SSE bursts would otherwise
       // force full schedule DOM rebuilds back-to-back.
+      var change;
+      try { change = JSON.parse(e.data); } catch (_) { change = {}; }
       var page = window.state.currentPage;
       if (page === 'schedule' && typeof window.scheduleLoadSchedule === 'function') {
-        window.scheduleLoadSchedule({ delay: 280 });
+        window.scheduleLoadSchedule({ delay: 280, resourceIds: change.resource_ids });
       } else if (page === 'schedule' && typeof window.loadSchedule === 'function') {
         window.loadSchedule();
       } else if (page === 'timesheets' && typeof window.loadTimesheets === 'function') {
@@ -308,6 +318,8 @@ window.apiBookingWithConflictConfirm = async function apiBookingWithConflictConf
       apiCache.invalidatePrefix('/api/schedule-data');
       if (window.state.currentPage === 'resources' && typeof window.loadResources === 'function') {
         window.loadResources();
+      } else if (window.state.currentPage === 'schedule' && typeof window.scheduleLoadSchedule === 'function') {
+        window.scheduleLoadSchedule({ delay: 280 });
       }
     });
 
@@ -316,6 +328,8 @@ window.apiBookingWithConflictConfirm = async function apiBookingWithConflictConf
       apiCache.invalidatePrefix('/api/schedule-data');
       if (window.state.currentPage === 'projects' && typeof window.loadProjects === 'function') {
         window.loadProjects();
+      } else if (window.state.currentPage === 'schedule' && typeof window.scheduleLoadSchedule === 'function') {
+        window.scheduleLoadSchedule({ delay: 280 });
       }
     });
 

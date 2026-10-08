@@ -23,7 +23,8 @@
     "bundle:schedule": "node scripts/bundle-schedule.js",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:headed": "playwright test --headed"
+    "test:e2e:headed": "playwright test --headed",
+    "benchmark:concurrency": "node scripts/benchmark-concurrency.js"
   },
   "dependencies": {
     "better-sqlite3": "^9.4.3",
