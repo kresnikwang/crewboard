@@ -35,14 +35,14 @@ router.get('/schedule-data', (req, res) => {
 
   /* Resources */
   const resources = db.prepare(`
-    SELECT r.id, r.name, r.email, r.role, r.team, r.color, r.hours_per_day, r.is_active, r.enterprise_id, r.created_at, r.wecom_userid,
+    SELECT r.id, r.name, r.email, r.role, r.team, r.color, r.hours_per_day, r.is_active, r.is_archived, r.enterprise_id, r.created_at, r.wecom_userid,
            COALESCE(NULLIF(r.avatar, ''), u.avatar, '') AS avatar
     FROM resources r
     LEFT JOIN users u
       ON lower(r.email) = lower(u.email)
       AND u.enterprise_id = r.enterprise_id
       AND u.status = 'active'
-    WHERE r.is_active = 1 AND r.enterprise_id = ?${resourceFilter}
+    WHERE r.is_active = 1 AND r.is_archived = 0 AND r.enterprise_id = ?${resourceFilter}
     ORDER BY r.team, r.name
   `).all(entId, ...resourceIds);
 

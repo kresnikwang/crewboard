@@ -38,7 +38,7 @@ router.post('/wecom/sync', async (req, res) => {
     return res.status(400).json({ error: L(req, 'wecom.empty_department'), code: 'empty_department_users' });
   }
 
-  const resources = db.prepare('SELECT id, name, email FROM resources WHERE enterprise_id = ? AND is_active = 1').all(req.user.enterprise_id);
+  const resources = db.prepare('SELECT id, name, email FROM resources WHERE enterprise_id = ? AND is_active = 1 AND is_archived = 0').all(req.user.enterprise_id);
   const matched = [];
   const unmatched = [];
 
@@ -91,7 +91,7 @@ router.post('/wecom/test-message', async (req, res) => {
   const resource = db.prepare(`
     SELECT id, name, email, wecom_userid
     FROM resources
-    WHERE id = ? AND enterprise_id = ? AND is_active = 1
+    WHERE id = ? AND enterprise_id = ? AND is_active = 1 AND is_archived = 0
   `).get(resourceId, req.user.enterprise_id);
 
   if (!resource) {

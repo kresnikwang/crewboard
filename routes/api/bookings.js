@@ -117,6 +117,9 @@ module.exports = function register(router, ctx) {
       if (!canEditBooking(req.user, b)) {
         return res.status(403).json({ error: L(req, 'bookings.only_move_own') });
       }
+      if (authz.getResourceInEnterprise(b.resource_id, entId)?.is_archived) {
+        return res.status(400).json({ error: L(req, 'resources.archived') });
+      }
       bookings.push(b);
     }
 
@@ -286,8 +289,9 @@ module.exports = function register(router, ctx) {
       if (requestedHours === null) return res.status(400).json({ error: L(req, 'bookings.invalid_hours') });
     }
 
-    const resource = db.prepare('SELECT id, name FROM resources WHERE id=? AND enterprise_id=?').get(resource_id, entId);
+    const resource = db.prepare('SELECT id, name, is_archived FROM resources WHERE id=? AND enterprise_id=?').get(resource_id, entId);
     if (!resource) return res.status(400).json({ error: L(req, 'common.resource_not_found') });
+    if (resource.is_archived) return res.status(400).json({ error: L(req, 'resources.archived') });
     const project = db.prepare('SELECT id, name FROM projects WHERE id=? AND enterprise_id=?').get(project_id, entId);
     if (!project) return res.status(400).json({ error: L(req, 'common.project_not_found') });
 
@@ -428,6 +432,7 @@ module.exports = function register(router, ctx) {
 
     const nextResource = authz.getResourceInEnterprise(resource_id, entId);
     if (!nextResource) return res.status(400).json({ error: L(req, 'common.resource_not_found') });
+    if (nextResource.is_archived) return res.status(400).json({ error: L(req, 'resources.archived') });
     const nextProject = authz.getProjectInEnterprise(project_id, entId);
     if (!nextProject) return res.status(400).json({ error: L(req, 'common.project_not_found') });
 

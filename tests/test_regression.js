@@ -245,6 +245,55 @@ async function main() {
     const projR = await request('GET', '/api/reports/projects?start=2031-06-01&end=2031-06-07', null, adminToken);
     assert('项目报表', projR.status === 200 && projR.body.rows, JSON.stringify(projR.body).slice(0, 120));
 
+    // ── Personnel archive / restore ──────────────────────────────────
+    console.log('\n📋 人员存档');
+    const archiveUrl = `/api/resources/${rid}/archive`;
+    const restoreUrl = `/api/resources/${rid}/unarchive`;
+    for (const role of ['manager', 'basic']) {
+      db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, mgrUser.id);
+      assert(`${role} 不可存档人员`, (await request('PATCH', archiveUrl, null, mgrToken)).status === 403);
+      assert(`${role} 不可恢复人员`, (await request('PATCH', restoreUrl, null, mgrToken)).status === 403);
+    }
+    db.prepare('UPDATE users SET role = ? WHERE id = ?').run('manager', mgrUser.id);
+    const foreignEnt = db.prepare("INSERT INTO enterprises (name, code) VALUES ('另一企业', ?)").run(`foreign-${TS}`).lastInsertRowid;
+    const foreignRid = db.prepare("INSERT INTO resources (name, enterprise_id) VALUES ('外部人员', ?)").run(foreignEnt).lastInsertRowid;
+    for (const action of ['archive', 'unarchive']) {
+      assert(`跨企业 ${action} 拒绝`, (await request('PATCH', `/api/resources/${foreignRid}/${action}`, null, adminToken)).status === 404);
+    }
+    assert('管理员存档人员', (await request('PATCH', archiveUrl, null, adminToken)).status === 200);
+    assert('重复存档幂等', (await request('PATCH', archiveUrl, null, adminToken)).status === 200);
+    const activePeople = await request('GET', '/api/resources', null, adminToken);
+    const archivedPeople = await request('GET', '/api/resources?archived=1', null, adminToken);
+    assert('默认列表隐藏存档人员', !activePeople.body.some(r => r.id === rid));
+    assert('存档列表包含原资料且企业隔离', archivedPeople.body.some(r => r.id === rid && r.name === '张三' && r.is_archived === 1) && !archivedPeople.body.some(r => r.id === foreignRid));
+    const archivedSchedule = await request('GET', '/api/schedule-data?start=2031-06-01&end=2031-06-30', null, adminToken);
+    assert('排班人员列表隐藏存档人员', !archivedSchedule.body.resources.some(r => r.id === rid));
+    assert('历史排班与休假保留', archivedSchedule.body.bookings.some(b => b.id === bookingId) && archivedSchedule.body.leave.some(l => l.id === leave.body.id));
+    const archiveBooking = { resource_id: rid, project_id: pid, date: '2031-06-16', hours: 2, force: true };
+    assert('存档后不可新建排班', (await request('POST', '/api/bookings', archiveBooking, adminToken)).status === 400);
+    assert('存档后不可改派排班', (await request('PUT', `/api/bookings/${bookingId}`, archiveBooking, adminToken)).status === 400);
+    assert('存档后不可移动排班', (await request('POST', '/api/bookings/shift', { ids: [bookingId], day_delta: 1, force: true }, adminToken)).status === 400);
+    assert('存档后不可新增休假', (await request('POST', '/api/leave', { resource_id: rid, date: '2031-06-16' }, adminToken)).status === 400);
+    assert('存档后不可批量新增休假', (await request('POST', '/api/leave/batch', { resource_id: rid, start_date: '2031-06-16' }, adminToken)).status === 400);
+    assert('存档后不可预订节假日', (await request('POST', '/api/leave/book-holidays', { resource_ids: [rid], start_date: '2031-06-01', end_date: '2031-06-30' }, adminToken)).status === 400);
+    const archiveReport = await request('GET', '/api/reports/utilization?start=2031-06-01&end=2031-06-30', null, adminToken);
+    assert('历史报表保留存档人员工时', archiveReport.body.rows.some(r => r.id === rid && r.booked_hours > 0 && r.actual_hours > 0));
+    assert('管理员恢复人员', (await request('PATCH', restoreUrl, null, adminToken)).status === 200);
+    assert('重复恢复幂等', (await request('PATCH', restoreUrl, null, adminToken)).status === 200);
+    const restoredPeople = await request('GET', '/api/resources', null, adminToken);
+    assert('恢复后原 ID 重新出现', restoredPeople.body.some(r => r.id === rid && r.is_archived === 0));
+    assert('恢复后可排班', (await request('POST', '/api/bookings', archiveBooking, adminToken)).status === 200);
+    const archiveLogs = db.prepare("SELECT action FROM audit_logs WHERE entity_type = 'resource' AND entity_id = ? AND action IN ('resource.archive', 'resource.unarchive')").all(rid);
+    assert('存档与恢复均审计且重复操作不新增日志', archiveLogs.length === 2);
+    const deletedResource = await request('POST', '/api/resources', { name: '删除测试人员' }, adminToken);
+    const deletedRid = deletedResource.body.id;
+    await request('PATCH', `/api/resources/${deletedRid}/archive`, null, adminToken);
+    await request('DELETE', `/api/resources/${deletedRid}`, null, adminToken);
+    assert('已删除人员不可恢复', (await request('PATCH', `/api/resources/${deletedRid}/unarchive`, null, adminToken)).status === 404);
+    assert('已删除人员不可存档', (await request('PATCH', `/api/resources/${deletedRid}/archive`, null, adminToken)).status === 404);
+    const deletedList = await request('GET', '/api/resources?archived=1', null, adminToken);
+    assert('已删除人员不在存档列表', !deletedList.body.some(r => r.id === deletedRid));
+
     // ── Holidays / health / SSE headers ──────────────────────────────
     console.log('\n📋 其它接口');
     const holidays = await request('GET', '/api/holidays?start=2026-01-01&end=2026-01-10', null, adminToken);

@@ -40,7 +40,7 @@ async function main() {
     const resources = db.prepare(`
       SELECT id, name, wecom_userid 
       FROM resources 
-      WHERE enterprise_id = ? AND is_active = 1 AND wecom_userid != ''
+      WHERE enterprise_id = ? AND is_active = 1 AND is_archived = 0 AND wecom_userid != ''
     `).all(ent.id);
     
     if (resources.length === 0) {

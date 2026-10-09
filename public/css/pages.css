@@ -22,6 +22,15 @@
 .ts-proj-code { font-size: 11px; font-weight: 600; color: var(--text-tertiary); background: var(--bg); padding: 1px 6px; border-radius: 3px; margin-right: 2px; white-space: nowrap; }
 .ts-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
 .table-scroll-hint { color: var(--text-secondary); font-size: 12px; margin: 0 0 10px; display: none; }
+.resource-status-filter { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.resource-status-filter .btn { min-height: 44px; }
+.resource-status-filter .btn[aria-pressed="true"] { color: var(--primary); border-color: var(--primary); background: var(--primary-light); }
+.resource-archive-hint { color: var(--text-secondary); font-size: 13px; line-height: 1.6; margin: 0 0 16px; max-width: 72ch; }
+.resource-lifecycle-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-right: auto; }
+.resource-lifecycle-actions .btn, .res-actions .btn-res-restore { min-height: 44px; }
+.res-actions .btn-res-restore { white-space: nowrap; }
+.res-table .res-actions .btn-icon { width: 44px; height: 44px; flex-shrink: 0; }
+@media (max-width: 575px) { .resource-lifecycle-actions { flex-basis: 100%; } }
 .resource-table-wrap { overflow: auto; border: 1px solid var(--border); border-radius: var(--radius); }
 .res-table { min-width: 960px; margin-bottom: 0; }
 .res-table .res-name { white-space: nowrap; }

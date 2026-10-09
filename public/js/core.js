@@ -314,10 +314,14 @@ window.apiBookingWithConflictConfirm = async function apiBookingWithConflictConf
     });
 
     _es.addEventListener('resource-change', function () {
+      // Pickers prefer state.resources over the API cache; discard both snapshots.
+      state.resources = [];
       apiCache.invalidatePrefix('/api/resources');
       apiCache.invalidatePrefix('/api/schedule-data');
       if (window.state.currentPage === 'resources' && typeof window.loadResources === 'function') {
         window.loadResources();
+      } else if (window.state.currentPage === 'timesheets' && typeof window.loadTimesheets === 'function') {
+        window.loadTimesheets();
       } else if (window.state.currentPage === 'schedule' && typeof window.scheduleLoadSchedule === 'function') {
         window.scheduleLoadSchedule({ delay: 280 });
       }

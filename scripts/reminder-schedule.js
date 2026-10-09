@@ -41,7 +41,7 @@ async function main() {
     const resources = db.prepare(`
       SELECT id, name, wecom_userid, team 
       FROM resources 
-      WHERE enterprise_id = ? AND is_active = 1 AND wecom_userid != '' AND team LIKE '%客户%'
+      WHERE enterprise_id = ? AND is_active = 1 AND is_archived = 0 AND wecom_userid != '' AND team LIKE '%客户%'
     `).all(ent.id);
     
     if (resources.length === 0) {

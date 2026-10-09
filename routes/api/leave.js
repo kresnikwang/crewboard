@@ -28,9 +28,9 @@ router.post('/leave', (req, res) => {
   if (!entId) return res.status(400).json({ error: L(req, 'common.need_enterprise') });
   if (!isManagerOrAdmin(req.user)) return res.status(403).json({ error: L(req, 'leave.register_manager_only') });
   const { resource_id, date, type, notes } = req.body;
-  if (!authz.getResourceInEnterprise(resource_id, entId)) {
-    return res.status(400).json({ error: L(req, 'common.resource_not_found') });
-  }
+  const resource = authz.getResourceInEnterprise(resource_id, entId);
+  if (!resource) return res.status(400).json({ error: L(req, 'common.resource_not_found') });
+  if (resource.is_archived) return res.status(400).json({ error: L(req, 'resources.archived') });
   if (!isYmd(date)) return res.status(400).json({ error: L(req, 'common.invalid_date') });
   // The renderer keeps a single leave entry per resource per day, and a
   // UNIQUE index enforces it. Check up front so a duplicate is a clean 409
@@ -65,9 +65,9 @@ router.post('/leave/batch', (req, res) => {
   if (isBefore(end_date, start_date)) {
     return res.status(400).json({ error: L(req, 'common.end_before_start') });
   }
-  if (!authz.getResourceInEnterprise(resource_id, entId)) {
-    return res.status(400).json({ error: L(req, 'common.resource_not_found') });
-  }
+  const resource = authz.getResourceInEnterprise(resource_id, entId);
+  if (!resource) return res.status(400).json({ error: L(req, 'common.resource_not_found') });
+  if (resource.is_archived) return res.status(400).json({ error: L(req, 'resources.archived') });
 
   const endDate = end_date || start_date;
   const leaveType = type || 'vacation';
@@ -112,9 +112,9 @@ router.post('/leave/book-holidays', (req, res) => {
     return res.status(400).json({ error: L(req, 'common.missing_required_params') });
   }
   for (const rid of resource_ids) {
-    if (!authz.getResourceInEnterprise(rid, entId)) {
-      return res.status(400).json({ error: L(req, 'common.resource_not_found') });
-    }
+    const resource = authz.getResourceInEnterprise(rid, entId);
+    if (!resource) return res.status(400).json({ error: L(req, 'common.resource_not_found') });
+    if (resource.is_archived) return res.status(400).json({ error: L(req, 'resources.archived') });
   }
 
   const insert = db.prepare('INSERT OR IGNORE INTO leave_entries (resource_id, date, type, notes) VALUES (?,?,?,?)');

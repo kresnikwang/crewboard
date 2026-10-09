@@ -434,6 +434,13 @@
 
   // --- manage resources ---
   Object.assign(translations.zh, {
+    'manage.resource_status': '人员状态', 'manage.active_resources': '启用中',
+    'manage.resource_archived_status': '已存档', 'manage.archive_resource': '存档人员',
+    'manage.reactivate_resource': '重新启用', 'manage.no_archived_resources': '暂无已存档人员',
+    'manage.archive_resource_hint': '存档后，人员将从排班和人员选择列表隐藏，历史排班、休假及工时保留。可随时重新启用；关联账号的登录权限不变。',
+    'manage.confirm_archive_resource': '确定存档「{name}」吗？\n\n该人员将从排班和人员选择列表隐藏，现有排班、休假及工时保留，重新启用后可继续使用。关联账号的登录权限不变。',
+    'manage.resource_archived': '人员已存档，可在「已存档」中重新启用',
+    'manage.resource_reactivated': '人员已重新启用',
     'manage.resources_title': '人员管理', 'manage.add_resource': '添加人员',
     'manage.position': '职位', 'manage.hours_day': '工时/天',
     'manage.permissions': '系统权限', 'manage.account_status': '账号状态',
@@ -453,6 +460,13 @@
     'manage.co_managed_projects': '协同管理的项目', 'manage.no_active_projects': '暂无活跃项目'
   });
   Object.assign(translations.en, {
+    'manage.resource_status': 'Resource status', 'manage.active_resources': 'Active',
+    'manage.resource_archived_status': 'Archived', 'manage.archive_resource': 'Archive resource',
+    'manage.reactivate_resource': 'Reactivate', 'manage.no_archived_resources': 'No archived resources',
+    'manage.archive_resource_hint': 'Archived resources are hidden from scheduling and resource pickers. Bookings, leave and timesheets are retained. Reactivate at any time; linked account access stays unchanged.',
+    'manage.confirm_archive_resource': 'Archive "{name}"?\n\nThis resource will be hidden from scheduling and resource pickers. Existing bookings, leave and timesheets are retained and available after reactivation. Linked account access stays unchanged.',
+    'manage.resource_archived': 'Resource archived. Reactivate from the Archived list.',
+    'manage.resource_reactivated': 'Resource reactivated',
     'manage.resources_title': 'Resources', 'manage.add_resource': 'Add Resource',
     'manage.position': 'Position', 'manage.hours_day': 'Hours/Day',
     'manage.permissions': 'Permissions', 'manage.account_status': 'Account Status',
@@ -897,6 +911,8 @@
     'audit.action.leave_delete': '删除休假',
     'audit.action.resource_create': '添加人员',
     'audit.action.resource_update': '更新人员',
+    'audit.action.resource_archive': '存档人员',
+    'audit.action.resource_unarchive': '重新启用人员',
     'audit.action.resource_delete': '删除人员'
   });
   Object.assign(translations.en, {
@@ -914,6 +930,8 @@
     'audit.action.leave_delete': 'Deleted leave',
     'audit.action.resource_create': 'Added resource',
     'audit.action.resource_update': 'Updated resource',
+    'audit.action.resource_archive': 'Archived resource',
+    'audit.action.resource_unarchive': 'Reactivated resource',
     'audit.action.resource_delete': 'Deleted resource'
   });
 

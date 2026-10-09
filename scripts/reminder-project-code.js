@@ -67,7 +67,7 @@ async function main() {
              u.name AS creator_name,
              u.resource_id,
              r.wecom_userid,
-             r.is_active AS resource_active
+             (r.is_active = 1 AND r.is_archived = 0) AS resource_active
       FROM projects p
       LEFT JOIN users u ON u.id = p.created_by
       LEFT JOIN resources r ON r.id = u.resource_id

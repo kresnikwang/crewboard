@@ -64,19 +64,40 @@ function compressResourceAvatar(file, callback) {
 
 // ===================== Resources (人员管理) =====================
 
+var resourceArchiveView = false;
+var managedResources = [];
+var archivedResources = [];
+var resourceLoadVersion = 0;
+
+function invalidateResourceDataCaches() {
+  if (!window.apiCache) return;
+  window.apiCache.invalidatePrefix('/api/resources');
+  window.apiCache.invalidatePrefix('/api/schedule-data');
+}
+
 window.loadResources = async function loadResources() {
+  var version = ++resourceLoadVersion;
   try {
-    state.resources = await api('/api/resources'); // 已包含 JOIN 后的账号字段
+    var results = await Promise.all([api('/api/resources'), api('/api/resources?archived=1')]);
+    if (version !== resourceLoadVersion) return;
+    managedResources = results[0];
+    archivedResources = results[1];
+    state.resources = managedResources; // Keep archived personnel out of shared schedule pickers.
   } catch (err) {
     toast(t('manage.load_failed') + ': ' + err.message, 'error');
     return;
   }
 
+  renderResourceManagement();
+};
+
+function renderResourceManagement() {
+  var resources = resourceArchiveView ? archivedResources : managedResources;
   var container = document.getElementById('resource-list');
   if (!container) return;
 
   var teams = {};
-  state.resources.forEach(function (r) {
+  resources.forEach(function (r) {
     var team = r.team || t('manage.ungrouped');
     if (!teams[team]) teams[team] = [];
     teams[team].push(r);
@@ -99,7 +120,7 @@ window.loadResources = async function loadResources() {
     '<th style="width:72px">' + t('manage.hours_day') + '</th>' +
     '<th style="width:90px">' + t('manage.permissions') + '</th>' +
     '<th style="width:80px">' + t('manage.account_status') + '</th>' +
-    (canManage ? '<th style="width:60px"></th>' : '') +
+    (canManage ? '<th style="width:188px"></th>' : '') +
   '</tr></thead><tbody>';
 
   var teamNames = Object.keys(teams).sort();
@@ -141,7 +162,8 @@ window.loadResources = async function loadResources() {
         '<td><div class="res-name-cell">' +
           avatarContent +
           '<div><div class="res-name">' + escapeHtml(r.name) + '</div>' +
-          '<div class="res-meta">' + escapeHtml(r.team || '') + '</div></div>' +
+          '<div class="res-meta">' + escapeHtml(r.team || '') + '</div>' +
+          (r.is_archived ? '<span class="archive-badge">' + t('manage.resource_archived_status') + '</span>' : '') + '</div>' +
         '</div></td>' +
         '<td>' + escapeHtml(r.role || '-') + '</td>' +
         '<td style="font-size:12px">' + escapeHtml(r.email || '-') + '</td>' +
@@ -150,20 +172,32 @@ window.loadResources = async function loadResources() {
         '<td>' + permCell + '</td>' +
         '<td>' + accountCell + '</td>' +
         (canManage ? '<td><div class="res-actions">' +
-          '<button class="btn-icon btn-res-edit" data-id="' + r.id + '" title="' + t('common.edit') + '">&#9998;</button>' +
-          '<button class="btn-icon btn-res-del" data-id="' + r.id + '" title="' + t('common.delete') + '">&#10005;</button>' +
+          '<button class="btn-icon btn-res-edit" aria-label="' + t('common.edit') + '" data-id="' + r.id + '" title="' + t('common.edit') + '">&#9998;</button>' +
+          (r.is_archived ? '<button class="btn btn-outline btn-sm btn-res-restore" data-id="' + r.id + '">' + t('manage.reactivate_resource') + '</button>' : '') +
+          '<button class="btn-icon btn-res-del" data-id="' + r.id + '" title="' + t('common.delete') + '" aria-label="' + t('common.delete') + '">&#10005;</button>' +
         '</div></td>' : '') +
       '</tr>';
     });
   });
 
   html += '</tbody></table>';
-  if (state.resources.length === 0) {
-    html = '<div class="empty-hint">' + t('manage.no_resources') + '</div>';
+  if (resources.length === 0) {
+    html = '<div class="empty-hint">' + t(resourceArchiveView ? 'manage.no_archived_resources' : 'manage.no_resources') + '</div>';
   }
-  container.innerHTML = state.resources.length
+  var listHtml = resources.length
     ? '<p class="table-scroll-hint">' + t('common.scroll_table') + '</p><div class="resource-table-wrap" tabindex="0" role="region" aria-label="' + escapeHtml(t('manage.resources_title')) + '">' + html + '</div>'
     : html;
+  container.innerHTML = '<div class="resource-status-filter" role="group" aria-label="' + t('manage.resource_status') + '">' +
+    '<button type="button" class="btn btn-outline" id="resource-tab-active" aria-pressed="' + !resourceArchiveView + '">' + t('manage.active_resources') + ' (' + managedResources.length + ')</button>' +
+    '<button type="button" class="btn btn-outline" id="resource-tab-archived" aria-pressed="' + resourceArchiveView + '">' + t('manage.resource_archived_status') + ' (' + archivedResources.length + ')</button></div>' +
+    (resourceArchiveView ? '<p class="resource-archive-hint">' + t('manage.archive_resource_hint') + '</p>' : '') + listHtml;
+  ['active', 'archived'].forEach(function (tab) {
+    document.getElementById('resource-tab-' + tab).addEventListener('click', function () {
+      resourceArchiveView = tab === 'archived';
+      renderResourceManagement();
+      document.getElementById('resource-tab-' + tab).focus();
+    });
+  });
 
   /* 权限下拉事件 */
   container.querySelectorAll('.res-role-select').forEach(function (sel) {
@@ -188,12 +222,15 @@ window.loadResources = async function loadResources() {
   container.querySelectorAll('.btn-res-del').forEach(function (btn) {
     btn.addEventListener('click', function (e) { e.stopPropagation(); deleteResource(parseInt(btn.dataset.id, 10)); });
   });
+  container.querySelectorAll('.btn-res-restore').forEach(function (btn) {
+    btn.addEventListener('click', function (e) { e.stopPropagation(); setResourceArchived(parseInt(btn.dataset.id, 10), false); });
+  });
   /* Click on row to edit — only for admin */
   if (canManage) {
     container.querySelectorAll('tr[data-id]').forEach(function (row) {
       row.style.cursor = 'pointer';
       row.addEventListener('click', function (e) {
-        if (e.target.closest('.btn-icon') || e.target.closest('.res-role-select')) return;
+        if (e.target.closest('button') || e.target.closest('.res-role-select')) return;
         showResourceModal(parseInt(row.dataset.id, 10));
       });
     });
@@ -211,11 +248,11 @@ window.loadResources = async function loadResources() {
       newBtnRes.addEventListener('click', function () { showResourceModal(); });
     }
   }
-};
+}
 
 window.showResourceModal = async function showResourceModal(id) {
   var resource = null;
-  if (id) resource = state.resources.find(function (r) { return r.id === id; });
+  if (id) resource = managedResources.concat(archivedResources).find(function (r) { return r.id === id; });
   var title = resource ? t('manage.edit_resource_title') : t('manage.add_resource_title');
 
   var hasManagedProjectsField = false;
@@ -336,11 +373,16 @@ window.showResourceModal = async function showResourceModal(id) {
       '</div>';
   }
 
+  if (resource) {
+    body += '<p class="resource-archive-hint">' + t('manage.archive_resource_hint') + '</p>';
+  }
   body += '</div>';
 
   var footer = '';
   if (id) {
-    footer += '<button class="btn btn-danger bk-footer-left" id="btn-del-resource">' + t('manage.delete_resource') + '</button>';
+    footer += '<div class="resource-lifecycle-actions">' +
+      '<button class="btn btn-outline" id="btn-archive-resource">' + t(resource.is_archived ? 'manage.reactivate_resource' : 'manage.archive_resource') + '</button>' +
+      '<button class="btn btn-danger" id="btn-del-resource">' + t('manage.delete_resource') + '</button></div>';
   }
   footer += '<button class="btn btn-outline" onclick="closeModal()">' + t('common.cancel') + '</button>';
   footer += '<button class="btn btn-primary" id="btn-save-resource">' + t('common.save') + '</button>';
@@ -394,6 +436,9 @@ window.showResourceModal = async function showResourceModal(id) {
 
   document.getElementById('btn-save-resource').addEventListener('click', function () { saveResource(id || null); });
   if (id) {
+    document.getElementById('btn-archive-resource').addEventListener('click', function () {
+      setResourceArchived(id, !resource.is_archived);
+    });
     document.getElementById('btn-del-resource').addEventListener('click', function () {
       deleteResource(id);
     });
@@ -426,7 +471,7 @@ window.saveResource = async function saveResource(id) {
     }
 
     // Save co-managed projects if checkboxes exist
-    var resource = id ? state.resources.find(function (r) { return r.id === id; }) : null;
+    var resource = id ? managedResources.concat(archivedResources).find(function (r) { return r.id === id; }) : null;
     if (resource && resource.user_id && resource.user_role === 'manager') {
       var checkboxes = document.querySelectorAll('.managed-project-checkbox');
       if (checkboxes.length > 0) {
@@ -445,6 +490,7 @@ window.saveResource = async function saveResource(id) {
 
     document.getElementById('modal').classList.remove('rg-modal');
     closeModal();
+    invalidateResourceDataCaches();
     loadResources();
   } catch (err) {
     toast(t('common.save_failed') + ': ' + err.message, 'error');
@@ -458,8 +504,34 @@ window.deleteResource = async function deleteResource(id) {
     toast(t('manage.resource_deleted'));
     document.getElementById('modal').classList.remove('rg-modal');
     closeModal();
+    invalidateResourceDataCaches();
     loadResources();
   } catch (err) { toast(t('common.delete_failed') + ': ' + err.message, 'error'); }
+};
+
+var resourceStatusPending = new Set();
+window.setResourceArchived = async function setResourceArchived(id, archived) {
+  if (resourceStatusPending.has(id)) return;
+  var resource = managedResources.concat(archivedResources).find(function (r) { return r.id === id; });
+  if (archived && !confirm(t('manage.confirm_archive_resource', { name: resource ? resource.name : '' }))) return;
+  resourceStatusPending.add(id);
+  var buttons = document.querySelectorAll('#btn-archive-resource, .btn-res-restore[data-id="' + id + '"]');
+  buttons.forEach(function (btn) { btn.disabled = true; });
+  try {
+    await api('/api/resources/' + id + (archived ? '/archive' : '/unarchive'), { method: 'PATCH' });
+    invalidateResourceDataCaches();
+    document.getElementById('modal').classList.remove('rg-modal');
+    closeModal();
+    toast(t(archived ? 'manage.resource_archived' : 'manage.resource_reactivated'), 'success');
+    await loadResources();
+    var filter = document.getElementById(resourceArchiveView ? 'resource-tab-archived' : 'resource-tab-active');
+    if (filter) filter.focus();
+  } catch (err) {
+    toast(t('common.save_failed') + ': ' + err.message, 'error');
+  } finally {
+    resourceStatusPending.delete(id);
+    buttons.forEach(function (btn) { btn.disabled = false; });
+  }
 };
 
 var pcActiveTab = 'projects';

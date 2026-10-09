@@ -13,9 +13,10 @@ module.exports = function register(router, ctx) {
 router.get('/resources', (req, res) => {
   const entId = req.user?.enterprise_id;
   if (!entId) return res.json([]);
+  const archived = req.query.archived === '1' ? 1 : 0;
   // LEFT JOIN users to include linked account info (matched by email)
   const resources = db.prepare(`
-    SELECT r.id, r.name, r.email, r.role, r.team, r.color, r.hours_per_day, r.is_active, r.enterprise_id, r.created_at, r.wecom_userid,
+    SELECT r.id, r.name, r.email, r.role, r.team, r.color, r.hours_per_day, r.is_active, r.is_archived, r.enterprise_id, r.created_at, r.wecom_userid,
            COALESCE(NULLIF(r.avatar, ''), u.avatar, '') AS avatar,
            u.id        AS user_id,
            u.phone     AS user_phone,
@@ -28,9 +29,9 @@ router.get('/resources', (req, res) => {
       ON lower(r.email) = lower(u.email)
       AND u.enterprise_id = r.enterprise_id
       AND u.status = 'active'
-    WHERE r.is_active = 1 AND r.enterprise_id = ?
+    WHERE r.is_active = 1 AND r.is_archived = ? AND r.enterprise_id = ?
     ORDER BY r.team, r.name
-  `).all(entId);
+  `).all(archived, entId);
   res.json(resources);
 });
 
@@ -102,6 +103,26 @@ router.put('/resources/:id', (req, res) => {
   });
   sseBroadcast(entId, 'resource-change', { action: 'update' }, req.user?.id);
 });
+
+// Explicit target state makes retries safe and never revives soft-deleted rows.
+for (const [action, archived] of [['archive', 1], ['unarchive', 0]]) {
+  router.patch('/resources/:id/' + action, (req, res) => {
+    const entId = req.user?.enterprise_id;
+    if (!entId) return res.status(400).json({ error: L(req, 'common.need_enterprise') });
+    if (!isAdmin(req.user)) return res.status(403).json({ error: L(req, 'resources.archive_admin_only') });
+    const resource = authz.getResourceInEnterprise(req.params.id, entId);
+    if (!resource || !resource.is_active) return res.status(404).json({ error: L(req, 'resources.not_found') });
+    if (resource.is_archived === archived) return res.json({ ok: true });
+    db.prepare('UPDATE resources SET is_archived = ? WHERE id = ? AND enterprise_id = ?')
+      .run(archived, resource.id, entId);
+    logAudit(db, {
+      enterpriseId: entId, user: req.user, action: 'resource.' + action,
+      entityType: 'resource', entityId: resource.id, details: { name: resource.name },
+    });
+    res.json({ ok: true });
+    sseBroadcast(entId, 'resource-change', { action, id: resource.id }, req.user?.id);
+  });
+}
 
 router.delete('/resources/:id', (req, res) => {
   const entId = req.user?.enterprise_id;

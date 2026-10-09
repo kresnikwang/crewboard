@@ -145,6 +145,8 @@ const MESSAGES = {
   'projects.scope_exists': { zh: '该工作范围已存在', en: 'This scope already exists' },
 
   // ---------- resources ----------
+  'resources.archive_admin_only': { zh: '仅管理员可存档或重新启用人员', en: 'Only admins can archive or reactivate members' },
+  'resources.archived': { zh: '此人员已存档，请先重新启用再排班', en: 'This member is archived. Reactivate them before scheduling.' },
   'resources.not_found': { zh: '人员不存在', en: 'Member not found' },
   'resources.add_admin_only': { zh: '仅管理员可添加人员', en: 'Only admins can add members' },
   'resources.edit_admin_only': { zh: '仅管理员可编辑人员', en: 'Only admins can edit members' },

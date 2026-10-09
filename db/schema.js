@@ -287,6 +287,11 @@ function migrate(db) {
     db.exec("ALTER TABLE resources ADD COLUMN wecom_userid TEXT DEFAULT ''");
   }
 
+  // Keep archive separate from soft deletion so deleted personnel cannot be restored.
+  if (!resCols.find(c => c.name === 'is_archived')) {
+    db.exec('ALTER TABLE resources ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0');
+  }
+
   // Add avatar column to resources table
   if (!resCols.find(c => c.name === 'avatar')) {
     db.exec("ALTER TABLE resources ADD COLUMN avatar TEXT DEFAULT ''");
