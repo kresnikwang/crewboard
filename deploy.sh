@@ -50,7 +50,7 @@ if ! command -v terser &> /dev/null; then
   echo "  ⚠️  terser 未安装，跳过 JS 压缩"
 else
   mkdir -p public/js/dist public/css/dist
-  for f in public/js/i18n.js public/js/core.js public/js/schedule.js public/js/timesheets.js public/js/reports.js public/js/manage.js public/js/enterprise.js; do
+  for f in public/js/i18n.js public/js/name-search.js public/js/core.js public/js/schedule.js public/js/timesheets.js public/js/reports.js public/js/manage.js public/js/enterprise.js; do
     if [ -f "$f" ]; then
       name=$(basename $f .js)
       terser "$f" --compress --mangle --output "public/js/dist/${name}.min.js" 2>/dev/null

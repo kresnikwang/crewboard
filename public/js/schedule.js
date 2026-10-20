@@ -2558,7 +2558,9 @@
       '</div>';
       teams[tm].forEach(function (r) {
         var sel = selIds.indexOf(r.id) >= 0 ? ' selected' : '';
-        optionsHtml += '<div class="ms-option' + sel + '" data-id="' + r.id + '">' +
+        var pinyin = window.CrewNameSearch ? window.CrewNameSearch.pinyinLabel(r.name) : '';
+        optionsHtml += '<div class="ms-option' + sel + '" data-id="' + r.id + '"' +
+          (pinyin ? ' data-pinyin="' + escAttr(pinyin) + '"' : '') + '>' +
           '<span class="ms-option-check"></span>' +
           '<span class="ms-option-avatar" style="background:' + (r.color || '#3B7DDD') + '">' + esc(r.name.charAt(0)) + '</span>' +
           '<span class="ms-option-info"><span class="ms-option-name">' + esc(r.name) + '</span>' +
@@ -2684,17 +2686,33 @@
 
     /* Search filter */
     searchInput.addEventListener('input', function () {
-      var q = searchInput.value.toLowerCase();
+      var q = searchInput.value;
+      var matcher = window.CrewNameSearch;
+      var hasOptionMatch = false;
       dropdown.querySelectorAll('.ms-option').forEach(function (opt) {
-        var name = opt.querySelector('.ms-option-name').textContent.toLowerCase();
-        opt.style.display = name.indexOf(q) >= 0 ? '' : 'none';
+        var name = opt.querySelector('.ms-option-name').textContent;
+        var role = opt.querySelector('.ms-option-role');
+        var match = matcher
+          ? matcher.matchesText(q, [name, role ? role.textContent : '', opt.dataset.pinyin || ''])
+          : name.toLowerCase().indexOf(q.toLowerCase()) >= 0;
+        opt.style.display = match ? '' : 'none';
+        if (match) hasOptionMatch = true;
       });
+      var oldEmpty = dropdown.querySelector('.ms-empty');
+      if (oldEmpty) oldEmpty.remove();
+      if (matcher && matcher.normalize(q) && !hasOptionMatch) {
+        var empty = document.createElement('div');
+        empty.className = 'ms-empty';
+        empty.setAttribute('role', 'status');
+        empty.textContent = t('schedule.no_match_people');
+        dropdown.appendChild(empty);
+      }
       dropdown.querySelectorAll('.ms-team-label').forEach(function (lbl) {
         /* Hide team label if all its options are hidden */
         var next = lbl.nextElementSibling;
         var anyVisible = false;
         while (next && !next.classList.contains('ms-team-label')) {
-          if (next.style.display !== 'none') anyVisible = true;
+          if (next.classList.contains('ms-option') && next.style.display !== 'none') anyVisible = true;
           next = next.nextElementSibling;
         }
         lbl.style.display = anyVisible ? '' : 'none';
@@ -3038,7 +3056,9 @@
     var codePrefix = p.code ? '[' + esc(p.code) + '] ' : '';
     var color = p.color || p.client_color || '#3B7DDD';
     var searchText = (p.name + ' ' + (p.code || '') + ' ' + (clientName || p.client_name || '')).toLowerCase();
-    return '<div class="ms-option' + sel + '" data-id="' + p.id + '" data-search="' + escAttr(searchText) + '">' +
+    var pinyin = window.CrewNameSearch ? window.CrewNameSearch.pinyinLabel(searchText) : '';
+    return '<div class="ms-option' + sel + '" data-id="' + p.id + '" data-search="' + escAttr(searchText) + '"' +
+      (pinyin ? ' data-pinyin="' + escAttr(pinyin) + '"' : '') + '>' +
       '<span class="ms-option-check"></span>' +
       '<span class="ms-option-avatar" style="background:' + color + '">' + esc(p.name.charAt(0)) + '</span>' +
       '<span class="ms-option-info"><span class="ms-option-name">' + codePrefix + esc(p.name) + '</span>' +
@@ -3153,17 +3173,32 @@
     var labelEl = document.getElementById('bk-project-label');
 
     function filterProjectOptions(q) {
+      var matcher = window.CrewNameSearch;
+      var lowerQuery = q.toLowerCase();
+      var hasOptionMatch = false;
       dropdown.querySelectorAll('.ms-option').forEach(function (opt) {
         var search = opt.dataset.search || '';
-        var name = opt.querySelector('.ms-option-name').textContent.toLowerCase();
-        var match = !q || search.indexOf(q) >= 0 || name.indexOf(q) >= 0;
+        var name = opt.querySelector('.ms-option-name').textContent;
+        var match = !q || (matcher
+          ? matcher.matchesText(q, [search, name, opt.dataset.pinyin || ''])
+          : search.indexOf(lowerQuery) >= 0 || name.toLowerCase().indexOf(lowerQuery) >= 0);
         opt.style.display = match ? '' : 'none';
+        if (match) hasOptionMatch = true;
       });
+      var oldEmpty = dropdown.querySelector('.ms-empty');
+      if (oldEmpty) oldEmpty.remove();
+      if (matcher && matcher.normalize(q) && !hasOptionMatch) {
+        var empty = document.createElement('div');
+        empty.className = 'ms-empty';
+        empty.setAttribute('role', 'status');
+        empty.textContent = t('schedule.no_match_projects');
+        dropdown.appendChild(empty);
+      }
       dropdown.querySelectorAll('.ms-team-label').forEach(function (lbl) {
         var next = lbl.nextElementSibling;
         var anyVisible = false;
         while (next && !next.classList.contains('ms-team-label')) {
-          if (next.style.display !== 'none') anyVisible = true;
+          if (next.classList.contains('ms-option') && next.style.display !== 'none') anyVisible = true;
           next = next.nextElementSibling;
         }
         lbl.style.display = anyVisible ? '' : 'none';
@@ -3207,7 +3242,7 @@
     });
 
     searchInput.addEventListener('input', function () {
-      filterProjectOptions(searchInput.value.toLowerCase());
+      filterProjectOptions(searchInput.value);
       if (!dropdown.classList.contains('open')) dropdown.classList.add('open');
     });
 

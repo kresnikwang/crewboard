@@ -68,6 +68,7 @@ var resourceArchiveView = false;
 var managedResources = [];
 var archivedResources = [];
 var resourceLoadVersion = 0;
+var resourceSearchQuery = '';
 
 function invalidateResourceDataCaches() {
   if (!window.apiCache) return;
@@ -92,9 +93,15 @@ window.loadResources = async function loadResources() {
 };
 
 function renderResourceManagement() {
-  var resources = resourceArchiveView ? archivedResources : managedResources;
+  var allResources = resourceArchiveView ? archivedResources : managedResources;
   var container = document.getElementById('resource-list');
   if (!container) return;
+
+  var resources = allResources.filter(function (r) {
+    return window.CrewNameSearch
+      ? window.CrewNameSearch.matchesName(r.name, resourceSearchQuery)
+      : !resourceSearchQuery || (r.name || '').toLowerCase().indexOf(resourceSearchQuery.toLowerCase()) >= 0;
+  });
 
   var teams = {};
   resources.forEach(function (r) {
@@ -182,7 +189,9 @@ function renderResourceManagement() {
 
   html += '</tbody></table>';
   if (resources.length === 0) {
-    html = '<div class="empty-hint">' + t(resourceArchiveView ? 'manage.no_archived_resources' : 'manage.no_resources') + '</div>';
+    html = '<div class="empty-hint">' + t(resourceSearchQuery
+      ? 'manage.no_match_resources'
+      : resourceArchiveView ? 'manage.no_archived_resources' : 'manage.no_resources') + '</div>';
   }
   var listHtml = resources.length
     ? '<p class="table-scroll-hint">' + t('common.scroll_table') + '</p><div class="resource-table-wrap" tabindex="0" role="region" aria-label="' + escapeHtml(t('manage.resources_title')) + '">' + html + '</div>'
@@ -190,7 +199,26 @@ function renderResourceManagement() {
   container.innerHTML = '<div class="resource-status-filter" role="group" aria-label="' + t('manage.resource_status') + '">' +
     '<button type="button" class="btn btn-outline" id="resource-tab-active" aria-pressed="' + !resourceArchiveView + '">' + t('manage.active_resources') + ' (' + managedResources.length + ')</button>' +
     '<button type="button" class="btn btn-outline" id="resource-tab-archived" aria-pressed="' + resourceArchiveView + '">' + t('manage.resource_archived_status') + ' (' + archivedResources.length + ')</button></div>' +
+    (allResources.length ? '<div class="resource-list-tools">' +
+      '<label class="resource-search-box" for="resource-search">' +
+        '<svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M14 14l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' +
+        '<input type="search" id="resource-search" value="' + escapeAttr(resourceSearchQuery) + '" placeholder="' + escapeAttr(t('schedule.search_resource')) + '" aria-label="' + escapeAttr(t('schedule.search_resource')) + '" autocomplete="off">' +
+      '</label>' +
+      '<span class="resource-search-count">' + (resourceSearchQuery ? resources.length + ' / ' + allResources.length : allResources.length) + '</span>' +
+    '</div>' : '') +
     (resourceArchiveView ? '<p class="resource-archive-hint">' + t('manage.archive_resource_hint') + '</p>' : '') + listHtml;
+  var searchInput = document.getElementById('resource-search');
+  if (searchInput) {
+    searchInput.addEventListener('input', function () {
+      resourceSearchQuery = searchInput.value.trim();
+      renderResourceManagement();
+      var nextInput = document.getElementById('resource-search');
+      if (nextInput) {
+        nextInput.focus();
+        nextInput.setSelectionRange(nextInput.value.length, nextInput.value.length);
+      }
+    });
+  }
   ['active', 'archived'].forEach(function (tab) {
     document.getElementById('resource-tab-' + tab).addEventListener('click', function () {
       resourceArchiveView = tab === 'archived';
@@ -693,12 +721,14 @@ function renderProjectsTable(container) {
      isAdmin), so only surface selection to admins. Showing it to managers
      produced a button that always failed with 403. */
   var canArchivePC = !!permsPC.can_admin;
-  var query = pcSearchQuery.toLowerCase();
+  var query = pcSearchQuery;
+  var matcher = window.CrewNameSearch;
   var filtered = state.projects.filter(function (p) {
     if (!query) return true;
-    return (p.name && p.name.toLowerCase().indexOf(query) >= 0) ||
-           (p.client_name && p.client_name.toLowerCase().indexOf(query) >= 0) ||
-           (p.code && p.code.toLowerCase().indexOf(query) >= 0);
+    var fields = [p.name || '', p.client_name || '', p.code || ''];
+    return matcher
+      ? matcher.matchesText(query, fields)
+      : fields.some(function (value) { return value.toLowerCase().indexOf(query.toLowerCase()) >= 0; });
   });
 
   // Drop selections that are no longer in the active (non-archived) list.
@@ -885,10 +915,13 @@ window.batchArchiveSelectedProjects = async function batchArchiveSelectedProject
 function renderClientsTable(container) {
   var permsClient = window.state.permissions || {};
   var canManageClient = !!permsClient.manage_projects;
-  var query = pcSearchQuery.toLowerCase();
+  var query = pcSearchQuery;
+  var matcher = window.CrewNameSearch;
   var filtered = state.clients.filter(function (c) {
     if (!query) return true;
-    return (c.name && c.name.toLowerCase().indexOf(query) >= 0);
+    return matcher
+      ? matcher.matchesText(query, [c.name || ''])
+      : (c.name || '').toLowerCase().indexOf(query.toLowerCase()) >= 0;
   });
 
   if (filtered.length === 0) {
@@ -1277,16 +1310,20 @@ window.unarchiveClient = async function unarchiveClient(id) {
 
 // --------------- Archived Page ---------------
 function renderArchivedPage(container) {
-  var query = pcSearchQuery.toLowerCase();
+  var query = pcSearchQuery;
+  var matcher = window.CrewNameSearch;
   var archivedProjects = (state.archivedProjects || []).filter(function (p) {
     if (!query) return true;
-    return (p.name && p.name.toLowerCase().indexOf(query) >= 0) ||
-           (p.client_name && p.client_name.toLowerCase().indexOf(query) >= 0) ||
-           (p.code && p.code.toLowerCase().indexOf(query) >= 0);
+    var fields = [p.name || '', p.client_name || '', p.code || ''];
+    return matcher
+      ? matcher.matchesText(query, fields)
+      : fields.some(function (value) { return value.toLowerCase().indexOf(query.toLowerCase()) >= 0; });
   });
   var archivedClients = (state.archivedClients || []).filter(function (c) {
     if (!query) return true;
-    return (c.name && c.name.toLowerCase().indexOf(query) >= 0);
+    return matcher
+      ? matcher.matchesText(query, [c.name || ''])
+      : (c.name || '').toLowerCase().indexOf(query.toLowerCase()) >= 0;
   });
 
   if (!archivedProjects.length && !archivedClients.length) {
