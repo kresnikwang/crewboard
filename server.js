@@ -76,9 +76,12 @@ if (NODE_ENV === 'production') {
         res.setHeader('Pragma', 'no-cache');
         res.setHeader('Expires', '0');
       } else if (filePath.match(/\.(js|css)$/)) {
-        // JS/CSS：带 ?v=hash 版本号，允许缓存但必须 revalidate
-        // 部署时 deploy.sh 会更新版本号，触发浏览器重新下载
-        res.setHeader('Cache-Control', 'public, no-cache, must-revalidate');
+        // JS/CSS：deploy.sh 把 ?v= 替换为 commit hash，URL 随版本变化，可长期缓存；
+        // 没有有效 hash（含未替换的 __VERSION__）时仍需 revalidate
+        const version = res.req && res.req.query && res.req.query.v;
+        res.setHeader('Cache-Control', /^[0-9a-f]{7,40}$/.test(version || '')
+          ? 'public, max-age=31536000, immutable'
+          : 'public, no-cache, must-revalidate');
       } else if (filePath.match(/\.(png|jpg|jpeg|gif|ico|svg|woff2?)$/)) {
         // 图片/字体：长期缓存（不常变动）
         res.setHeader('Cache-Control', 'public, max-age=2592000');

@@ -5,6 +5,7 @@
 - 应用目录：`/www/wwwroot/resource.skandstudio.com`
 - 域名：`https://resource.skandstudio.com`
 - Node 服务监听：`127.0.0.1:3000`
+- Node.js：20–26（better-sqlite3 12.x 的支持范围；本地开发与测试使用 Node 24）
 - 进程管理：PM2，主进程名 `crewboard`，fork 模式，单实例
 - 数据库：应用目录下的 `db/resource-guru.db`
 - 反向代理：Nginx，由服务器面板维护
@@ -24,7 +25,7 @@ bash deploy.sh
 
 1. 使用 `sqlite3 .backup`（没有 sqlite3 时回退为复制）备份数据库，并清理超过 30 天的备份。
 2. 暂存上次部署注入到 `public/index.html` 的版本号改动。
-3. `git pull origin main --ff-only`。
+3. `git pull origin main --ff-only`；如果 `package.json` 或 `package-lock.json` 有变化，先确认 Node 主版本在 20–26（better-sqlite3 12.x 的支持范围），再执行 `npm ci --omit=dev` 并验证 better-sqlite3 可加载。
 4. 合并 `public/js/schedule/*.js`，压缩 JS/CSS，并检查 Bootstrap、字体等静态资源。
 5. 用当前短 commit hash 替换 `public/index.html` 的 `__VERSION__`。
 6. 只 reload `crewboard` 主进程，避免误触发提醒任务。
@@ -77,7 +78,7 @@ PM2 的保存列表是服务器状态，不是 Git 文件。修改或修复 PM2 
 
 - 普通 JSON/JS/CSS 已启用 gzip，参考配置补充 `gzip_comp_level 5`、`gzip_vary on`、`gzip_proxied any`。使用带 `Accept-Encoding: gzip` 的请求检查 `Content-Encoding` 和 `Vary`。
 - `/api/sse` 使用独立 location，关闭压缩、缓冲和代理缓存，读取超时 1 小时；Node 每 30 秒发心跳。其他请求仍按普通代理处理。
-- JS/CSS 保留 ETag 协商缓存。当前资源文件名可变，仅有查询参数版本号，尚不使用 `immutable` 长期缓存；升级为内容哈希文件名后再调整。
+- JS/CSS 的 `?v=` 是 commit hash 时返回 `max-age=31536000, immutable`（参考配置中的 `map $arg_v`，Node 静态服务同样处理）；缺少版本号或仍是 `__VERSION__` 占位符时退回 ETag 协商缓存。每次部署 hash 都会变化，浏览器自然下载新文件；前提是生产机不手动改动已提交的静态文件。`index.html` 中所有 JS/CSS（含 Bootstrap 和按需加载的 pinyin-pro）都必须带 `?v=__VERSION__`。
 - 排班聚合接口支持可选 `resource_ids=1,2`，局部查询仍受企业隔离约束；日期范围最多 366 天，人员列表最多 500 个 ID。
 
 ## 回滚思路

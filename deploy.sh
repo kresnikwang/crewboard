@@ -37,7 +37,21 @@ echo "=== [2/7] 暂存本地改动（版本号注入等）==="
 git stash 2>/dev/null || true
 
 echo "=== [3/7] 拉取最新代码 ==="
+PREV_HEAD=$(git rev-parse HEAD)
 git pull origin main --ff-only
+
+# 依赖变化时重新安装（better-sqlite3 等原生模块需要与 Node 版本匹配）
+if ! git diff --quiet "$PREV_HEAD" HEAD -- package.json package-lock.json; then
+  NODE_MAJOR=$(node -p 'process.versions.node.split(".")[0]')
+  if [ "$NODE_MAJOR" -lt 20 ] || [ "$NODE_MAJOR" -gt 26 ]; then
+    echo "  ❌ 依赖已变化，但 Node $(node -v) 不在 better-sqlite3 支持的 20–26 范围内；请先升级 Node 再部署"
+    exit 1
+  fi
+  echo "  依赖已变化，执行 npm ci --omit=dev（Node $(node -v)）"
+  npm ci --omit=dev
+  node -e "require('better-sqlite3')(':memory:').prepare('select 1').get()"
+  echo "  ✓ better-sqlite3 加载正常"
+fi
 
 echo "=== [4/7] 自动压缩 JS/CSS 文件 ==="
 # Bundle schedule parts → schedule.js (source of truth: public/js/schedule/*)
@@ -99,12 +113,11 @@ if [ ! -f "public/vendor/bootstrap/bootstrap.bundle.min.js" ]; then
   mkdir -p public/vendor/bootstrap
   curl -sL "https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" -o "public/vendor/bootstrap/bootstrap.bundle.min.js"
 fi
-if [ ! -f "public/fonts/inter-400.woff2" ]; then
+if [ ! -f "public/fonts/inter.woff2" ]; then
   echo "  ⚠️  Inter 字体不存在，正在下载..."
   mkdir -p public/fonts
-  for weight in 300 400 500 600 700; do
-    curl -sL "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1pL7SUc.woff2" -o "public/fonts/inter-${weight}.woff2" 2>/dev/null || true
-  done
+  # 单个字体文件，index.html 用 font-weight: 300 700 覆盖全部字重
+  curl -sL "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1pL7SUc.woff2" -o "public/fonts/inter.woff2" 2>/dev/null || true
 fi
 
 echo "=== [6/7] 注入版本号（git commit hash）==="

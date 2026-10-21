@@ -6,53 +6,23 @@
   <title>神马排班CrewBoard</title>
   <link rel="icon" href="/img/favicon.ico" type="image/x-icon">
   <!-- Preload critical resources -->
-  <link rel="preload" href="/fonts/inter-400.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="/fonts/inter-600.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/js/dist/core.min.js?v=__VERSION__" as="script">
   <link rel="preload" href="/js/dist/i18n.min.js?v=__VERSION__" as="script">
-  <link rel="preload" href="/vendor/pinyin-pro/pinyin-pro.min.js?v=__VERSION__" as="script">
   <!-- Bootstrap 5 CSS (本地版本，更快加载) -->
-  <link rel="stylesheet" href="/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="/vendor/bootstrap/bootstrap.min.css?v=__VERSION__">
   <!-- 自定义样式（必须在 Bootstrap 之后，确保业务样式优先级更高） -->
   <link rel="stylesheet" href="/css/dist/style.min.css?v=__VERSION__">
   <!-- Bootstrap 兼容层：设计令牌映射 + 桥接类（阶段2） -->
   <link rel="stylesheet" href="/css/dist/bootstrap-bridge.min.css?v=__VERSION__">
-  <!-- Inter 字体：本地 woff2 格式，仅加载必要的字重 -->
+  <!-- Inter 字体：原来 5 个字重文件内容完全相同，合并为一个 woff2 覆盖 300–700，只下载一次（渲染结果不变） -->
   <style>
     @font-face {
       font-family: 'Inter';
       font-style: normal;
-      font-weight: 300;
+      font-weight: 300 700;
       font-display: swap;
-      src: url('/fonts/inter-300.woff2') format('woff2');
-    }
-    @font-face {
-      font-family: 'Inter';
-      font-style: normal;
-      font-weight: 400;
-      font-display: swap;
-      src: url('/fonts/inter-400.woff2') format('woff2');
-    }
-    @font-face {
-      font-family: 'Inter';
-      font-style: normal;
-      font-weight: 500;
-      font-display: swap;
-      src: url('/fonts/inter-500.woff2') format('woff2');
-    }
-    @font-face {
-      font-family: 'Inter';
-      font-style: normal;
-      font-weight: 600;
-      font-display: swap;
-      src: url('/fonts/inter-600.woff2') format('woff2');
-    }
-    @font-face {
-      font-family: 'Inter';
-      font-style: normal;
-      font-weight: 700;
-      font-display: swap;
-      src: url('/fonts/inter-700.woff2') format('woff2');
+      src: url('/fonts/inter.woff2') format('woff2');
     }
   </style>
   <script>
@@ -497,11 +467,11 @@
   </div>
 
   <!-- Bootstrap 5 JS Bundle (本地版本，defer 加载以不阻塞 HTML 解析) -->
-  <script src="/vendor/bootstrap/bootstrap.bundle.min.js" defer></script>
+  <script src="/vendor/bootstrap/bootstrap.bundle.min.js?v=__VERSION__" defer></script>
   <!-- 应用脚本：defer 加载，按依赖顺序 -->
   <script src="/js/dist/i18n.min.js?v=__VERSION__" defer></script>
-  <script src="/vendor/pinyin-pro/pinyin-pro.min.js?v=__VERSION__" defer></script>
-  <script src="/js/dist/name-search.min.js?v=__VERSION__" defer></script>
+  <!-- pinyin-pro 在首次搜索时按需加载（见 name-search.js） -->
+  <script src="/js/dist/name-search.min.js?v=__VERSION__" data-pinyin-src="/vendor/pinyin-pro/pinyin-pro.min.js?v=__VERSION__" defer></script>
   <script src="/js/dist/core.min.js?v=__VERSION__" defer></script>
   <script src="/js/dist/schedule.min.js?v=__VERSION__" defer></script>
   <script src="/js/dist/timesheets.min.js?v=__VERSION__" defer></script>
