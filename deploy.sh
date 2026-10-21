@@ -92,12 +92,12 @@ echo "=== [5/7] 验证本地资源（Bootstrap、字体、压缩后的文件）=
 if [ ! -f "public/vendor/bootstrap/bootstrap.min.css" ]; then
   echo "  ⚠️  Bootstrap CSS 不存在，正在下载..."
   mkdir -p public/vendor/bootstrap
-  curl -sL "https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" -o "public/vendor/bootstrap/bootstrap.min.css"
+  curl -sL "https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" -o "public/vendor/bootstrap/bootstrap.min.css"
 fi
 if [ ! -f "public/vendor/bootstrap/bootstrap.bundle.min.js" ]; then
   echo "  ⚠️  Bootstrap JS 不存在，正在下载..."
   mkdir -p public/vendor/bootstrap
-  curl -sL "https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" -o "public/vendor/bootstrap/bootstrap.bundle.min.js"
+  curl -sL "https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" -o "public/vendor/bootstrap/bootstrap.bundle.min.js"
 fi
 if [ ! -f "public/fonts/inter-400.woff2" ]; then
   echo "  ⚠️  Inter 字体不存在，正在下载..."
