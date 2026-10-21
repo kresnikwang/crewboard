@@ -8,7 +8,7 @@
 - Node.js：20–26（better-sqlite3 12.x 的支持范围；本地开发与测试使用 Node 24）
 - 进程管理：PM2，主进程名 `crewboard`，fork 模式，单实例
 - 数据库：应用目录下的 `db/resource-guru.db`
-- 反向代理：Nginx，由服务器面板维护
+- 反向代理：Nginx 1.24，systemd 服务 `nginx`，二进制 `/opt/nginx/sbin/nginx`，主配置 `/etc/nginx/nginx.conf`，站点配置 `/etc/nginx/conf.d/resource.skandstudio.com.conf`（与同机其他站点共用这个 Nginx）
 
 连接主机和认证信息不写在仓库中。使用本机已配置的 SSH host、SSH agent 或外部密钥管理，不要把密码复制进命令、脚本或 Markdown。
 
@@ -74,7 +74,19 @@ PM2 的保存列表是服务器状态，不是 Git 文件。修改或修复 PM2 
 
 ## Nginx 压缩与实时推送配置
 
-仓库 `nginx.conf` 是站点配置参考，由服务器面板维护的实际配置不会被 `deploy.sh` 自动替换。应用更新可正常发布，Nginx 调整需要另行合并到该站点配置并执行 `nginx -t`，成功后 reload。
+仓库 `nginx.conf` 是站点配置参考，生产实际配置 `/etc/nginx/conf.d/resource.skandstudio.com.conf` 不会被 `deploy.sh` 自动替换。应用更新可正常发布，Nginx 调整需要另行合并到该站点配置。
+
+注意：`PATH` 里的 `nginx`（`/usr/bin/nginx`）是宝塔面板版本，默认读取不存在的 `/www/server/nginx/conf/nginx.conf`，直接执行 `nginx -t` 会误报失败；不要用它测试或 reload。正确流程：
+
+```bash
+F=/etc/nginx/conf.d/resource.skandstudio.com.conf
+cp -p "$F" "$F.pre-<改动名>-<commit>"   # 先备份；文件名不以 .conf 结尾，不会被 include
+# 编辑 $F 后：
+/opt/nginx/sbin/nginx -p /opt/nginx -c /etc/nginx/nginx.conf -t
+systemctl reload nginx                   # ExecReload 会再次 -t，失败则不 reload
+```
+
+测试失败时用备份覆盖回 `$F`，再测试一次。`conf.d/*.conf` 在 `http` 块内被 include，因此站点文件里可以直接写 `map`；变量名要带站点前缀（如 `$crewboard_asset_cache`），避免与同机其他站点冲突。reload 对所有站点生效，但是平滑的，不中断已有连接。
 
 - 普通 JSON/JS/CSS 已启用 gzip，参考配置补充 `gzip_comp_level 5`、`gzip_vary on`、`gzip_proxied any`。使用带 `Accept-Encoding: gzip` 的请求检查 `Content-Encoding` 和 `Vary`。
 - `/api/sse` 使用独立 location，关闭压缩、缓冲和代理缓存，读取超时 1 小时；Node 每 30 秒发心跳。其他请求仍按普通代理处理。
@@ -85,7 +97,8 @@ PM2 的保存列表是服务器状态，不是 Git 文件。修改或修复 PM2 
 
 1. 先保留当前数据库备份和 PM2 日志。
 2. 在生产目录确认目标 commit 可以 `git checkout` 或通过远程分支恢复。
-3. 重新执行 `bash deploy.sh`，让静态资源版本号和压缩产物一起回到同一版本。
-4. 访问 `/api/health`，再做登录、排班读取和密码重置等最小人工检查。
+3. 重新执行 `bash deploy.sh`，让静态资源版本号和压缩产物一起回到同一版本；如果目标版本的依赖不同，先执行 `npm ci --omit=dev`（旧 `deploy.sh` 不会自动安装依赖）。
+4. 如果该次发布改过 Nginx，用 `conf.d` 中对应的 `*.pre-<改动名>-<commit>` 备份恢复站点配置，按上面的流程测试后 reload。
+5. 访问 `/api/health`，再做登录、排班读取和密码重置等最小人工检查。
 
 数据库回滚必须单独评估迁移兼容性；不要仅因为应用回滚就直接覆盖生产数据库。
